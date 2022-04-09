@@ -4,5 +4,9 @@ package object
 type ReplicaSet struct {
 }
 
+// ReplicaSetStatus represents the current status of a ReplicaSet.
+type ReplicaSetStatus struct {
+}
+
 type Pod struct {
 }
