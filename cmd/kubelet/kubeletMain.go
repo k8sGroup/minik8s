@@ -1,7 +1,10 @@
 package main
 
-import "os"
+import (
+	"fmt"
+	"minik8s/cmd/kubelet/app/pod"
+)
 
 func main() {
-	os.MkdirAll("./tmp", os.ModePerm)
+	fmt.Printf(pod.GetCurrentAbPathByCaller())
 }

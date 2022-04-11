@@ -2,9 +2,9 @@ package dockerClient
 
 import (
 	"context"
-	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"io"
@@ -108,45 +108,56 @@ func createContainersOfPod(containers []module.Container) ([]string, error) {
 					exports[p] = struct{}{}
 				}
 			}
-
 			err := dockerClientPullSingleImage(value.Image)
 			if err != nil {
 				return nil, err
 			}
-			fmt.Printf("11111")
+			var mounts []mount.Mount
+			if value.VolumeMounts != nil {
+				for _, it := range value.VolumeMounts {
+					mounts = append(mounts, mount.Mount{
+						Type:   mount.TypeBind,
+						Source: it.Name,
+						Target: it.MountPath,
+					})
+				}
+			}
+
 			resp, err := cli.ContainerCreate(context.Background(), &container.Config{
 				Image:        value.Image,
 				ExposedPorts: exports,
-			}, nil, nil, nil, value.Name)
+				Cmd:          value.Command,
+			}, &container.HostConfig{
+				Mounts: mounts,
+			}, nil, nil, value.Name)
 			if err != nil {
 				return nil, err
 			}
 			firstContainerId = resp.ID
 			result = append(result, firstContainerId)
 		} else {
-			//生成开放端口
-			var exports nat.PortSet
-			if value.Ports != nil {
-				exports := make(nat.PortSet, len(value.Ports))
-				for _, port := range value.Ports {
-					p, err := nat.NewPort("tcp", port.ContainerPort)
-					if err != nil {
-						return nil, err
-					}
-					exports[p] = struct{}{}
-				}
-			}
+			//只有第一个container可以生成开放端口
 			//先拉取镜像
 			err := dockerClientPullSingleImage(value.Image)
 			if err != nil {
 				return nil, err
 			}
-
+			var mounts []mount.Mount
+			if value.VolumeMounts != nil {
+				for _, it := range value.VolumeMounts {
+					mounts = append(mounts, mount.Mount{
+						Type:   mount.TypeBind,
+						Source: it.Name,
+						Target: it.MountPath,
+					})
+				}
+			}
 			resp, err := cli.ContainerCreate(context.Background(), &container.Config{
-				Image:        value.Image,
-				ExposedPorts: exports,
+				Image: value.Image,
+				Cmd:   value.Command,
 			}, &container.HostConfig{
 				NetworkMode: container.NetworkMode("container:" + firstContainerId),
+				Mounts:      mounts,
 			}, nil, nil, value.Name)
 			if err != nil {
 				return nil, err
@@ -159,6 +170,7 @@ func createContainersOfPod(containers []module.Container) ([]string, error) {
 
 //涉及大量指针操作，要确保在caller和callee在同一个地址空间中
 func HandleCommand(command *message.Command) *message.Response {
+
 	switch command.CommandType {
 	case message.COMMAND_GET_ALL_CONTAINER:
 		containers, err := getAllContainers()

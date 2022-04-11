@@ -11,7 +11,6 @@ spec:  #Pod 的详细定义
   containers:
     - name: string #容器名称
       image: string  #容器的镜像名称
-      imagePullPolicy: [ Always|Never|IfNotPresent ]  #获取镜像的策略
       command: [string] #容器的启动命令列表
       volumeMounts: #容器的挂载
         - name: string #共享数据卷的名称

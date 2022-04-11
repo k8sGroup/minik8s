@@ -14,13 +14,12 @@ type VolumeMount struct {
 	MountPath string `yaml:"mountPath"`
 }
 type Container struct {
-	Name            string        `yaml:"name"`
-	Image           string        `yaml:"image"`
-	ImagePullPolicy string        `yaml:"imagePullPolicy"`
-	Command         []string      `yaml:"command"`
-	VolumeMounts    []VolumeMount `yaml:"volumeMounts"`
-	Limits          Limit         `yaml:"limits"`
-	Ports           []Port        `yaml:"ports"`
+	Name         string        `yaml:"name"`
+	Image        string        `yaml:"image"`
+	Command      []string      `yaml:"command"`
+	VolumeMounts []VolumeMount `yaml:"volumeMounts"`
+	Limits       Limit         `yaml:"limits"`
+	Ports        []Port        `yaml:"ports"`
 }
 type Limit struct {
 	Cpu    string `yaml:"cpu"`
