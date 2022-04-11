@@ -1,0 +1,24 @@
+# 定义的Pod模板
+kind: Pod
+metadata:
+  name: string  #pod 的名称
+spec:  #Pod 的详细定义
+  volumes: #在该pod上定义的共享数据卷
+    - name: string #共享数据卷的名称
+      type: string #共享数据卷类型  有 emptyDir（类型为emtyDir的存储卷，与Pod同生命周期的一个临时目录。为空值）
+                   # hostPath (表示挂载Pod所在宿主机的目录)
+      path: string #路径， emptyDir时不用管这个字段
+  containers:
+    - name: string #容器名称
+      image: string  #容器的镜像名称
+      imagePullPolicy: [ Always|Never|IfNotPresent ]  #获取镜像的策略
+      command: [string] #容器的启动命令列表
+      volumeMounts: #容器的挂载
+        - name: string #共享数据卷的名称
+          mountPath: string #容器内的mount路径
+      limits: #容器资源的限制
+        cpu: string #cpu的限制
+        memory: string #内存限制
+      ports: #容器开放的端口
+        - containerPort: string
+
