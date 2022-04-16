@@ -143,6 +143,17 @@ func (r *Request) Resource(resource string) *Request {
 	return r
 }
 
+// Name sets the name of a resource to access (<resource>/[ns/<namespace>/]<name>)
+func (r *Request) Name(resourceName string) *Request {
+	r.resourceName = resourceName
+	return r
+}
+
+// TODO: 定义错误，打印log
+func (r Result) Error() error {
+	return nil
+}
+
 /***********************Result************************/
 
 func (r *Result) GetBody() []byte {

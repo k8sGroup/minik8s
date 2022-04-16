@@ -2,7 +2,9 @@ package replicaset
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/emicklei/go-restful"
+	"io/ioutil"
 	"minik8s/k8s.io/client/rest"
 	workqueue "minik8s/k8s.io/client/util"
 	"minik8s/object"
@@ -12,6 +14,7 @@ import (
 type ReplicaSetController struct {
 	// client connect to api server
 	kubeClient rest.Interface
+	// server provide service for api server
 	kubeServer *restful.WebService
 
 	// connect to pod
@@ -53,6 +56,8 @@ func (rsc *ReplicaSetController) register() {
 // TODO: handle add replica set
 func (rsc *ReplicaSetController) addRS(req *restful.Request, resp *restful.Response) {
 	rs := &object.ReplicaSet{}
+	body, _ := ioutil.ReadAll(req.Request.Body)
+	_ = json.Unmarshal(body, rs)
 	rsc.enqueueRS(rs)
 }
 
@@ -67,16 +72,19 @@ func (rsc *ReplicaSetController) enqueueRS(rs *object.ReplicaSet) {
 	rsc.queue.Add(key)
 }
 
-// syncReplicaSet will sync the ReplicaSet with the given key if it has had its expectations fulfilled,
-// meaning it did not expect to see any more of its pods created or deleted. This function is not meant to be
-// invoked concurrently with the same key.
 func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
+	//namespace := "test"
+	//name := "test"
+	// get all replica sets of the namespace
+
+	// get all pods of the namespace
+
+	// filter all inactive pods
+
+	// manage pods
 	return nil
 }
 
-// manageReplicas checks and updates replicas for the given ReplicaSet.
-// It will requeue the replica set in case of an error while creating/deleting pods.
 func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPods []*object.Pod, rs *object.ReplicaSet) error {
-	// 调用 apiserver 的接口进行创建
 	return nil
 }
