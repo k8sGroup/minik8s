@@ -6,12 +6,16 @@ import (
 	"minik8s/k8s.io/client/rest"
 	workqueue "minik8s/k8s.io/client/util"
 	"minik8s/object"
+	"minik8s/pkg/controller"
 )
 
 type ReplicaSetController struct {
 	// client connect to api server
 	kubeClient rest.Interface
 	kubeServer *restful.WebService
+
+	// connect to pod
+	podControl controller.PodControlInterface
 
 	syncHandler func(ctx context.Context, rsKey string) error
 

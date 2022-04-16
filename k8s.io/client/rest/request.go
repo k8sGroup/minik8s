@@ -29,6 +29,8 @@ type Request struct {
 	// structural elements of the request that are part of the Kubernetes API conventions
 	namespace    string
 	namespaceSet bool
+	resource     string
+	resourceName string
 
 	// output
 	err  error
@@ -133,6 +135,11 @@ func (r *Request) Body(obj interface{}) *Request {
 	}
 	r.body = bytes.NewReader(data)
 
+	return r
+}
+
+func (r *Request) Resource(resource string) *Request {
+	r.resource = resource
 	return r
 }
 

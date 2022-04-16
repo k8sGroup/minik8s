@@ -10,3 +10,6 @@ type ReplicaSetStatus struct {
 
 type Pod struct {
 }
+
+type PodTemplateSpec struct {
+}
