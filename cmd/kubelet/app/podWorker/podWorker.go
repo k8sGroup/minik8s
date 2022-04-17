@@ -9,7 +9,7 @@ import (
 type PodWorker struct {
 }
 
-func (podWorker PodWorker) syncLoop(commands <-chan message.PodCommand, responses chan<- message.PodResponse) {
+func (podWorker *PodWorker) SyncLoop(commands <-chan message.PodCommand, responses chan<- message.PodResponse) {
 	for {
 		select {
 		case command, _ := <-commands:

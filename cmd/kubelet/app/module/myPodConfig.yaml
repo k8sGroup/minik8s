@@ -7,17 +7,22 @@ spec:  #Pod 的详细定义
     - name: string #共享数据卷的名称
       type: string #共享数据卷类型  有 emptyDir（类型为emtyDir的存储卷，与Pod同生命周期的一个临时目录。为空值）
                    # hostPath (表示挂载Pod所在宿主机的目录)
+                   # hostFile 表示文件
       path: string #路径， emptyDir时不用管这个字段
   containers:
     - name: string #容器名称
       image: string  #容器的镜像名称
-      command: [string] #容器的启动命令列表
+      command: [string] #容器的启动命令列表    --对应dockerFile中的entryPoint
+      args: [string] #容器的启动命令参数列表    --对应dockerFile中的CMD
       volumeMounts: #容器的挂载
         - name: string #共享数据卷的名称
           mountPath: string #容器内的mount路径
       limits: #容器资源的限制
         cpu: string #cpu的限制
         memory: string #内存限制
+      env:  #容器的环境变量
+        - name: string
+          value: string
       ports: #容器开放的端口
         - containerPort: string
 

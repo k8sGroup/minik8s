@@ -17,14 +17,21 @@ type Container struct {
 	Name         string        `yaml:"name"`
 	Image        string        `yaml:"image"`
 	Command      []string      `yaml:"command"`
+	Args         []string      `yaml:"args"`
 	VolumeMounts []VolumeMount `yaml:"volumeMounts"`
 	Limits       Limit         `yaml:"limits"`
 	Ports        []Port        `yaml:"ports"`
+	Env          []EnvEntry    `yaml:"env"`
 }
 type Limit struct {
 	Cpu    string `yaml:"cpu"`
 	Memory string `yaml:"memory"`
 }
+type EnvEntry struct {
+	Name  string `yaml:"name"`
+	Value string `yaml:"value"`
+}
+
 type Volume struct {
 	Name string `yaml:"name"`
 	Type string `yaml:"type"`
