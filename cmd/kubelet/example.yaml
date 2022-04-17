@@ -1,16 +1,20 @@
-apiVersion: v1 #定义k8s api的版本v1
 kind: Pod #kind资源 Pod
-metadata: #属性，名字叫nginx,标签叫app : web(键值对)
-  name: nginx
-  labels:
-    app: web
+metadata:
+  name: example
 spec: #详细
+  volumes:
+    - name: nginxConfig
+      type: hostFile
+      path: D:\goLandProject\minik8s\minik8s\cmd\kubelet\nginx.conf
   containers: #容器信息
     - name: nginx #容器叫nginx
       image: nginx #使用的镜像
       ports: #容器开放的端口
         - containerPort: 80
-        - containerPort: 3306
-    - name: mysql
-      image: mysql
+      volumeMounts:
+        - name: nginxConfig
+          mountPath: /etc/nginx/nginx.conf
+    - name: ghost
+      image: ghost
+
 

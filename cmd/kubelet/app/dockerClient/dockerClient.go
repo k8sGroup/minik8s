@@ -2,9 +2,9 @@ package dockerClient
 
 import (
 	"context"
-	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"io"
@@ -88,77 +88,134 @@ func dockerClientPullSingleImage(image string) error {
 	io.Copy(ioutil.Discard, out)
 	return nil
 }
+func runContainers(containerIds []string) error {
+	cli := getInstance().cli
+	for _, value := range containerIds {
+		err := cli.ContainerStart(context.Background(), value, types.ContainerStartOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func getContainersInfo(containerIds []string) ([]types.ContainerJSON, error) {
+	cli := getInstance().cli
+	var result []types.ContainerJSON
+	for _, value := range containerIds {
+		single, err := cli.ContainerInspect(context.Background(), value)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, single)
+	}
+	return result, nil
+}
+
+//创建pause容器
+func createPause(ports []module.Port, name string) (container.ContainerCreateCreatedBody, error) {
+	cli := getInstance().cli
+	err := dockerClientPullSingleImage("gcr.io/google_containers/pause-amd64:3.0")
+	if err != nil {
+		return container.ContainerCreateCreatedBody{}, err
+	}
+	var exports nat.PortSet
+	exports = make(nat.PortSet, len(ports))
+	for _, port := range ports {
+		p, err := nat.NewPort("tcp", port.ContainerPort)
+		if err != nil {
+			return container.ContainerCreateCreatedBody{}, err
+		}
+		exports[p] = struct{}{}
+	}
+
+	resp, err := cli.ContainerCreate(context.Background(), &container.Config{
+		Image:        "gcr.io/google_containers/pause-amd64:3.0",
+		ExposedPorts: exports,
+	}, &container.HostConfig{
+		IpcMode: container.IpcMode("shareable"),
+		PortBindings: nat.PortMap{
+			"80/tcp": []nat.PortBinding{
+				{
+					HostIP:   "0.0.0.0",
+					HostPort: "8080",
+				},
+			},
+		},
+	}, nil, nil, name)
+	return resp, err
+}
 func createContainersOfPod(containers []module.Container) ([]string, error) {
 	cli := getInstance().cli
-	flag := true
 	var firstContainerId string
 	var result []string
+	//先生成所有要暴露的port集合
+	var totlePort []module.Port
+	pauseName := "pause"
 	for _, value := range containers {
-		if flag {
-			flag = false
-			//生成开放端口
-			var exports nat.PortSet
-			if value.Ports != nil {
-				exports := make(nat.PortSet, len(value.Ports))
-				for _, port := range value.Ports {
-					p, err := nat.NewPort("tcp", port.ContainerPort)
-					if err != nil {
-						return nil, err
-					}
-					exports[p] = struct{}{}
-				}
-			}
-
-			err := dockerClientPullSingleImage(value.Image)
-			if err != nil {
-				return nil, err
-			}
-			fmt.Printf("11111")
-			resp, err := cli.ContainerCreate(context.Background(), &container.Config{
-				Image:        value.Image,
-				ExposedPorts: exports,
-			}, nil, nil, nil, value.Name)
-			if err != nil {
-				return nil, err
-			}
-			firstContainerId = resp.ID
-			result = append(result, firstContainerId)
-		} else {
-			//生成开放端口
-			var exports nat.PortSet
-			if value.Ports != nil {
-				exports := make(nat.PortSet, len(value.Ports))
-				for _, port := range value.Ports {
-					p, err := nat.NewPort("tcp", port.ContainerPort)
-					if err != nil {
-						return nil, err
-					}
-					exports[p] = struct{}{}
-				}
-			}
-			//先拉取镜像
-			err := dockerClientPullSingleImage(value.Image)
-			if err != nil {
-				return nil, err
-			}
-
-			resp, err := cli.ContainerCreate(context.Background(), &container.Config{
-				Image:        value.Image,
-				ExposedPorts: exports,
-			}, &container.HostConfig{
-				NetworkMode: container.NetworkMode("container:" + firstContainerId),
-			}, nil, nil, value.Name)
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, resp.ID)
+		pauseName += "_" + value.Name
+		for _, port := range value.Ports {
+			totlePort = append(totlePort, port)
 		}
+	}
+	//创建pause容器
+	pause, err := createPause(totlePort, pauseName)
+	if err != nil {
+		return nil, err
+	}
+	firstContainerId = pause.ID
+	result = append(result, firstContainerId)
+	for _, value := range containers {
+		//只有第一个container可以生成开放端口
+		//先拉取镜像
+		err := dockerClientPullSingleImage(value.Image)
+		if err != nil {
+			return nil, err
+		}
+		var mounts []mount.Mount
+		if value.VolumeMounts != nil {
+			for _, it := range value.VolumeMounts {
+				mounts = append(mounts, mount.Mount{
+					Type:   mount.TypeBind,
+					Source: it.Name,
+					Target: it.MountPath,
+				})
+			}
+		}
+		//生成env
+		var env []string
+		if value.Env != nil {
+			for _, it := range value.Env {
+				singleEnv := it.Name + "=" + it.Value
+				env = append(env, singleEnv)
+			}
+		}
+		resp, err := cli.ContainerCreate(context.Background(), &container.Config{
+			Image:      value.Image,
+			Entrypoint: value.Command,
+			Cmd:        value.Args,
+			Env:        env,
+		}, &container.HostConfig{
+			NetworkMode: container.NetworkMode("container:" + firstContainerId),
+			Mounts:      mounts,
+			IpcMode:     container.IpcMode("container:" + firstContainerId),
+			PidMode:     container.PidMode("container" + firstContainerId),
+		}, nil, nil, value.Name)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, resp.ID)
+	}
+	//启动容器
+	err = runContainers(result)
+	if err != nil {
+		return nil, err
 	}
 	return result, nil
 }
 
 //涉及大量指针操作，要确保在caller和callee在同一个地址空间中
 func HandleCommand(command *message.Command) *message.Response {
+
 	switch command.CommandType {
 	case message.COMMAND_GET_ALL_CONTAINER:
 		containers, err := getAllContainers()
