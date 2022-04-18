@@ -12,13 +12,14 @@ const COMMAND_RUN_CONTAINER = 2
 const COMMAND_STOP_CONTAINER = 3
 const COMMAND_BUILD_CONTAINERS_OF_POD = 4
 const COMMAND_PULL_IMAGES = 5
+const COMMAND_PROBE_CONTAINER = 6
 
 //------------------------------------------------------------------------------//
 
 //-------------------------- Pod Part ------------------------------------------//
 const ADD_POD = 0
-
 const DELETE_POD = 1
+const PROBE_POD = 2
 
 //-------------------------------------------------------------------------------//
 type Command struct {
@@ -38,6 +39,13 @@ type CommandWithImages struct {
 	Command
 	Images []string
 }
+
+//commandType are COMMAND_PROBE_CONTAINER|
+type CommandWithContainerIds struct {
+	Command
+	ContainerIds []string
+}
+
 type Response struct {
 	CommandType int
 	Err         error
@@ -49,8 +57,15 @@ type ResponseWithContainInfo struct {
 
 type ResponseWithContainIds struct {
 	Response
-	ContainersIds []string
+	Containers []module.ContainerMeta
 }
+
+//返回的切片中元素顺序与commnad中容器id顺序一一对应
+type ResponseWithProbeInfos struct {
+	Response
+	ProbeInfos []string
+}
+
 type PodCommand struct {
 	ContainerCommand *Command
 	PodUid           string

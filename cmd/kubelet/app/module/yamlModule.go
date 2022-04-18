@@ -23,6 +23,13 @@ type Container struct {
 	Ports        []Port        `yaml:"ports"`
 	Env          []EnvEntry    `yaml:"env"`
 }
+
+//如果直接使用配置文件中的名字创建的话，一台机器上重名的概率很高
+type ContainerMeta struct {
+	OriginName  string
+	RealName    string
+	ContainerId string
+}
 type Limit struct {
 	Cpu    string `yaml:"cpu"`
 	Memory string `yaml:"memory"`

@@ -11,75 +11,107 @@ import (
 	"io/ioutil"
 	"minik8s/cmd/kubelet/app/message"
 	"minik8s/cmd/kubelet/app/module"
-	"sync"
 	"unsafe"
 )
 
-type dockerClient struct {
-	cli *client.Client
-}
-
-var instance *dockerClient
-var lock sync.Mutex
-
-func getInstance() *dockerClient {
-	//lock.Lock()
-	//defer lock.Unlock()
-	if instance == nil {
-		instance = new(dockerClient)
-		cli, err := client.NewClientWithOpts()
-		instance.cli = cli
-		if err != nil {
-			//may quit here
-			panic(err)
-			return nil
-		}
-		return instance
-	} else {
-		return instance
-	}
+func getNewClient() (*client.Client, error) {
+	return client.NewClientWithOpts()
 }
 
 //获取所有容器,docker ps -a
 func getAllContainers() ([]types.Container, error) {
-	cli := getInstance().cli
+	cli, err := getNewClient()
+	if err != nil {
+		return nil, err
+	}
 	return cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
 }
 func getRunningContainers() ([]types.Container, error) {
-	cli := getInstance().cli
+	cli, err := getNewClient()
+	if err != nil {
+		return nil, err
+	}
 	return cli.ContainerList(context.Background(), types.ContainerListOptions{})
 }
 func startContainer(containerId string) error {
-	cli := getInstance().cli
-	err := cli.ContainerStart(context.Background(), containerId, types.ContainerStartOptions{})
+	cli, err := getNewClient()
+	if err != nil {
+		return err
+	}
+	err = cli.ContainerStart(context.Background(), containerId, types.ContainerStartOptions{})
 	return err
 }
 func stopContainer(containerId string) error {
-	cli := getInstance().cli
-	err := cli.ContainerStop(context.Background(), containerId, nil)
+	cli, err := getNewClient()
+	if err != nil {
+		return err
+	}
+	err = cli.ContainerStop(context.Background(), containerId, nil)
 	return err
 }
 func getPodNetworkSettings(containerId string) (*types.NetworkSettings, error) {
-	cli := getInstance().cli
-	res, err := cli.ContainerInspect(context.Background(), containerId)
+	cli, err := getNewClient()
 	if err != nil {
+		return nil, err
+	}
+	res, err2 := cli.ContainerInspect(context.Background(), containerId)
+	if err2 != nil {
 		return nil, err
 	}
 	return res.NetworkSettings, nil
 }
+func isImageExist(a string, b string) bool {
+	if a == b {
+		return true
+	}
+	tmp := a + ":latest"
+	if tmp == b {
+		return true
+	}
+	return false
+}
 func dockerClientPullImages(images []string) error {
+	//先统一拉取镜像，确认是否已经存在于本地
+	cli, err2 := getNewClient()
+	if err2 != nil {
+		return err2
+	}
+	resp, err := cli.ImageList(context.Background(), types.ImageListOptions{All: true})
+	if err != nil {
+		return err
+	}
+	var filter []string
 	for _, value := range images {
-		err := dockerClientPullSingleImage(value)
-		if err != nil {
-			return err
+		flag := false
+		for _, it := range resp {
+			if isImageExist(value, it.RepoTags[0]) {
+				flag = true
+				break
+			}
+		}
+		if flag {
+			continue
+		}
+		filter = append(filter, value)
+	}
+	if filter != nil {
+		for _, value := range filter {
+			err := dockerClientPullSingleImage(value)
+			if err != nil {
+				return err
+			}
 		}
 	}
+
 	return nil
 }
 
 //注意， 调用ImagePull 函数， 拉取进程在后台运行，因此要保证前台挂起足够时间保证拉取成功
 func dockerClientPullSingleImage(image string) error {
-	cli := getInstance().cli
+	cli, err2 := getNewClient()
+	if err2 != nil {
+		return err2
+	}
 	out, err := cli.ImagePull(context.Background(), image, types.ImagePullOptions{})
 	if err != nil {
 		return err
@@ -88,10 +120,13 @@ func dockerClientPullSingleImage(image string) error {
 	io.Copy(ioutil.Discard, out)
 	return nil
 }
-func runContainers(containerIds []string) error {
-	cli := getInstance().cli
+func runContainers(containerIds []module.ContainerMeta) error {
+	cli, err2 := getNewClient()
+	if err2 != nil {
+		return err2
+	}
 	for _, value := range containerIds {
-		err := cli.ContainerStart(context.Background(), value, types.ContainerStartOptions{})
+		err := cli.ContainerStart(context.Background(), value.ContainerId, types.ContainerStartOptions{})
 		if err != nil {
 			return err
 		}
@@ -99,7 +134,10 @@ func runContainers(containerIds []string) error {
 	return nil
 }
 func getContainersInfo(containerIds []string) ([]types.ContainerJSON, error) {
-	cli := getInstance().cli
+	cli, err2 := getNewClient()
+	if err2 != nil {
+		return nil, err2
+	}
 	var result []types.ContainerJSON
 	for _, value := range containerIds {
 		single, err := cli.ContainerInspect(context.Background(), value)
@@ -113,10 +151,9 @@ func getContainersInfo(containerIds []string) ([]types.ContainerJSON, error) {
 
 //创建pause容器
 func createPause(ports []module.Port, name string) (container.ContainerCreateCreatedBody, error) {
-	cli := getInstance().cli
-	err := dockerClientPullSingleImage("gcr.io/google_containers/pause-amd64:3.0")
-	if err != nil {
-		return container.ContainerCreateCreatedBody{}, err
+	cli, err2 := getNewClient()
+	if err2 != nil {
+		return container.ContainerCreateCreatedBody{}, err2
 	}
 	var exports nat.PortSet
 	exports = make(nat.PortSet, len(ports))
@@ -144,18 +181,46 @@ func createPause(ports []module.Port, name string) (container.ContainerCreateCre
 	}, nil, nil, name)
 	return resp, err
 }
-func createContainersOfPod(containers []module.Container) ([]string, error) {
-	cli := getInstance().cli
+
+//检查容器状态
+func probeContainers(containerIds []string) ([]string, error) {
+	cli, err2 := getNewClient()
+	if err2 != nil {
+		return nil, err2
+	}
+	var res []string
+	for _, value := range containerIds {
+		resp, err := cli.ContainerInspect(context.Background(), value)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, resp.State.Status)
+	}
+	return res, nil
+}
+
+func createContainersOfPod(containers []module.Container) ([]module.ContainerMeta, error) {
+	cli, err2 := getNewClient()
+	if err2 != nil {
+		return nil, err2
+	}
 	var firstContainerId string
-	var result []string
+	var result []module.ContainerMeta
 	//先生成所有要暴露的port集合
 	var totlePort []module.Port
+	images := []string{"gcr.io/google_containers/pause-amd64:3.0"}
 	pauseName := "pause"
 	for _, value := range containers {
 		pauseName += "_" + value.Name
+		images = append(images, value.Image)
 		for _, port := range value.Ports {
 			totlePort = append(totlePort, port)
 		}
+	}
+	//先统一拉取镜像
+	err := dockerClientPullImages(images)
+	if err != nil {
+		return nil, err
 	}
 	//创建pause容器
 	pause, err := createPause(totlePort, pauseName)
@@ -163,14 +228,11 @@ func createContainersOfPod(containers []module.Container) ([]string, error) {
 		return nil, err
 	}
 	firstContainerId = pause.ID
-	result = append(result, firstContainerId)
+	result = append(result, module.ContainerMeta{
+		RealName:    pauseName,
+		ContainerId: firstContainerId,
+	})
 	for _, value := range containers {
-		//只有第一个container可以生成开放端口
-		//先拉取镜像
-		err := dockerClientPullSingleImage(value.Image)
-		if err != nil {
-			return nil, err
-		}
 		var mounts []mount.Mount
 		if value.VolumeMounts != nil {
 			for _, it := range value.VolumeMounts {
@@ -203,7 +265,10 @@ func createContainersOfPod(containers []module.Container) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, resp.ID)
+		result = append(result, module.ContainerMeta{
+			RealName:    value.Name,
+			ContainerId: resp.ID,
+		})
 	}
 	//启动容器
 	err = runContainers(result)
@@ -251,7 +316,7 @@ func HandleCommand(command *message.Command) *message.Response {
 		var result message.ResponseWithContainIds
 		result.Err = err
 		result.CommandType = message.COMMAND_BUILD_CONTAINERS_OF_POD
-		result.ContainersIds = res
+		result.Containers = res
 		return &(result.Response)
 	case message.COMMAND_PULL_IMAGES:
 		p := (*message.CommandWithImages)(unsafe.Pointer(command))
@@ -260,6 +325,14 @@ func HandleCommand(command *message.Command) *message.Response {
 		result.CommandType = message.COMMAND_PULL_IMAGES
 		result.Err = err
 		return &result
+	case message.COMMAND_PROBE_CONTAINER:
+		p := (*message.CommandWithContainerIds)(unsafe.Pointer(command))
+		res, err := probeContainers(p.ContainerIds)
+		var result message.ResponseWithProbeInfos
+		result.Err = err
+		result.CommandType = message.COMMAND_PROBE_CONTAINER
+		result.ProbeInfos = res
+		return &(result.Response)
 	}
 	return nil
 }

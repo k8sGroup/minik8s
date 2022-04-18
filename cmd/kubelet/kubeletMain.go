@@ -9,8 +9,8 @@ import (
 )
 
 func main() {
+
 	p := podManager.NewPodManager()
-	p.StartPodManager()
 	data, err := ioutil.ReadFile("D:\\goLandProject\\minik8s\\minik8s\\cmd\\kubelet\\example.yaml")
 	if err != nil {
 		fmt.Printf(err.Error())
