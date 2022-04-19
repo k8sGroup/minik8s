@@ -199,6 +199,38 @@ func probeContainers(containerIds []string) ([]string, error) {
 	return res, nil
 }
 
+//删除containers
+func deleteContainers(containerIds []string) error {
+	cli, err2 := getNewClient()
+	if err2 != nil {
+		return err2
+	}
+	for _, value := range containerIds {
+		err := cli.ContainerRemove(context.Background(), value, types.ContainerRemoveOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+//查找是否存在，存在就删除
+func deleteExitedContainers(names []string) error {
+	cli, err2 := getNewClient()
+	if err2 != nil {
+		return err2
+	}
+	for _, value := range names {
+		_, err := cli.ContainerInspect(context.Background(), value)
+		if err == nil {
+			err = cli.ContainerRemove(context.Background(), value, types.ContainerRemoveOptions{})
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 func createContainersOfPod(containers []module.Container) ([]module.ContainerMeta, error) {
 	cli, err2 := getNewClient()
 	if err2 != nil {
@@ -209,13 +241,21 @@ func createContainersOfPod(containers []module.Container) ([]module.ContainerMet
 	//先生成所有要暴露的port集合
 	var totlePort []module.Port
 	images := []string{"gcr.io/google_containers/pause-amd64:3.0"}
+	//防止重名，先检查是否重名，有的话删除
+	var names []string
 	pauseName := "pause"
 	for _, value := range containers {
 		pauseName += "_" + value.Name
+		names = append(names, value.Name)
 		images = append(images, value.Image)
 		for _, port := range value.Ports {
 			totlePort = append(totlePort, port)
 		}
+	}
+	names = append(names, pauseName)
+	err3 := deleteExitedContainers(names)
+	if err3 != nil {
+		return nil, err3
 	}
 	//先统一拉取镜像
 	err := dockerClientPullImages(images)
@@ -333,6 +373,14 @@ func HandleCommand(command *message.Command) *message.Response {
 		result.CommandType = message.COMMAND_PROBE_CONTAINER
 		result.ProbeInfos = res
 		return &(result.Response)
+	case message.COMMAND_DELETE_CONTAINER:
+		//删除containers的操作
+		p := (*message.CommandWithContainerIds)(unsafe.Pointer(command))
+		err := deleteContainers(p.ContainerIds)
+		var result message.Response
+		result.CommandType = message.COMMAND_DELETE_CONTAINER
+		result.Err = err
+		return &result
 	}
 	return nil
 }

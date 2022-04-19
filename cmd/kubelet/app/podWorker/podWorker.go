@@ -12,7 +12,10 @@ type PodWorker struct {
 func (podWorker *PodWorker) SyncLoop(commands <-chan message.PodCommand, responses chan<- message.PodResponse) {
 	for {
 		select {
-		case command, _ := <-commands:
+		case command, ok := <-commands:
+			if !ok {
+				return
+			}
 			res := dockerClient.HandleCommand(command.ContainerCommand)
 			result := message.PodResponse{
 				ContainerResponse: res,

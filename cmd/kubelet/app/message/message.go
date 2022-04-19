@@ -13,6 +13,7 @@ const COMMAND_STOP_CONTAINER = 3
 const COMMAND_BUILD_CONTAINERS_OF_POD = 4
 const COMMAND_PULL_IMAGES = 5
 const COMMAND_PROBE_CONTAINER = 6
+const COMMAND_DELETE_CONTAINER = 7
 
 //------------------------------------------------------------------------------//
 
@@ -40,7 +41,7 @@ type CommandWithImages struct {
 	Images []string
 }
 
-//commandType are COMMAND_PROBE_CONTAINER|
+//commandType are COMMAND_PROBE_CONTAINER|COMMAND_DELETE_CONTAINER
 type CommandWithContainerIds struct {
 	Command
 	ContainerIds []string

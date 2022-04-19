@@ -17,11 +17,12 @@ import (
 const emptyDir = "emptyDir"
 const hostPath = "hostPath"
 
-//pod的四种状态
+//pod的状态
 const POD_PENDING_STATUS = "Pending"
 const POD_FAILED_STATUS = "Failed"
 const POD_RUNNING_STATUS = "Running"
 const POD_EXITED_STATUS = "Exited"
+const POD_DELETED = "deleted"
 
 //container 的状态
 const CONTAINER_EXITED_STATUS = "exited"
@@ -48,7 +49,12 @@ type Pod struct {
 	commandChan  chan message.PodCommand
 	responseChan chan message.PodResponse
 	podWorker    *podWorker.PodWorker
+	//探针相关
+	timer        *time.Ticker
 	canProbeWork bool
+	stopChan     chan bool
+	//存一份snapshot
+	podSnapShoot PodSnapShoot
 }
 
 //获取pod的信息快照
@@ -87,6 +93,22 @@ func NewPodfromConfig(config *module.Config) *Pod {
 	}
 	newPod.AddVolumes(config.Spec.Volumes)
 	newPod.status = POD_PENDING_STATUS //此时还未部署,设置状态为Pending
+	//生成snapShoot
+	errMsg := ""
+	if newPod.err != nil {
+		errMsg = newPod.err.Error()
+	}
+	newPod.podSnapShoot = PodSnapShoot{
+		Name:        newPod.name,
+		Uid:         newPod.uid,
+		Ctime:       newPod.ctime,
+		Containers:  newPod.containers,
+		TmpDirMap:   newPod.tmpDirMap,
+		HostFileMap: newPod.hostFileMap,
+		HostDirMap:  newPod.hostDirMap,
+		Status:      newPod.status,
+		Err:         errMsg,
+	}
 	//启动pod
 	newPod.StartPod()
 	return newPod
@@ -94,16 +116,22 @@ func NewPodfromConfig(config *module.Config) *Pod {
 func (p *Pod) StartPod() {
 	go p.podWorker.SyncLoop(p.commandChan, p.responseChan)
 	go p.listeningResponse()
-	go p.StartProbe()
+	p.StartProbe()
 }
 
 func (p *Pod) listeningResponse() {
+	//删除pod后释放资源
+	defer p.releaseResource()
 	for {
 		select {
-		case response, _ := <-p.responseChan:
+		case response, ok := <-p.responseChan:
+			if !ok {
+				return
+			}
 			switch response.PodResponseType {
 			case message.ADD_POD:
 				//判断是否成功
+				p.rwLock.Lock()
 				responseWithContainIds := (*message.ResponseWithContainIds)(unsafe.Pointer(response.ContainerResponse))
 				if responseWithContainIds.Err != nil {
 					//出错了
@@ -113,27 +141,36 @@ func (p *Pod) listeningResponse() {
 					//设置containersId
 					p.SetContainers(responseWithContainIds.Containers, POD_RUNNING_STATUS)
 				}
+				p.rwLock.Unlock()
 			case message.PROBE_POD:
 				p.rwLock.Lock()
-				responseWithProbeInfos := (*message.ResponseWithProbeInfos)(unsafe.Pointer(response.ContainerResponse))
-				if responseWithProbeInfos.Err != nil {
-					p.err = responseWithProbeInfos.Err
-					p.status = POD_FAILED_STATUS
+				if p.status == POD_DELETED {
+					p.canProbeWork = true
+					p.rwLock.Unlock()
 				} else {
-					p.status = POD_RUNNING_STATUS
-					for _, value := range responseWithProbeInfos.ProbeInfos {
-						if value == CONTAINER_CREATED_STATUS {
-							p.status = POD_PENDING_STATUS
-							break
-						}
-						if value == CONTAINER_EXITED_STATUS {
-							p.status = POD_EXITED_STATUS
-							break
+					responseWithProbeInfos := (*message.ResponseWithProbeInfos)(unsafe.Pointer(response.ContainerResponse))
+					if responseWithProbeInfos.Err != nil {
+						p.err = responseWithProbeInfos.Err
+						p.status = POD_FAILED_STATUS
+					} else {
+						p.status = POD_RUNNING_STATUS
+						for _, value := range responseWithProbeInfos.ProbeInfos {
+							if value == CONTAINER_CREATED_STATUS {
+								p.status = POD_PENDING_STATUS
+								break
+							}
+							if value == CONTAINER_EXITED_STATUS {
+								p.status = POD_EXITED_STATUS
+								break
+							}
 						}
 					}
+					p.canProbeWork = true
+					p.rwLock.Unlock()
 				}
-				p.canProbeWork = true
-				p.rwLock.Unlock()
+
+			case message.DELETE_POD:
+				return
 			}
 		}
 	}
@@ -183,69 +220,12 @@ func GetCurrentAbPathByCaller() string {
 
 //----------------初始化相关函数结束------------------------//
 
-//-----------------读取pod信息，需要读锁------------------------//
-//func (p *Pod) GetPodInfo() ([]byte, error) {
-//	p.rwLock.RLock()
-//	defer p.rwLock.RUnlock()
-//	return ffjson.Marshal(p)
-//}
-func (p *Pod) StartProbe() {
-	timer := time.NewTimer(PROBE_INTERVAL * time.Second)
-	for {
-		<-timer.C
-		p.rwLock.Lock()
-		if p.canProbeWork && p.status != POD_PENDING_STATUS && p.status != POD_FAILED_STATUS {
-			command := &message.CommandWithContainerIds{}
-			command.CommandType = message.COMMAND_PROBE_CONTAINER
-			var group []string
-			for _, value := range p.containers {
-				group = append(group, value.ContainerId)
-			}
-			command.ContainerIds = group
-			podCommand := message.PodCommand{
-				PodUid:           p.uid,
-				PodCommandType:   message.PROBE_POD,
-				ContainerCommand: &(command.Command),
-			}
-			p.commandChan <- podCommand
-			p.canProbeWork = false
-		}
-		p.rwLock.Unlock()
-	}
-}
-func (p *Pod) GetPodSnapShoot() PodSnapShoot {
-	p.rwLock.RLock()
-	defer p.rwLock.RUnlock()
-	errMsg := ""
-	if p.err != nil {
-		errMsg = p.err.Error()
-	}
-	return PodSnapShoot{
-		Name:        p.name,
-		Uid:         p.uid,
-		Ctime:       p.ctime,
-		Containers:  p.containers,
-		TmpDirMap:   p.tmpDirMap,
-		HostFileMap: p.hostFileMap,
-		HostDirMap:  p.hostDirMap,
-		Status:      p.status,
-		Err:         errMsg,
-	}
-
-}
-
-//-----------------------------------------------------------//
-
-//--------------写pod信息，需要写锁------------------------------//
+//----------------辅助函数--------------------------------//
 func (p *Pod) SetStatusAndErr(status string, err error) {
-	p.rwLock.Lock()
-	defer p.rwLock.Unlock()
 	p.status = status
 	p.err = err
 }
 func (p *Pod) SetContainers(containers []module.ContainerMeta, status string) {
-	p.rwLock.Lock()
-	defer p.rwLock.Unlock()
 	for _, value := range containers {
 		for index, it := range p.containers {
 			if it.RealName == value.RealName {
@@ -254,6 +234,106 @@ func (p *Pod) SetContainers(containers []module.ContainerMeta, status string) {
 		}
 	}
 	p.status = status
+}
+
+//-------------------------------------------------------//
+
+//-----------------读取pod信息，需要读锁------------------------//
+func (p *Pod) GetPodSnapShoot() PodSnapShoot {
+	//p.rwLock.TryRLock()
+	//defer p.rwLock.RUnlock()
+	//只有获取到锁的情况下才会更新 podSnapshoot并返回新值，否者返回旧缓存
+	if p.rwLock.TryRLock() {
+		errMsg := ""
+		if p.err != nil {
+			errMsg = p.err.Error()
+		}
+		p.podSnapShoot = PodSnapShoot{
+			Name:        p.name,
+			Uid:         p.uid,
+			Ctime:       p.ctime,
+			Containers:  p.containers,
+			TmpDirMap:   p.tmpDirMap,
+			HostFileMap: p.hostFileMap,
+			HostDirMap:  p.hostDirMap,
+			Status:      p.status,
+			Err:         errMsg,
+		}
+		p.rwLock.RUnlock()
+		return p.podSnapShoot
+	} else {
+		return p.podSnapShoot
+	}
+
+}
+
+//-----------------------------------------------------------//
+
+//--------------写pod信息，需要写锁------------------------------//
+func (p *Pod) StartProbe() {
+	p.timer = time.NewTicker(PROBE_INTERVAL * time.Second)
+	p.stopChan = make(chan bool)
+	go func(p *Pod) {
+		defer p.timer.Stop()
+		for {
+			select {
+			case <-p.timer.C:
+				p.rwLock.Lock()
+				//这几种情况下不进行检查
+				if p.canProbeWork && p.status != POD_PENDING_STATUS && p.status != POD_FAILED_STATUS && p.status != POD_DELETED {
+					command := &message.CommandWithContainerIds{}
+					command.CommandType = message.COMMAND_PROBE_CONTAINER
+					var group []string
+					for _, value := range p.containers {
+						group = append(group, value.ContainerId)
+					}
+					command.ContainerIds = group
+					podCommand := message.PodCommand{
+						PodUid:           p.uid,
+						PodCommandType:   message.PROBE_POD,
+						ContainerCommand: &(command.Command),
+					}
+					p.commandChan <- podCommand
+					p.canProbeWork = false
+				}
+				p.rwLock.Unlock()
+			case stop := <-p.stopChan:
+				if stop {
+					return
+				}
+			}
+		}
+	}(p)
+}
+
+func (p *Pod) DeletePod() {
+	p.rwLock.Lock()
+	p.status = POD_DELETED
+	command := &message.CommandWithContainerIds{}
+	command.CommandType = message.COMMAND_DELETE_CONTAINER
+	var group []string
+	for _, value := range p.containers {
+		group = append(group, value.ContainerId)
+	}
+	command.ContainerIds = group
+	podCommand := message.PodCommand{
+		PodUid:           p.uid,
+		PodCommandType:   message.DELETE_POD,
+		ContainerCommand: &(command.Command),
+	}
+	p.commandChan <- podCommand
+	p.rwLock.Unlock()
+}
+
+//释放所有资源
+func (p *Pod) releaseResource() {
+	//拿下锁防止寄了
+	p.rwLock.Lock()
+	p.canProbeWork = false
+	p.stopChan <- true
+	close(p.commandChan)
+	close(p.responseChan)
+	p.rwLock.Unlock()
 }
 
 //-----------------------------------------------------------//
