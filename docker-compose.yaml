@@ -15,7 +15,7 @@ services:
       - RABBITMQ_DEFAULT_USER=root
       - RABBITMQ_DEFAULT_PASS=123456
   etcd:
-    image: bitnami/etcd:latest
+    image: bitnami/etcd:3.3
     container_name: etcd
     restart: always
     hostname: etcd_host
@@ -24,6 +24,8 @@ services:
       - "2380:2380"
       - "4001:4001"
     volumes:
-      - ./docker/etcd:/bitnami/etcd
+      - ./docker/etcd/data:/bitnami/etcd/data
     environment:
       - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+      - ETCDCTL_API=2

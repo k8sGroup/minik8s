@@ -34,7 +34,7 @@ func Infof(f string, v ...any) {
 	strBuilder := strings.Builder{}
 	strBuilder.WriteString(prefixFmt)
 	strBuilder.WriteString(f)
-	var a = []any{"Info ", file, line, runtime.FuncForPC(funcName).Name()}
+	var a = []any{"Info", file, line, runtime.FuncForPC(funcName).Name()}
 	a = append(a, v...)
 	_, _ = fmt.Fprintf(output, strBuilder.String(), a...)
 }
@@ -45,7 +45,7 @@ func Warnf(f string, v ...any) {
 	strBuilder := strings.Builder{}
 	strBuilder.WriteString(prefixFmt)
 	strBuilder.WriteString(f)
-	var a = []any{"Warn ", file, line, runtime.FuncForPC(funcName).Name()}
+	var a = []any{"Warn", file, line, runtime.FuncForPC(funcName).Name()}
 	a = append(a, v...)
 	_, _ = fmt.Fprintf(output, strBuilder.String(), a...)
 }
@@ -73,8 +73,11 @@ func Errorf(f string, v ...any) {
 	_, _ = fmt.Fprintf(output, strBuilder.String(), a...)
 }
 
-// Debugf outputs log with level Debug.
-// set debug false in release
+/*
+Debugf outputs log with level Debug.
+
+Set debug false in release
+*/
 func Debugf(f string, v ...any) {
 	if !debug {
 		return
