@@ -8,17 +8,7 @@ import (
 	"time"
 )
 
-const rerunDuration = 10 * time.Second
-
 type HandleFunc func(d amqp.Delivery)
-
-type SubscriberConfig struct {
-	user     string
-	password string
-	host     string
-	port     string
-	maxRetry int
-}
 
 type redo struct {
 	exchangeName string
@@ -27,37 +17,28 @@ type redo struct {
 }
 
 type Subscriber struct {
-	// conn RabbitMQ connection
-	conn *amqp.Connection
-	// connUrl connection url
-	connUrl string
-	// maxRetry 当连接意外中断时的最大重连次数
-	maxRetry int
-	// errCh error channel用于发生意外close时的notify rerun机制
-	errCh chan *amqp.Error
-	// redoLogs 存储了redo log，在发生断线重连时需要进行redo，记录了subscribe的信息
-	redoLogs map[int]redo
-	// normal 当手动关闭连接时为true，否则为false
-	normal bool
-	// nextSlot 下一个slot的id
-	nextSlot int
-	// mtxNormal 保护normal元数据
-	mtxNormal sync.Mutex
-	// mtxRedo 保护redoLogs元数据
-	mtxRedo sync.Mutex
+	conn          *amqp.Connection // conn RabbitMQ connection
+	connUrl       string           // connUrl connection url
+	maxRetry      int              // maxRetry 当连接意外中断时的最大重连次数
+	retryInterval time.Duration    // retryInterval
+	redoLogs      map[int]redo     // redoLogs 存储了redo log，在发生断线重连时需要进行redo，记录了subscribe的信息
+	normal        bool             // normal 当手动关闭连接时为true，否则为false
+	nextSlot      int              // nextSlot 下一个slot的id
+	mtxRecover    sync.Mutex       // mtxRecover 恢复状态的锁
+	mtxNormal     sync.Mutex       // mtxNormal 保护normal元数据
+	mtxRedo       sync.Mutex       // mtxRedo 保护redoLogs元数据
 }
 
 /*
 NewSubscriber 创建一个Subscriber并且返回指针
-
 */
-func NewSubscriber(config SubscriberConfig) (*Subscriber, error) {
-	url := fmt.Sprintf("amqp://%s:%s@%s:%s/", config.user, config.password, config.host, config.port)
+func NewSubscriber(config QConfig) (*Subscriber, error) {
+	url := fmt.Sprintf("amqp://%s:%s@%s:%s/", config.User, config.Password, config.Host, config.Port)
 	var err error
 	s := new(Subscriber)
 	s.connUrl = url
-	s.maxRetry = config.maxRetry
-	s.errCh = make(chan *amqp.Error)
+	s.maxRetry = config.MaxRetry
+	s.retryInterval = config.RetryInterval
 	s.redoLogs = make(map[int]redo)
 	s.normal = false
 	s.nextSlot = 0
@@ -66,56 +47,14 @@ func NewSubscriber(config SubscriberConfig) (*Subscriber, error) {
 		return nil, err
 	}
 
-	reconnect := func() error {
-		var err error
-		s.conn, err = amqp.Dial(s.connUrl)
-		if err != nil {
-			return err
-		}
-		s.conn.NotifyClose(s.errCh)
-		return nil
-	}
-
-	rerun := func(errCh <-chan *amqp.Error) {
-		time.Sleep(5 * rerunDuration)
-		for {
-			select {
-			case <-errCh:
-				s.mtxNormal.Lock()
-				normal := s.normal
-				s.mtxNormal.Unlock()
-				if !s.conn.IsClosed() {
-					continue
-				}
-				if normal {
-					klog.Infof("Close connection normally...\n")
-					return
-				}
-				if !normal {
-					for i := 1; i <= s.maxRetry; i++ {
-						klog.Infof("Trying to reconnect : retry - %d\n", i)
-						if err := reconnect(); err == nil {
-							s.redoAll()
-							s.conn.NotifyClose(s.errCh)
-							break
-						}
-						time.Sleep(rerunDuration)
-					}
-					// 在最大重试次数之后仍然无法重连
-					klog.Fatalf("Error reconnecting!\n")
-				}
-			}
-		}
-	}
-
-	go rerun(s.errCh)
-	s.conn.NotifyClose(s.errCh)
+	errCh := make(chan *amqp.Error)
+	go s.rerun(errCh)
+	s.conn.NotifyClose(errCh)
 	return s, nil
 }
 
 /*
-CloseConnection 关闭Subscriber的connection，subscriber变为不可用状态
-
+CloseConnection 关闭subscriber的connection，subscriber变为不可用状态
 */
 func (s *Subscriber) CloseConnection() error {
 	s.mtxNormal.Lock()
@@ -131,7 +70,8 @@ func (s *Subscriber) CloseConnection() error {
 }
 
 /*
-Subscribe 创建一个rabbitmq channel并且放入goroutine消费消息，
+Subscribe 创建一个rabbitmq channel并且放入goroutine消费消息
+
 goroutine直到stopCh收到消息才退出，使用Close(stopCh)来关闭rabbitmq channel
 
 exchangeName 订阅的交换机名称
@@ -139,7 +79,7 @@ exchangeName 订阅的交换机名称
 handler 传入的处理函数
 
 */
-func (s *Subscriber) Subscribe(exchangeName string, handler HandleFunc, stopCh <-chan struct{}) error {
+func (s *Subscriber) Subscribe(exchangeName string, handler HandleFunc, stopChannelCh <-chan struct{}) error {
 	ch, err := s.conn.Channel()
 	if err != nil {
 		return err
@@ -195,18 +135,20 @@ func (s *Subscriber) Subscribe(exchangeName string, handler HandleFunc, stopCh <
 	s.mtxRedo.Lock()
 	index := s.nextSlot
 	s.nextSlot++
-	s.redoLogs[index] = redo{exchangeName: exchangeName, handler: handler, stopCh: stopCh}
+	s.redoLogs[index] = redo{exchangeName: exchangeName, handler: handler, stopCh: stopChannelCh}
 	s.mtxRedo.Unlock()
 
-	stop := func(ch *amqp.Channel, stopCh <-chan struct{}, index int, stopConnCh <-chan *amqp.Error) {
+	stop := func(amqpChannel *amqp.Channel, index int, stopChannelCh <-chan struct{}, stopConnectionCh <-chan *amqp.Error) {
 		select {
-		case <-stopConnCh:
+		case <-stopConnectionCh:
+			klog.Infof("connection closed!\n")
 			return
-		case <-stopCh:
+		case <-stopChannelCh:
 			s.mtxRedo.Lock()
+			klog.Infof("remove redo log %d \n", index)
 			delete(s.redoLogs, index)
 			s.mtxRedo.Unlock()
-			_ = ch.Close()
+			_ = amqpChannel.Close()
 			return
 		}
 	}
@@ -218,14 +160,26 @@ func (s *Subscriber) Subscribe(exchangeName string, handler HandleFunc, stopCh <
 		}
 	}
 
-	stopConnCh := make(chan *amqp.Error)
-	s.conn.NotifyClose(stopConnCh)
-	go stop(ch, stopCh, index, stopConnCh)
+	stopConnectionCh := make(chan *amqp.Error)
+	s.conn.NotifyClose(stopConnectionCh)
+	go stop(ch, index, stopChannelCh, stopConnectionCh)
 	go consumeLoop(msgs, handler)
 	return nil
 }
 
-func (s *Subscriber) redoAll() {
+/*
+Unsubscribe  取消一个之前已经订阅的subscribe
+
+*/
+func (s *Subscriber) Unsubscribe(stopChannelCh chan<- struct{}) {
+	s.mtxRecover.Lock()
+	defer s.mtxRecover.Unlock()
+	close(stopChannelCh)
+}
+
+func (s *Subscriber) recover() {
+	s.mtxRecover.Lock()
+	defer s.mtxRecover.Unlock()
 	s.mtxRedo.Lock()
 	redoCopy := s.redoLogs
 	s.redoLogs = make(map[int]redo)
@@ -234,7 +188,46 @@ func (s *Subscriber) redoAll() {
 	for _, redo := range redoCopy {
 		err := s.Subscribe(redo.exchangeName, redo.handler, redo.stopCh)
 		if err != nil {
-			klog.Errorf("Error subscribing while reconnection!\n")
+			klog.Errorf("Error subscribing while reconnecting!\n")
+		}
+	}
+}
+
+func (s *Subscriber) reconnect() error {
+	var err error
+	s.conn, err = amqp.Dial(s.connUrl)
+	if err != nil {
+		return err
+	}
+	errCh := make(chan *amqp.Error)
+	go s.rerun(errCh)
+	s.conn.NotifyClose(errCh)
+	s.recover()
+	return nil
+}
+
+func (s *Subscriber) rerun(errCh <-chan *amqp.Error) {
+	time.Sleep(time.Second)
+	select {
+	case <-errCh:
+		s.mtxNormal.Lock()
+		normal := s.normal
+		s.mtxNormal.Unlock()
+		if normal {
+			klog.Infof("Subscriber : Close connection normally...\n")
+			return
+		}
+		if !normal {
+			for i := 1; i <= s.maxRetry; i++ {
+				klog.Warnf("Subscriber : Trying to reconnect : retry - %d\n", i)
+				if err := s.reconnect(); err == nil {
+					klog.Infof("Subscriber reconnected!")
+					return
+				}
+				time.Sleep(s.retryInterval)
+			}
+			// 在最大重试次数之后仍然无法重连
+			klog.Errorf("Subscriber : Error reconnecting!\n")
 		}
 	}
 }
