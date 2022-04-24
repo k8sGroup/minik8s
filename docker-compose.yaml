@@ -1,0 +1,31 @@
+version: '3'
+services:
+  rabbitmq:
+    image: rabbitmq:3.9-management
+    container_name: rabbitmq
+    restart: always
+    hostname: rabbitmq_host
+    ports:
+      - "15672:15672"   # web UI 管理接口
+      - "5672:5672"    # 生产者和消费者连接使用的接口
+    volumes:
+      - ./docker/rabbit/log:/var/log/rabbitmq #挂载 RabbitMQ日志
+      - ./docker/rabbit/data:/var/lib/rabbitmq #挂载 RabbitMQ数据
+    environment:
+      - RABBITMQ_DEFAULT_USER=root
+      - RABBITMQ_DEFAULT_PASS=123456
+  etcd:
+    image: bitnami/etcd:3.3
+    container_name: etcd
+    restart: always
+    hostname: etcd_host
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+      - "4001:4001"
+    volumes:
+      - ./docker/etcd/data:/bitnami/etcd/data
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+      - ETCDCTL_API=2
