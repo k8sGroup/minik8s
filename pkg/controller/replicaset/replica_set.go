@@ -5,27 +5,37 @@ import (
 	"encoding/json"
 	"github.com/streadway/amqp"
 	"minik8s/object"
+	"minik8s/pkg/client"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/queue"
+	"net/http"
 
 	"minik8s/pkg/messaging"
 )
 
 type ReplicaSetController struct {
-	// watch
+	// watcher
 	Subscriber   *messaging.Subscriber
 	ExchangeName string
 	stopCh       <-chan struct{}
+	// lister
 
+	// working queue
 	queue queue.ConcurrentQueue
+
+	Client client.RESTClient
 }
 
-func NewReplicaSetController(config messaging.QConfig) *ReplicaSetController {
-	subscriber, _ := messaging.NewSubscriber(config)
+func NewReplicaSetController(msgConfig messaging.QConfig, clientConfig client.Config) *ReplicaSetController {
+	subscriber, _ := messaging.NewSubscriber(msgConfig)
 	exchangeName := "ReplicaSetController"
+	restClient := client.RESTClient{
+		Client: &http.Client{},
+	}
 	rsc := &ReplicaSetController{
 		Subscriber:   subscriber,
 		ExchangeName: exchangeName,
+		Client:       restClient,
 	}
 	return rsc
 }
@@ -55,8 +65,11 @@ func (rsc *ReplicaSetController) register() {
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 func (rsc *ReplicaSetController) worker(ctx context.Context) {
 	for {
-		key := rsc.queue.Front()
-		rsc.syncReplicaSet(ctx, key)
+		if !rsc.queue.Empty() {
+			key := rsc.queue.Front()
+			rsc.queue.Dequeue()
+			rsc.syncReplicaSet(ctx, key)
+		}
 	}
 }
 
@@ -66,9 +79,8 @@ func (rsc *ReplicaSetController) addRS(d amqp.Delivery) {
 	if err != nil {
 		klog.Warnf("addRS bad message")
 	}
-	// store key and value
-	key := ""
-
+	// encode object to key
+	key := getKey(rs)
 	// enqueue key
 	rsc.queue.Enqueue(key)
 }
@@ -82,9 +94,9 @@ func (rsc *ReplicaSetController) deleteRS(d amqp.Delivery) {
 }
 
 func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
-	//namespace := "test"
+	// get name of key
 	//name := "test"
-	// get all replica sets of the namespace
+	// get all replica sets of the name
 
 	// get all pods of the namespace
 
@@ -95,5 +107,47 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 }
 
 func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPods []*object.Pod, rs *object.ReplicaSet) error {
+	// make diff for current pods and expected number
+	diff := len(filteredPods) - int(*(rs.Spec.Replicas))
+	//key := getKey(rs)
+
+	if diff < 0 {
+		diff *= -1
+		// create pods
+		for i := 0; i < diff; i++ {
+			err := rsc.Client.CreatePods(ctx, &rs.Spec.Template)
+			if err != nil {
+				klog.Errorf("create pod fail")
+			}
+		}
+
+	} else if diff > 0 {
+		// delete pods
+		relatedPods, _ := rsc.getRelatedPods(rs)
+		podsToDelete := getPodsToDelete(filteredPods, relatedPods, diff)
+		for _, pod := range podsToDelete {
+			err := rsc.Client.DeletePod(ctx, pod.Name)
+			if err != nil {
+				klog.Errorf("delete pod fail")
+			}
+		}
+	}
 	return nil
+}
+
+// ge related pods to replicaset
+func (rsc *ReplicaSetController) getRelatedPods(rs *object.ReplicaSet) ([]*object.Pod, error) {
+	var relatedPods []*object.Pod
+	return relatedPods, nil
+}
+
+// choose pods to be deleted
+// simple policy
+func getPodsToDelete(filteredPods, relatedPods []*object.Pod, diff int) []*object.Pod {
+	return filteredPods[:diff]
+}
+
+// TODO: key is the resource name
+func getKey(rs *object.ReplicaSet) string {
+	return ""
 }
