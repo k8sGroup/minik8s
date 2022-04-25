@@ -6,6 +6,7 @@ import (
 	"github.com/streadway/amqp"
 	"minik8s/object"
 	"minik8s/pkg/client"
+	"minik8s/pkg/controller"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/queue"
 	"net/http"
@@ -95,14 +96,19 @@ func (rsc *ReplicaSetController) deleteRS(d amqp.Delivery) {
 
 func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
 	// get name of key
-	//name := "test"
+	name := "test"
 	// get all replica sets of the name
-
-	// get all pods of the namespace
-
+	rs, _ := rsc.Client.GetRS(name)
+	// get all actual pods of the rs
+	allPods, _ := rsc.Client.GetRSPods(name)
 	// filter all inactive pods
-
+	activePods := controller.FilterActivePods(allPods)
 	// manage pods
+	rsc.manageReplicas(ctx, activePods, rs)
+	// calculate new status
+	newStatus := calculateStatus(rs, activePods)
+	// update status
+	updateReplicaSetStatus(ctx, &rsc.Client, rs, newStatus)
 	return nil
 }
 
@@ -135,6 +141,12 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 	return nil
 }
 
+func calculateStatus(rs *object.ReplicaSet, filteredPods []*object.Pod) object.ReplicaSetStatus {
+	newStatus := rs.Status
+	newStatus.Replicas = int32(len(filteredPods))
+	return newStatus
+}
+
 // ge related pods to replicaset
 func (rsc *ReplicaSetController) getRelatedPods(rs *object.ReplicaSet) ([]*object.Pod, error) {
 	var relatedPods []*object.Pod
@@ -150,4 +162,10 @@ func getPodsToDelete(filteredPods, relatedPods []*object.Pod, diff int) []*objec
 // TODO: key is the resource name
 func getKey(rs *object.ReplicaSet) string {
 	return ""
+}
+
+func updateReplicaSetStatus(ctx context.Context, c *client.RESTClient, rs *object.ReplicaSet, newStatus object.ReplicaSetStatus) (*object.ReplicaSet, error) {
+	var updatedRS *object.ReplicaSet
+	updatedRS, _ = c.UpdateRSStatus(ctx, rs)
+	return updatedRS, nil
 }
