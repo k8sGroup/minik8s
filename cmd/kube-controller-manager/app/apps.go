@@ -1,4 +1,5 @@
 package app
+<<<<<<< HEAD
 
 import (
 	"context"
@@ -26,3 +27,5 @@ func startReplicaSetController(ctx context.Context, controllerCtx ControllerCont
 	go replicaset.NewReplicaSetController(msgConfig, clientConfig).Run(ctx)
 	return nil
 }
+=======
+>>>>>>> feature/controller_manager
