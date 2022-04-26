@@ -22,7 +22,7 @@ const POD_PENDING_STATUS = "Pending"
 const POD_FAILED_STATUS = "Failed"
 const POD_RUNNING_STATUS = "Running"
 const POD_EXITED_STATUS = "Exited"
-const POD_DELETED = "deleted"
+const POD_DELETED_STATUS = "deleted"
 
 //container 的状态
 const CONTAINER_EXITED_STATUS = "exited"
@@ -144,7 +144,7 @@ func (p *Pod) listeningResponse() {
 				p.rwLock.Unlock()
 			case message.PROBE_POD:
 				p.rwLock.Lock()
-				if p.status == POD_DELETED {
+				if p.status == POD_DELETED_STATUS {
 					p.canProbeWork = true
 					p.rwLock.Unlock()
 				} else {
@@ -280,7 +280,7 @@ func (p *Pod) StartProbe() {
 			case <-p.timer.C:
 				p.rwLock.Lock()
 				//这几种情况下不进行检查
-				if p.canProbeWork && p.status != POD_PENDING_STATUS && p.status != POD_FAILED_STATUS && p.status != POD_DELETED {
+				if p.canProbeWork && p.status != POD_PENDING_STATUS && p.status != POD_FAILED_STATUS && p.status != POD_DELETED_STATUS {
 					command := &message.CommandWithContainerIds{}
 					command.CommandType = message.COMMAND_PROBE_CONTAINER
 					var group []string
@@ -308,7 +308,7 @@ func (p *Pod) StartProbe() {
 
 func (p *Pod) DeletePod() {
 	p.rwLock.Lock()
-	p.status = POD_DELETED
+	p.status = POD_DELETED_STATUS
 	command := &message.CommandWithContainerIds{}
 	command.CommandType = message.COMMAND_DELETE_CONTAINER
 	var group []string

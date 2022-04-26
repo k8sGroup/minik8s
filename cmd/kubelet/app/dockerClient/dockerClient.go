@@ -231,6 +231,7 @@ func deleteExitedContainers(names []string) error {
 	}
 	return nil
 }
+
 func createContainersOfPod(containers []module.Container) ([]module.ContainerMeta, error) {
 	cli, err2 := getNewClient()
 	if err2 != nil {
