@@ -96,7 +96,7 @@ func (rsc *ReplicaSetController) deleteRS(d amqp.Delivery) {
 
 func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
 	// get name of key
-	name := "test"
+	name := key
 	// get all replica sets of the name
 	rs, _ := rsc.Client.GetRS(name)
 	// get all actual pods of the rs
@@ -161,7 +161,7 @@ func getPodsToDelete(filteredPods, relatedPods []*object.Pod, diff int) []*objec
 
 // TODO: key is the resource name
 func getKey(rs *object.ReplicaSet) string {
-	return ""
+	return rs.Name
 }
 
 func updateReplicaSetStatus(ctx context.Context, c *client.RESTClient, rs *object.ReplicaSet, newStatus object.ReplicaSetStatus) (*object.ReplicaSet, error) {
