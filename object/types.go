@@ -38,6 +38,8 @@ type ReplicaSetStatus struct {
 type LabelSelector struct {
 }
 
+/*******************Pod*************************/
+
 type Pod struct {
 	ObjectMeta
 	Spec   PodSpec
@@ -45,6 +47,7 @@ type Pod struct {
 }
 
 type PodSpec struct {
+	NodeName string
 }
 
 type PodStatus struct {
@@ -64,4 +67,22 @@ type PodList struct {
 }
 
 type ListOptions struct {
+}
+
+/*******************Node*************************/
+
+type Node struct {
+	ObjectMeta
+	Spec   NodeSpec
+	Status NodeStatus
+}
+
+type NodeList struct {
+	Items []Node
+}
+
+type NodeSpec struct {
+}
+
+type NodeStatus struct {
 }

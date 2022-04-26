@@ -55,8 +55,10 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		klog.Fatalf("error starting controllers: %v\n", err)
 	}
 	// TODO
-	close(controllerContext.InformerStarted)
+	//close(controllerContext.InformerStarted)
 	select {}
+
+	return nil
 }
 
 func CreateControllerContext() (ControllerContext, error) {
@@ -67,18 +69,19 @@ func CreateControllerContext() (ControllerContext, error) {
 func NewControllerInitializers() map[string]InitFunc {
 	controller := map[string]InitFunc{}
 	// TODO : Initialize the map with controller name and InitFunc
+	controller["replicaset"] = startReplicaSetController
 	return controller
 }
 
 func StartControllers(ctx context.Context, controllerContext ControllerContext, controllers map[string]InitFunc) error {
 	for controllerName, initFunc := range controllers {
-		klog.Infof("Starting controller %s\n", controllerName)
+		klog.Debugf("Starting controller %s\n", controllerName)
 		err := initFunc(ctx, controllerContext)
 		if err != nil {
 			klog.Errorf("Error starting %s\n", controllerName)
 			return err
 		}
-		klog.Infof("Started controller %s\n", controllerName)
+		klog.Debugf("Started controller %s\n", controllerName)
 	}
 	return nil
 }

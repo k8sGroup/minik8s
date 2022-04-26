@@ -10,6 +10,7 @@ import (
 	"minik8s/pkg/klog"
 	"minik8s/pkg/queue"
 	"net/http"
+	"time"
 
 	"minik8s/pkg/messaging"
 )
@@ -19,7 +20,6 @@ type ReplicaSetController struct {
 	Subscriber   *messaging.Subscriber
 	ExchangeName string
 	stopCh       <-chan struct{}
-	// lister
 
 	// working queue
 	queue queue.ConcurrentQueue
@@ -43,6 +43,7 @@ func NewReplicaSetController(msgConfig messaging.QConfig, clientConfig client.Co
 
 // Run begins watching and syncing.
 func (rsc *ReplicaSetController) Run(ctx context.Context) {
+	klog.Debugf("[ReplicaSetController]start running\n")
 	rsc.register()
 	go rsc.worker(ctx)
 	<-ctx.Done()
@@ -51,16 +52,17 @@ func (rsc *ReplicaSetController) Run(ctx context.Context) {
 func (rsc *ReplicaSetController) register() {
 	err := rsc.Subscriber.Subscribe(rsc.ExchangeName+"."+"addRS", rsc.addRS, rsc.stopCh)
 	if err != nil {
-		klog.Errorf("register addRS fail")
+		klog.Errorf("register addRS fail\n")
 	}
 	err = rsc.Subscriber.Subscribe(rsc.ExchangeName+"."+"updateRS", rsc.updateRS, rsc.stopCh)
 	if err != nil {
-		klog.Errorf("register updateRS fail")
+		klog.Errorf("register updateRS fail\n")
 	}
 	err = rsc.Subscriber.Subscribe(rsc.ExchangeName+"."+"deleteRS", rsc.deleteRS, rsc.stopCh)
 	if err != nil {
-		klog.Errorf("register deleteRS fail")
+		klog.Errorf("register deleteRS fail\n")
 	}
+	klog.Debugf("success register\n")
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
@@ -69,8 +71,11 @@ func (rsc *ReplicaSetController) worker(ctx context.Context) {
 		if !rsc.queue.Empty() {
 			key := rsc.queue.Front()
 			rsc.queue.Dequeue()
-			rsc.syncReplicaSet(ctx, key)
+			rsc.syncReplicaSet(ctx, key.(string))
+		} else {
+			time.Sleep(time.Second)
 		}
+		klog.Infof("do some work\n")
 	}
 }
 
@@ -78,7 +83,7 @@ func (rsc *ReplicaSetController) addRS(d amqp.Delivery) {
 	rs := &object.ReplicaSet{}
 	err := json.Unmarshal(d.Body, rs)
 	if err != nil {
-		klog.Warnf("addRS bad message")
+		klog.Warnf("addRS bad message\n")
 	}
 	// encode object to key
 	key := getKey(rs)
@@ -123,7 +128,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		for i := 0; i < diff; i++ {
 			err := rsc.Client.CreatePods(ctx, &rs.Spec.Template)
 			if err != nil {
-				klog.Errorf("create pod fail")
+				klog.Errorf("create pod fail\n")
 			}
 		}
 
@@ -134,7 +139,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		for _, pod := range podsToDelete {
 			err := rsc.Client.DeletePod(ctx, pod.Name)
 			if err != nil {
-				klog.Errorf("delete pod fail")
+				klog.Errorf("delete pod fail\n")
 			}
 		}
 	}

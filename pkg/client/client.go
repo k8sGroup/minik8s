@@ -21,11 +21,13 @@ type RESTClient struct {
 	Client *http.Client
 }
 
+/******************************Pod*******************************/
+
 func (r RESTClient) CreatePods(ctx context.Context, template *object.PodTemplateSpec) error {
 	pod, _ := GetPodFromTemplate(template)
 	podRaw, _ := json.Marshal(pod)
 	reqBody := bytes.NewBuffer(podRaw)
-	attachURL := "/pods"
+	attachURL := "/pod"
 
 	req, _ := http.NewRequest("POST", r.base.String()+attachURL, reqBody)
 	resp, _ := r.Client.Do(req)
@@ -41,6 +43,20 @@ func (r RESTClient) CreatePods(ctx context.Context, template *object.PodTemplate
 		klog.Infof("[CreatePods] Body Pods Unmarshal fail")
 	}
 	return err
+}
+
+func (r RESTClient) UpdatePods(ctx context.Context, pod *object.Pod) error {
+	podRaw, _ := json.Marshal(pod)
+	reqBody := bytes.NewBuffer(podRaw)
+	attachURL := "/pod"
+
+	req, _ := http.NewRequest("POST", r.base.String()+attachURL, reqBody)
+	resp, _ := r.Client.Do(req)
+
+	if resp.StatusCode != object.SUCCESS {
+		return errors.New("create pod fail")
+	}
+	return nil
 }
 
 func (r RESTClient) DeletePod(ctx context.Context, podID string) error {
@@ -61,7 +77,7 @@ func GetPodFromTemplate(template *object.PodTemplateSpec) (*object.Pod, error) {
 	return pod, nil
 }
 
-/*************************************************************/
+/********************************RS*****************************/
 
 func (r RESTClient) GetRS(name string) (*object.ReplicaSet, error) {
 	attachURL := "/rs/" + name
@@ -121,4 +137,10 @@ func (r RESTClient) UpdateRSStatus(ctx context.Context, replicaSet *object.Repli
 		klog.Infof("[CreatePods] Body Pods Unmarshal fail")
 	}
 	return result, nil
+}
+
+/********************************Node*****************************/
+
+func (r RESTClient) GetNodes() ([]*object.Node, error) {
+	return nil, nil
 }

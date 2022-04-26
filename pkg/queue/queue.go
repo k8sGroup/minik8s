@@ -3,17 +3,17 @@ package queue
 import "sync"
 
 type ConcurrentQueue struct {
-	queue []string
+	queue []interface{}
 	mu    sync.Mutex
 }
 
-func (q *ConcurrentQueue) Enqueue(item string) {
+func (q *ConcurrentQueue) Enqueue(item interface{}) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.queue = append(q.queue, item)
 }
 
-func (q *ConcurrentQueue) Dequeue() string {
+func (q *ConcurrentQueue) Dequeue() interface{} {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	temp := q.queue[0]
@@ -21,7 +21,7 @@ func (q *ConcurrentQueue) Dequeue() string {
 	return temp
 }
 
-func (q *ConcurrentQueue) Front() string {
+func (q *ConcurrentQueue) Front() interface{} {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.queue[0]
