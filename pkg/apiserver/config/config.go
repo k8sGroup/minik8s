@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"minik8s/pkg/messaging"
+	"time"
+)
 
 /*
 apiServer 的路径是 /registry/{resource}/{namespace}/{resource_name}
@@ -32,18 +35,20 @@ const Path = "/registry/:resource/:namespace/:resourceName"
 const PrefixPath = "/registry/:resource/:namespace"
 const ParamResource = "resource"
 
-type Config struct {
+type ServerConfig struct {
 	HttpPort       int
 	ValidResources []string // 合法的resource
 	EtcdEndpoints  []string // etcd集群每一个节点的ip和端口
 	EtcdTimeout    time.Duration
+	QueueConfig    *messaging.QConfig
 }
 
-func DefaultServerConfig() *Config {
-	return &Config{
+func DefaultServerConfig() *ServerConfig {
+	return &ServerConfig{
 		HttpPort:       8080,
 		ValidResources: []string{"pod"},
 		EtcdEndpoints:  []string{"localhost:2379"},
 		EtcdTimeout:    5 * time.Second,
+		QueueConfig:    messaging.DefaultQConfig(),
 	}
 }

@@ -20,7 +20,7 @@ type Publisher struct {
 /*
 NewPublisher 创建一个Publisher并且返回其指针
 */
-func NewPublisher(config QConfig) (*Publisher, error) {
+func NewPublisher(config *QConfig) (*Publisher, error) {
 	url := fmt.Sprintf("amqp://%s:%s@%s:%s/", config.User, config.Password, config.Host, config.Port)
 	p := new(Publisher)
 	var err error
