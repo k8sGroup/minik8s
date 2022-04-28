@@ -3,6 +3,7 @@ package replicaset
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/streadway/amqp"
 	"minik8s/object"
 	"minik8s/pkg/client"
@@ -10,6 +11,7 @@ import (
 	"minik8s/pkg/klog"
 	"minik8s/pkg/queue"
 	"net/http"
+	"net/url"
 	"time"
 
 	"minik8s/pkg/messaging"
@@ -32,6 +34,7 @@ func NewReplicaSetController(msgConfig messaging.QConfig, clientConfig client.Co
 	exchangeName := "ReplicaSetController"
 	restClient := client.RESTClient{
 		Client: &http.Client{},
+		Base:   &url.URL{Host: "http://" + clientConfig.Host},
 	}
 	rsc := &ReplicaSetController{
 		Subscriber:   subscriber,
@@ -50,15 +53,19 @@ func (rsc *ReplicaSetController) Run(ctx context.Context) {
 }
 
 func (rsc *ReplicaSetController) register() {
-	err := rsc.Subscriber.Subscribe(rsc.ExchangeName+"."+"addRS", rsc.addRS, rsc.stopCh)
+	if rsc.Subscriber == nil {
+		fmt.Println("Nil subscriber...")
+		return
+	}
+	err := rsc.Subscriber.Subscribe(rsc.ExchangeName+"_"+"addRS", rsc.addRS, rsc.stopCh)
 	if err != nil {
 		klog.Errorf("register addRS fail\n")
 	}
-	err = rsc.Subscriber.Subscribe(rsc.ExchangeName+"."+"updateRS", rsc.updateRS, rsc.stopCh)
+	err = rsc.Subscriber.Subscribe(rsc.ExchangeName+"_"+"updateRS", rsc.updateRS, rsc.stopCh)
 	if err != nil {
 		klog.Errorf("register updateRS fail\n")
 	}
-	err = rsc.Subscriber.Subscribe(rsc.ExchangeName+"."+"deleteRS", rsc.deleteRS, rsc.stopCh)
+	err = rsc.Subscriber.Subscribe(rsc.ExchangeName+"_"+"deleteRS", rsc.deleteRS, rsc.stopCh)
 	if err != nil {
 		klog.Errorf("register deleteRS fail\n")
 	}

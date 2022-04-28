@@ -44,6 +44,7 @@ func NewSubscriber(config QConfig) (*Subscriber, error) {
 	s.nextSlot = 0
 	s.conn, err = amqp.Dial(url)
 	if err != nil {
+		fmt.Println("Fail to connect to message queue...")
 		return nil, err
 	}
 

@@ -43,6 +43,7 @@ func NewServer(c *config.Config) (*Server, error) {
 }
 
 func (s *Server) Run() error {
+	// start web api
 	err := s.engine.Run(fmt.Sprintf(":%d", s.port))
 	if err != nil {
 		return err

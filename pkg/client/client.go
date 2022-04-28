@@ -17,7 +17,7 @@ type Config struct {
 }
 
 type RESTClient struct {
-	base   *url.URL // url = base+resource+name
+	Base   *url.URL // url = base+resource+name
 	Client *http.Client
 }
 
@@ -27,9 +27,9 @@ func (r RESTClient) CreatePods(ctx context.Context, template *object.PodTemplate
 	pod, _ := GetPodFromTemplate(template)
 	podRaw, _ := json.Marshal(pod)
 	reqBody := bytes.NewBuffer(podRaw)
-	attachURL := "/pod"
+	attachURL := "/registry/pod/default"
 
-	req, _ := http.NewRequest("POST", r.base.String()+attachURL, reqBody)
+	req, _ := http.NewRequest("POST", r.Base.String()+attachURL, reqBody)
 	resp, _ := r.Client.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
@@ -50,7 +50,7 @@ func (r RESTClient) UpdatePods(ctx context.Context, pod *object.Pod) error {
 	reqBody := bytes.NewBuffer(podRaw)
 	attachURL := "/pod"
 
-	req, _ := http.NewRequest("POST", r.base.String()+attachURL, reqBody)
+	req, _ := http.NewRequest("POST", r.Base.String()+attachURL, reqBody)
 	resp, _ := r.Client.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
@@ -59,9 +59,9 @@ func (r RESTClient) UpdatePods(ctx context.Context, pod *object.Pod) error {
 	return nil
 }
 
-func (r RESTClient) DeletePod(ctx context.Context, podID string) error {
-	attachURL := "/pod/" + podID
-	req, _ := http.NewRequest("DELETE", r.base.String()+attachURL, nil)
+func (r RESTClient) DeletePod(ctx context.Context, podName string) error {
+	attachURL := "/registry/pod/default" + podName
+	req, _ := http.NewRequest("DELETE", r.Base.String()+attachURL, nil)
 	resp, _ := r.Client.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
@@ -82,7 +82,7 @@ func GetPodFromTemplate(template *object.PodTemplateSpec) (*object.Pod, error) {
 func (r RESTClient) GetRS(name string) (*object.ReplicaSet, error) {
 	attachURL := "/rs/" + name
 
-	req, _ := http.NewRequest("GET", r.base.String()+attachURL, nil)
+	req, _ := http.NewRequest("GET", r.Base.String()+attachURL, nil)
 	resp, _ := r.Client.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
@@ -101,7 +101,7 @@ func (r RESTClient) GetRS(name string) (*object.ReplicaSet, error) {
 func (r RESTClient) GetRSPods(name string) ([]*object.Pod, error) {
 	attachURL := "/pod/" + name
 
-	req, _ := http.NewRequest("GET", r.base.String()+attachURL, nil)
+	req, _ := http.NewRequest("GET", r.Base.String()+attachURL, nil)
 	resp, _ := r.Client.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
@@ -123,7 +123,7 @@ func (r RESTClient) UpdateRSStatus(ctx context.Context, replicaSet *object.Repli
 	reqBody := bytes.NewBuffer(body)
 	attachURL := "/rs/" + replicaSet.Name + "/" + "status"
 
-	req, _ := http.NewRequest("PUT", r.base.String()+attachURL, reqBody)
+	req, _ := http.NewRequest("PUT", r.Base.String()+attachURL, reqBody)
 	resp, _ := r.Client.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
