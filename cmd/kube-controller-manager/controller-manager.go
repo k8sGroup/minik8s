@@ -1,9 +1,13 @@
 package main
 
 import (
-	"minik8s/pkg/klog"
+	"minik8s/cmd/kube-controller-manager/app"
 )
 
 func main() {
-	klog.Infof("running controller manager.go\n")
+	command := app.NewControllerManagerCommand()
+	err := command.Execute()
+	if err != nil {
+		panic(err)
+	}
 }
