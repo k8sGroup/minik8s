@@ -1,7 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"minik8s/pkg/klog"
+)
 
 func main() {
-	fmt.Println("controller manager.go")
+	klog.Infof("running controller manager.go\n")
 }
