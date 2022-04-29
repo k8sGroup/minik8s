@@ -11,17 +11,31 @@ import (
 	"minik8s/pkg/klog"
 	"minik8s/pkg/messaging"
 	"minik8s/pkg/queue"
+	"net/http"
+	"net/url"
 	"time"
 )
 
 type Scheduler struct {
 	// watcher
-	Subscriber   *messaging.Subscriber
-	ExchangeName string
-	stopCh       <-chan struct{}
+	Subscriber *messaging.Subscriber
+	stopCh     <-chan struct{}
 
 	queue  queue.ConcurrentQueue
 	Client client.RESTClient
+}
+
+func NewScheduler(msgConfig messaging.QConfig, clientConfig client.Config) *Scheduler {
+	subscriber, _ := messaging.NewSubscriber(msgConfig)
+	restClient := client.RESTClient{
+		Client: &http.Client{},
+		Base:   &url.URL{Host: "http://" + clientConfig.Host},
+	}
+	rsc := &Scheduler{
+		Subscriber: subscriber,
+		Client:     restClient,
+	}
+	return rsc
 }
 
 // Run begins watching and syncing.
@@ -33,9 +47,13 @@ func (sched *Scheduler) Run(ctx context.Context) {
 }
 
 func (sched *Scheduler) register() {
-	err := sched.Subscriber.Subscribe(sched.ExchangeName+"."+"addRS", sched.watchNewPod, sched.stopCh)
+	exchangeName, _, err := sched.Client.WatchRegister("node", "", true)
 	if err != nil {
 		klog.Errorf("register watchNewPod fail\n")
+	}
+	err = sched.Subscriber.Subscribe(*exchangeName, sched.watchNewPod, sched.stopCh)
+	if err != nil {
+		klog.Errorf("subscribe watchNewPod fail\n")
 	}
 }
 

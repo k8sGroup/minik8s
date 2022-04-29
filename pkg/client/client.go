@@ -38,6 +38,8 @@ func (r RESTClient) CreatePods(ctx context.Context, template *object.PodTemplate
 
 	result := &object.Pod{}
 	body, _ := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+
 	err := json.Unmarshal(body, result)
 	if err != nil {
 		klog.Infof("[CreatePods] Body Pods Unmarshal fail")
@@ -56,6 +58,8 @@ func (r RESTClient) UpdatePods(ctx context.Context, pod *object.Pod) error {
 	if resp.StatusCode != object.SUCCESS {
 		return errors.New("create pod fail")
 	}
+	defer resp.Body.Close()
+
 	return nil
 }
 
@@ -67,6 +71,8 @@ func (r RESTClient) DeletePod(ctx context.Context, podName string) error {
 	if resp.StatusCode != object.SUCCESS {
 		return errors.New("delete pod fail")
 	}
+	defer resp.Body.Close()
+
 	return nil
 }
 
@@ -91,6 +97,8 @@ func (r RESTClient) GetRS(name string) (*object.ReplicaSet, error) {
 
 	result := &object.ReplicaSet{}
 	body, _ := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+
 	err := json.Unmarshal(body, result)
 	if err != nil {
 		klog.Infof("[CreatePods] Body Pods Unmarshal fail")
@@ -110,6 +118,8 @@ func (r RESTClient) GetRSPods(name string) ([]*object.Pod, error) {
 
 	var result []*object.Pod
 	body, _ := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+
 	err := json.Unmarshal(body, &result)
 	if err != nil {
 		klog.Infof("[GetRSPods] Body Pods Unmarshal fail")
@@ -132,6 +142,8 @@ func (r RESTClient) UpdateRSStatus(ctx context.Context, replicaSet *object.Repli
 
 	result := &object.ReplicaSet{}
 	body, _ = ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+
 	err := json.Unmarshal(body, result)
 	if err != nil {
 		klog.Infof("[CreatePods] Body Pods Unmarshal fail")
@@ -143,4 +155,30 @@ func (r RESTClient) UpdateRSStatus(ctx context.Context, replicaSet *object.Repli
 
 func (r RESTClient) GetNodes() ([]*object.Node, error) {
 	return nil, nil
+}
+
+/********************************watch*****************************/
+
+// WatchRegister get ticket for message queue
+func (r RESTClient) WatchRegister(resource string, name string, withPrefix bool) (*string, *int64, error) {
+	attachURL := "/" + resource + "/default"
+	if !withPrefix {
+		attachURL += "/" + name
+	}
+	req, _ := http.NewRequest("PUT", r.Base.String()+attachURL, nil)
+	resp, _ := r.Client.Do(req)
+
+	if resp.StatusCode != 200 {
+		return nil, nil, errors.New("api server register fail")
+	}
+	body, _ := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+
+	result := &TicketResponse{}
+	err := json.Unmarshal(body, result)
+	if err != nil {
+		klog.Infof("[CreatePods] Body Pods Unmarshal fail")
+	}
+	return &attachURL, &result.Ticket, nil
+
 }

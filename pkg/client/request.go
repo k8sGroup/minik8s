@@ -1,8 +1,5 @@
 package client
 
-type Request struct {
-}
-
-func NewRequest(c *RESTClient) *Request {
-	return nil
+type TicketResponse struct {
+	Ticket int64 `json:"ticket"`
 }

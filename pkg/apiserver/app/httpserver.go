@@ -156,6 +156,7 @@ client收到返回值之后检查是否是200，如果是200
 
 */
 func (s *Server) watch(ctx *gin.Context) {
+	fmt.Println("watch match...")
 	key := ctx.Request.URL.Path
 	ticketStr, status := ctx.GetPostForm("ticket")
 	if !status {

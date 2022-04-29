@@ -3,7 +3,6 @@ package replicaset
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/streadway/amqp"
 	"minik8s/object"
 	"minik8s/pkg/client"
@@ -31,15 +30,13 @@ type ReplicaSetController struct {
 
 func NewReplicaSetController(msgConfig messaging.QConfig, clientConfig client.Config) *ReplicaSetController {
 	subscriber, _ := messaging.NewSubscriber(msgConfig)
-	exchangeName := "ReplicaSetController"
 	restClient := client.RESTClient{
 		Client: &http.Client{},
 		Base:   &url.URL{Host: "http://" + clientConfig.Host},
 	}
 	rsc := &ReplicaSetController{
-		Subscriber:   subscriber,
-		ExchangeName: exchangeName,
-		Client:       restClient,
+		Subscriber: subscriber,
+		Client:     restClient,
 	}
 	return rsc
 }
@@ -53,22 +50,33 @@ func (rsc *ReplicaSetController) Run(ctx context.Context) {
 }
 
 func (rsc *ReplicaSetController) register() {
-	if rsc.Subscriber == nil {
-		fmt.Println("Nil subscriber...")
-		return
-	}
-	err := rsc.Subscriber.Subscribe(rsc.ExchangeName+"_"+"addRS", rsc.addRS, rsc.stopCh)
+	exchangeName, _, err := rsc.Client.WatchRegister("rs", "", true)
 	if err != nil {
-		klog.Errorf("register addRS fail\n")
+		klog.Errorf("register watchNewPod fail\n")
 	}
-	err = rsc.Subscriber.Subscribe(rsc.ExchangeName+"_"+"updateRS", rsc.updateRS, rsc.stopCh)
+	err = rsc.Subscriber.Subscribe(*exchangeName, rsc.addRS, rsc.stopCh)
 	if err != nil {
-		klog.Errorf("register updateRS fail\n")
+		klog.Errorf("subscribe watchNewPod fail\n")
 	}
-	err = rsc.Subscriber.Subscribe(rsc.ExchangeName+"_"+"deleteRS", rsc.deleteRS, rsc.stopCh)
+
+	exchangeName, _, err = rsc.Client.WatchRegister("rs", "", true)
 	if err != nil {
-		klog.Errorf("register deleteRS fail\n")
+		klog.Errorf("register watchNewPod fail\n")
 	}
+	err = rsc.Subscriber.Subscribe(*exchangeName, rsc.deleteRS, rsc.stopCh)
+	if err != nil {
+		klog.Errorf("subscribe watchNewPod fail\n")
+	}
+
+	exchangeName, _, err = rsc.Client.WatchRegister("rs", "", true)
+	if err != nil {
+		klog.Errorf("register watchNewPod fail\n")
+	}
+	err = rsc.Subscriber.Subscribe(*exchangeName, rsc.updateRS, rsc.stopCh)
+	if err != nil {
+		klog.Errorf("subscribe watchNewPod fail\n")
+	}
+
 	klog.Debugf("success register\n")
 }
 
