@@ -4,8 +4,9 @@ import (
 	"context"
 	"minik8s/cmd/kube-controller-manager/app/config"
 	"minik8s/cmd/kube-controller-manager/app/options"
-	"minik8s/cmd/wait"
 	"minik8s/pkg/klog"
+
+	"minik8s/pkg/listerwatcher"
 
 	"github.com/spf13/cobra"
 )
@@ -17,8 +18,7 @@ type Controller interface {
 }
 
 type ControllerContext struct {
-	InformerFactory Informer
-	InformerStarted chan struct{}
+	ls *listerwatcher.ListerWatcher
 }
 
 type InitFunc func(ctx context.Context, controllerCtx ControllerContext) (err error)
@@ -37,7 +37,7 @@ func NewControllerManagerCommand() *cobra.Command {
 				klog.Fatalf("failed to configure controller manager %v\n", err)
 			}
 			// FIXME : what's the meaning of stopCh ?
-			if err := Run(c.Complete(), wait.NeverStop); err != nil {
+			if err := Run(c.Complete()); err != nil {
 				klog.Fatalf("failed to run controller manager%v\n", err)
 			}
 		},
@@ -46,7 +46,7 @@ func NewControllerManagerCommand() *cobra.Command {
 	return cmd
 }
 
-func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
+func Run(c *config.CompletedConfig) error {
 	controllerContext, err := CreateControllerContext()
 	if err != nil {
 		return err
@@ -55,14 +55,17 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		klog.Fatalf("error starting controllers: %v\n", err)
 	}
 	// TODO
-	//close(controllerContext.InformerStarted)
 	select {}
 
 	return nil
 }
 
-func CreateControllerContext() (ControllerContext, error) {
-	controllerContext := ControllerContext{}
+func CreateControllerContext() (*ControllerContext, error) {
+	ls, err := listerwatcher.NewListerWatcher(listerwatcher.DefaultConfig())
+	if err != nil {
+		return nil, err
+	}
+	controllerContext := &ControllerContext{ls: ls}
 	return controllerContext, nil
 }
 
@@ -73,10 +76,10 @@ func NewControllerInitializers() map[string]InitFunc {
 	return controller
 }
 
-func StartControllers(ctx context.Context, controllerContext ControllerContext, controllers map[string]InitFunc) error {
+func StartControllers(ctx context.Context, controllerContext *ControllerContext, controllers map[string]InitFunc) error {
 	for controllerName, initFunc := range controllers {
-		klog.Debugf("Starting controller %s\n", controllerName)
-		err := initFunc(ctx, controllerContext)
+		klog.Infof("Starting controller %s\n", controllerName)
+		err := initFunc(ctx, *controllerContext)
 		if err != nil {
 			klog.Errorf("Error starting %s\n", controllerName)
 			return err

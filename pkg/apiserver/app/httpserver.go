@@ -24,6 +24,10 @@ type watchOpt struct {
 	ticket     uint64
 }
 
+type Ticket struct {
+	T uint64
+}
+
 type Server struct {
 	engine       *gin.Engine
 	port         int
@@ -141,7 +145,7 @@ func (s *Server) prefixGet(ctx *gin.Context) {
 
 /*
 watch
-根据key进行watch，通知server注册一个rabbitmq的消息队列，返回值为200+ticket。
+根据key进行watch，通知server注册一个rabbitmq的消息队列，返回值为200+T。
 
 client收到返回值之后检查是否是200，如果是200
 新建一个 Subscriber 或者使用原有的 Subscriber 进行 subscribe 操作。
@@ -160,13 +164,16 @@ func (s *Server) watch(ctx *gin.Context) {
 	key := ctx.Request.URL.Path
 	ticketStr, status := ctx.GetPostForm("ticket")
 	if !status {
-		ticket := s.ticketSeller.Add(1)
-		s.watcherChan <- watchOpt{key: key, withPrefix: false, ticket: ticket}
-		ctx.JSON(http.StatusOK, gin.H{"ticket": ticket})
+		t := Ticket{}
+		t.T = s.ticketSeller.Add(1)
+		data, _ := json.Marshal(t)
+		s.watcherChan <- watchOpt{key: key, withPrefix: false, ticket: t.T}
+		ctx.Data(http.StatusOK, "application/json", data)
 	} else {
 		s.watcherMtx.Lock()
 		ticket, err := strconv.ParseUint(ticketStr, 10, 64)
 		if err != nil {
+			klog.Infof("%s\n", err.Error())
 			ctx.AbortWithStatus(http.StatusBadRequest)
 		} else {
 			if s.watcherMap[key] != nil {
@@ -185,7 +192,7 @@ func (s *Server) watch(ctx *gin.Context) {
 
 /*
 prefixWatch
-根据前缀进行watch，通知server注册一个rabbitmq的消息队列，返回值为200+ticket。
+根据前缀进行watch，通知server注册一个rabbitmq的消息队列，返回值为200+T。
 
 client收到返回值之后检查是否是200，如果是200
 新建一个 Subscriber 或者使用原有的 Subscriber 进行 subscribe 操作。
@@ -203,13 +210,16 @@ func (s *Server) prefixWatch(ctx *gin.Context) {
 	key := ctx.Request.URL.Path
 	ticketStr, status := ctx.GetPostForm("ticket")
 	if !status {
-		ticket := s.ticketSeller.Add(1)
-		s.watcherChan <- watchOpt{key: key, withPrefix: true, ticket: ticket}
-		ctx.JSON(http.StatusOK, gin.H{"ticket": ticket})
+		t := Ticket{}
+		t.T = s.ticketSeller.Add(1)
+		data, _ := json.Marshal(t)
+		s.watcherChan <- watchOpt{key: key, withPrefix: true, ticket: t.T}
+		ctx.Data(http.StatusOK, "application/json", data)
 	} else {
 		s.watcherMtx.Lock()
 		ticket, err := strconv.ParseUint(ticketStr, 10, 64)
 		if err != nil {
+			klog.Infof("%s\n", err.Error())
 			ctx.AbortWithStatus(http.StatusBadRequest)
 		} else {
 			if s.watcherMap[key] != nil {

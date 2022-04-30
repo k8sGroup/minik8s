@@ -32,7 +32,7 @@ type Subscriber struct {
 /*
 NewSubscriber 创建一个Subscriber并且返回指针
 */
-func NewSubscriber(config QConfig) (*Subscriber, error) {
+func NewSubscriber(config *QConfig) (*Subscriber, error) {
 	url := fmt.Sprintf("amqp://%s:%s@%s:%s/", config.User, config.Password, config.Host, config.Port)
 	var err error
 	s := new(Subscriber)

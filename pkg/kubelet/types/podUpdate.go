@@ -1,6 +1,8 @@
 package types
 
-import "minik8s/cmd/kubelet/app/pod"
+import (
+	"minik8s/pkg/kubelet/pod"
+)
 
 type PodOperation int
 
