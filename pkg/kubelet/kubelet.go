@@ -2,6 +2,8 @@ package kubelet
 
 import (
 	"fmt"
+	"minik8s/object"
+	"minik8s/pkg/client"
 	"minik8s/pkg/kubelet/module"
 	"minik8s/pkg/kubelet/pod"
 	"minik8s/pkg/kubelet/podManager"
@@ -13,13 +15,30 @@ import (
 type Kubelet struct {
 	podManager *podManager.PodManager
 	kubeproxy  *kubeproxy.Kubeproxy
+	Client     client.RESTClient
 }
 
-func NewKubelet() *Kubelet {
+func NewKubelet(clientConfig client.Config) *Kubelet {
 	kubelet := &Kubelet{}
 	kubelet.podManager = podManager.NewPodManager()
 	kubelet.kubeproxy = kubeproxy.NewKubeproxy()
+
+	restClient := client.RESTClient{
+		Base: "http://" + clientConfig.Host,
+	}
+	kubelet.Client = restClient
+
 	return kubelet
+}
+
+func (k *Kubelet) Register() error {
+	meta := object.ObjectMeta{
+		Name: "node1",
+	}
+	node := object.Node{
+		ObjectMeta: meta,
+	}
+	return k.Client.RegisterNode(&node)
 }
 
 func (k *Kubelet) AddPodFromConfig(config module.Config) error {

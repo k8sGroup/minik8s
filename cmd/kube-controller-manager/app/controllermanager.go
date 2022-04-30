@@ -2,11 +2,13 @@ package app
 
 import (
 	"context"
-	"github.com/spf13/cobra"
 	"minik8s/cmd/kube-controller-manager/app/config"
 	"minik8s/cmd/kube-controller-manager/app/options"
 	"minik8s/pkg/klog"
+
 	"minik8s/pkg/listerwatcher"
+
+	"github.com/spf13/cobra"
 )
 
 type Informer struct {
@@ -54,6 +56,8 @@ func Run(c *config.CompletedConfig) error {
 	}
 	// TODO
 	select {}
+
+	return nil
 }
 
 func CreateControllerContext() (*ControllerContext, error) {
@@ -68,6 +72,7 @@ func CreateControllerContext() (*ControllerContext, error) {
 func NewControllerInitializers() map[string]InitFunc {
 	controller := map[string]InitFunc{}
 	// TODO : Initialize the map with controller name and InitFunc
+	controller["replicaset"] = startReplicaSetController
 	return controller
 }
 
@@ -79,7 +84,7 @@ func StartControllers(ctx context.Context, controllerContext *ControllerContext,
 			klog.Errorf("Error starting %s\n", controllerName)
 			return err
 		}
-		klog.Infof("Started controller %s\n", controllerName)
+		klog.Debugf("Started controller %s\n", controllerName)
 	}
 	return nil
 }
