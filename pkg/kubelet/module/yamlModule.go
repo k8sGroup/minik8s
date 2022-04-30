@@ -4,7 +4,8 @@ type Labels struct {
 	App string `yaml:"app"`
 }
 type MetaData struct {
-	Name string `yaml:"name"`
+	Name   string            `yaml:"name"`
+	Labels map[string]string `yaml:"labels"`
 }
 type Port struct {
 	ContainerPort string `yaml:"containerPort"`

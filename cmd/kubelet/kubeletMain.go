@@ -4,14 +4,26 @@ import (
 	"fmt"
 	"github.com/go-yaml/yaml"
 	"io/ioutil"
-	"minik8s/cmd/kubelet/app/module"
-	"minik8s/cmd/kubelet/app/podManager"
+	"minik8s/pkg/kubelet"
+	"minik8s/pkg/kubelet/module"
+	"runtime"
 )
 
 func main() {
+	sysType := runtime.GOOS
+	p := kubelet.NewKubelet()
+	var data []byte
+	var err error
+	if sysType == "linux" {
+		//InLinux
+		data, err = ioutil.ReadFile("/home/minik8s/cmd/kubelet/example.yaml")
+	}
+	if sysType == "windows" {
+		data, err = ioutil.ReadFile("D:\\goLandProject\\minik8s\\minik8s\\cmd\\kubelet\\exampleWin.yaml")
+	}
 
-	p := podManager.NewPodManager()
-	data, err := ioutil.ReadFile("D:\\goLandProject\\minik8s\\minik8s\\cmd\\kubelet\\example.yaml")
+	//InWindows
+
 	if err != nil {
 		fmt.Printf(err.Error())
 	}
@@ -24,7 +36,11 @@ func main() {
 	for {
 		fmt.Printf("输入操作类型:\n" +
 			"1、新建pod\n" +
-			"2、查询pod信息\n")
+			"2、查询pod信息\n" +
+			"3、删除pod\n" +
+			"4、为pod添加端口映射\n" +
+			"5、查询端口映射信息\n" +
+			"6、删除端口映射\n")
 		var choice int
 		fmt.Scanln(&choice)
 		switch choice {
@@ -55,6 +71,51 @@ func main() {
 				continue
 			}
 			fmt.Printf(string(resp))
+		case 3:
+			fmt.Printf("输入pod名字\n")
+			var name string
+			fmt.Scanln(&name)
+			err := p.DeletePod(name)
+			if err != nil {
+				fmt.Printf(err.Error())
+				continue
+			}
+			fmt.Printf("成功删除pod")
+		case 4:
+			fmt.Printf("输入选择的pod名\n")
+			var name string
+			fmt.Scanln(&name)
+			fmt.Printf("输入pod端口\n")
+			var podPort string
+			fmt.Scanln(&podPort)
+			var hostPort string
+			fmt.Printf("输入host端口\n")
+			fmt.Scanln(&hostPort)
+			_, err := p.AddPodPortMapping(name, podPort, hostPort)
+			if err != nil {
+				fmt.Printf(err.Error())
+			} else {
+				fmt.Printf("操作成功\n")
+			}
+		case 5:
+			fmt.Println(p.GetPodMappingInfo())
+		case 6:
+			fmt.Printf("输入选择的pod名\n")
+			var name string
+			fmt.Scanln(&name)
+			fmt.Printf("输入pod端口\n")
+			var podPort string
+			fmt.Scanln(&podPort)
+			var hostPort string
+			fmt.Printf("输入host端口\n")
+			fmt.Scanln(&hostPort)
+			err = p.RemovePortMapping(name, podPort, hostPort)
+			if err != nil {
+				fmt.Printf(err.Error())
+			} else {
+				fmt.Printf("操作成功")
+			}
+
 		}
 	}
 }

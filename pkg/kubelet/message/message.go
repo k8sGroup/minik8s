@@ -2,7 +2,7 @@ package message
 
 import (
 	"github.com/docker/docker/api/types"
-	"minik8s/cmd/kubelet/app/module"
+	"minik8s/pkg/kubelet/module"
 )
 
 //---------------------------Container Part---------------------------------------//
@@ -13,6 +13,7 @@ const COMMAND_STOP_CONTAINER = 3
 const COMMAND_BUILD_CONTAINERS_OF_POD = 4
 const COMMAND_PULL_IMAGES = 5
 const COMMAND_PROBE_CONTAINER = 6
+const COMMAND_DELETE_CONTAINER = 7
 
 //------------------------------------------------------------------------------//
 
@@ -40,7 +41,7 @@ type CommandWithImages struct {
 	Images []string
 }
 
-//commandType are COMMAND_PROBE_CONTAINER|
+//commandType are COMMAND_PROBE_CONTAINER|COMMAND_DELETE_CONTAINER
 type CommandWithContainerIds struct {
 	Command
 	ContainerIds []string
@@ -57,7 +58,8 @@ type ResponseWithContainInfo struct {
 
 type ResponseWithContainIds struct {
 	Response
-	Containers []module.ContainerMeta
+	Containers   []module.ContainerMeta
+	NetWorkInfos *types.NetworkSettings
 }
 
 //返回的切片中元素顺序与commnad中容器id顺序一一对应

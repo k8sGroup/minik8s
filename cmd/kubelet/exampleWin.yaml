@@ -7,7 +7,7 @@ spec: #详细
   volumes:
     - name: nginxConfig
       type: hostFile
-      path: /home/minik8s/cmd/kubelet/nginx.conf
+      path: D:\goLandProject\minik8s\minik8s\cmd\kubelet\nginx.conf
   containers: #容器信息
     - name: nginx #容器叫nginx
       image: nginx #使用的镜像

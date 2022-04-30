@@ -2,6 +2,9 @@
 kind: Pod
 metadata:
   name: string  #pod 的名称
+  labels: #设置资源的标签，为自定义
+    key1: value1
+    key2: value2
 spec:  #Pod 的详细定义
   volumes: #在该pod上定义的共享数据卷
     - name: string #共享数据卷的名称

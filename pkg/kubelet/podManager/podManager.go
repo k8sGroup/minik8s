@@ -3,11 +3,11 @@ package podManager
 import (
 	"errors"
 	"github.com/pquerna/ffjson/ffjson"
-	"minik8s/cmd/kubelet/app/dockerClient"
-	"minik8s/cmd/kubelet/app/message"
-	"minik8s/cmd/kubelet/app/module"
-	"minik8s/cmd/kubelet/app/pod"
 	"minik8s/pkg/klog"
+	"minik8s/pkg/kubelet/dockerClient"
+	"minik8s/pkg/kubelet/message"
+	"minik8s/pkg/kubelet/module"
+	"minik8s/pkg/kubelet/pod"
 )
 
 //存储所有的pod信息， 当需要获取pod信息时，直接从缓存中取，速度快  需要初始化变量
@@ -49,10 +49,37 @@ func (p *PodManager) GetPodInfo(podName string) ([]byte, error) {
 	res := pod.GetPodSnapShoot()
 	return ffjson.Marshal(res)
 }
-func (p *PodManager) AddPodFromConfig(config module.Config) {
-	//p.rwLock.Lock()
-	//defer p.rwLock.Unlock()
-	//form containers
+func (p *PodManager) GetPodSnapShoot(podName string) (*pod.PodSnapShoot, error) {
+	uid, ok := p.name2uuid[podName]
+	if !ok {
+		err := errors.New(podName + "对应的pod不存在")
+		return nil, err
+	}
+	pod, _ := p.uid2pod[uid]
+	res := pod.GetPodSnapShoot()
+	return &res, nil
+}
+func (p *PodManager) CheckIfPodExist(podName string) bool {
+	_, ok := p.name2uuid[podName]
+	return ok
+}
+func (p *PodManager) DeletePod(podName string) error {
+	if !p.CheckIfPodExist(podName) {
+		//不存在该pod
+		return errors.New(podName + "对应的pod不存在")
+	}
+	uid, _ := p.name2uuid[podName]
+	pod, _ := p.uid2pod[uid]
+	pod.DeletePod()
+	delete(p.name2uuid, podName)
+	delete(p.uid2pod, uid)
+	return nil
+}
+func (p *PodManager) AddPodFromConfig(config module.Config) error {
+	//首先检查name对应的pod是否存在， 存在的话报错
+	if p.CheckIfPodExist(config.MetaData.Name) {
+		return errors.New(config.MetaData.Name + "对应的pod已经存在，请先删除原pod")
+	}
 	newPod := pod.NewPodfromConfig(&config)
 	newPodShoot := newPod.GetPodSnapShoot()
 	p.uid2pod[newPodShoot.Uid] = newPod
@@ -91,7 +118,7 @@ func (p *PodManager) AddPodFromConfig(config module.Config) {
 	}
 	//塞进对应pod的commandChan
 	newPod.ReceivePodCommand(podCommand)
-	return
+	return nil
 }
 
 func (p *PodManager) PullImages(images []string) error {

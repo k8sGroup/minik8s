@@ -9,10 +9,14 @@ import (
 	"github.com/docker/go-connections/nat"
 	"io"
 	"io/ioutil"
-	"minik8s/cmd/kubelet/app/message"
-	"minik8s/cmd/kubelet/app/module"
+	"minik8s/pkg/kubelet/message"
+	"minik8s/pkg/kubelet/module"
 	"unsafe"
 )
+
+func GetNewClient() (*client.Client, error) {
+	return getNewClient()
+}
 
 func getNewClient() (*client.Client, error) {
 	return client.NewClientWithOpts()
@@ -170,14 +174,14 @@ func createPause(ports []module.Port, name string) (container.ContainerCreateCre
 		ExposedPorts: exports,
 	}, &container.HostConfig{
 		IpcMode: container.IpcMode("shareable"),
-		PortBindings: nat.PortMap{
-			"80/tcp": []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: "8080",
-				},
-			},
-		},
+		//PortBindings: nat.PortMap{
+		//	"80/tcp": []nat.PortBinding{
+		//		{
+		//			HostIP:   "0.0.0.0",
+		//			HostPort: "8080",
+		//		},
+		//	},
+		//},
 	}, nil, nil, name)
 	return resp, err
 }
@@ -199,33 +203,96 @@ func probeContainers(containerIds []string) ([]string, error) {
 	return res, nil
 }
 
-func createContainersOfPod(containers []module.Container) ([]module.ContainerMeta, error) {
+//删除containers
+func deleteContainers(containerIds []string) error {
+	cli, err2 := getNewClient()
+	if err2 != nil {
+		return err2
+	}
+	//需要先停止containers
+	for _, value := range containerIds {
+		err := cli.ContainerStop(context.Background(), value, nil)
+		if err != nil {
+			return err
+		}
+	}
+	for _, value := range containerIds {
+		err := cli.ContainerRemove(context.Background(), value, types.ContainerRemoveOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+//查找是否存在，存在就删除
+func deleteExitedContainers(names []string) error {
+	cli, err2 := getNewClient()
+	if err2 != nil {
+		return err2
+	}
+	for _, value := range names {
+		_, err := cli.ContainerInspect(context.Background(), value)
+		if err == nil {
+			//需要先停止container
+			err = cli.ContainerStop(context.Background(), value, nil)
+			if err != nil {
+				return err
+			}
+			err = cli.ContainerRemove(context.Background(), value, types.ContainerRemoveOptions{})
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+func getContainerNetInfo(name string) (*types.NetworkSettings, error) {
 	cli, err2 := getNewClient()
 	if err2 != nil {
 		return nil, err2
+	}
+	res, err := cli.ContainerInspect(context.Background(), name)
+	if err != nil {
+		return nil, err
+	}
+	return res.NetworkSettings, nil
+}
+func createContainersOfPod(containers []module.Container) ([]module.ContainerMeta, *types.NetworkSettings, error) {
+	cli, err2 := getNewClient()
+	if err2 != nil {
+		return nil, nil, err2
 	}
 	var firstContainerId string
 	var result []module.ContainerMeta
 	//先生成所有要暴露的port集合
 	var totlePort []module.Port
 	images := []string{"gcr.io/google_containers/pause-amd64:3.0"}
+	//防止重名，先检查是否重名，有的话删除
+	var names []string
 	pauseName := "pause"
 	for _, value := range containers {
 		pauseName += "_" + value.Name
+		names = append(names, value.Name)
 		images = append(images, value.Image)
 		for _, port := range value.Ports {
 			totlePort = append(totlePort, port)
 		}
 	}
+	names = append(names, pauseName)
+	err3 := deleteExitedContainers(names)
+	if err3 != nil {
+		return nil, nil, err3
+	}
 	//先统一拉取镜像
 	err := dockerClientPullImages(images)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	//创建pause容器
 	pause, err := createPause(totlePort, pauseName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	firstContainerId = pause.ID
 	result = append(result, module.ContainerMeta{
@@ -263,7 +330,7 @@ func createContainersOfPod(containers []module.Container) ([]module.ContainerMet
 			PidMode:     container.PidMode("container" + firstContainerId),
 		}, nil, nil, value.Name)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		result = append(result, module.ContainerMeta{
 			RealName:    value.Name,
@@ -273,9 +340,14 @@ func createContainersOfPod(containers []module.Container) ([]module.ContainerMet
 	//启动容器
 	err = runContainers(result)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return result, nil
+	var netSetting *types.NetworkSettings
+	netSetting, err = getContainerNetInfo(pauseName)
+	if err != nil {
+		return nil, nil, err
+	}
+	return result, netSetting, nil
 }
 
 //涉及大量指针操作，要确保在caller和callee在同一个地址空间中
@@ -312,11 +384,12 @@ func HandleCommand(command *message.Command) *message.Response {
 		return &result
 	case message.COMMAND_BUILD_CONTAINERS_OF_POD:
 		p := (*message.CommandWithConfig)(unsafe.Pointer(command))
-		res, err := createContainersOfPod(p.Group)
+		res, netSetting, err := createContainersOfPod(p.Group)
 		var result message.ResponseWithContainIds
 		result.Err = err
 		result.CommandType = message.COMMAND_BUILD_CONTAINERS_OF_POD
 		result.Containers = res
+		result.NetWorkInfos = netSetting
 		return &(result.Response)
 	case message.COMMAND_PULL_IMAGES:
 		p := (*message.CommandWithImages)(unsafe.Pointer(command))
@@ -333,6 +406,14 @@ func HandleCommand(command *message.Command) *message.Response {
 		result.CommandType = message.COMMAND_PROBE_CONTAINER
 		result.ProbeInfos = res
 		return &(result.Response)
+	case message.COMMAND_DELETE_CONTAINER:
+		//删除containers的操作
+		p := (*message.CommandWithContainerIds)(unsafe.Pointer(command))
+		err := deleteContainers(p.ContainerIds)
+		var result message.Response
+		result.CommandType = message.COMMAND_DELETE_CONTAINER
+		result.Err = err
+		return &result
 	}
 	return nil
 }
