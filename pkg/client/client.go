@@ -5,20 +5,20 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"minik8s/object"
 	"minik8s/pkg/klog"
+	"minik8s/pkg/listerwatcher"
 	"net/http"
-	"net/url"
 )
 
 type Config struct {
-	Host string
+	Host string // ip and port
 }
 
 type RESTClient struct {
-	Base   *url.URL // url = base+resource+name
-	Client *http.Client
+	Base string // url = base+resource+name
 }
 
 /******************************Pod*******************************/
@@ -29,8 +29,8 @@ func (r RESTClient) CreatePods(ctx context.Context, template *object.PodTemplate
 	reqBody := bytes.NewBuffer(podRaw)
 	attachURL := "/registry/pod/default"
 
-	req, _ := http.NewRequest("POST", r.Base.String()+attachURL, reqBody)
-	resp, _ := r.Client.Do(req)
+	req, _ := http.NewRequest("POST", r.Base+attachURL, reqBody)
+	resp, _ := http.DefaultClient.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
 		return errors.New("create pod fail")
@@ -52,8 +52,8 @@ func (r RESTClient) UpdatePods(ctx context.Context, pod *object.Pod) error {
 	reqBody := bytes.NewBuffer(podRaw)
 	attachURL := "/pod"
 
-	req, _ := http.NewRequest("POST", r.Base.String()+attachURL, reqBody)
-	resp, _ := r.Client.Do(req)
+	req, _ := http.NewRequest("POST", r.Base+attachURL, reqBody)
+	resp, _ := http.DefaultClient.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
 		return errors.New("create pod fail")
@@ -65,8 +65,8 @@ func (r RESTClient) UpdatePods(ctx context.Context, pod *object.Pod) error {
 
 func (r RESTClient) DeletePod(ctx context.Context, podName string) error {
 	attachURL := "/registry/pod/default" + podName
-	req, _ := http.NewRequest("DELETE", r.Base.String()+attachURL, nil)
-	resp, _ := r.Client.Do(req)
+	req, _ := http.NewRequest("DELETE", r.Base+attachURL, nil)
+	resp, _ := http.DefaultClient.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
 		return errors.New("delete pod fail")
@@ -88,8 +88,8 @@ func GetPodFromTemplate(template *object.PodTemplateSpec) (*object.Pod, error) {
 func (r RESTClient) GetRS(name string) (*object.ReplicaSet, error) {
 	attachURL := "/rs/" + name
 
-	req, _ := http.NewRequest("GET", r.Base.String()+attachURL, nil)
-	resp, _ := r.Client.Do(req)
+	req, _ := http.NewRequest("GET", r.Base+attachURL, nil)
+	resp, _ := http.DefaultClient.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
 		return nil, errors.New("delete pod fail")
@@ -109,8 +109,8 @@ func (r RESTClient) GetRS(name string) (*object.ReplicaSet, error) {
 func (r RESTClient) GetRSPods(name string) ([]*object.Pod, error) {
 	attachURL := "/pod/" + name
 
-	req, _ := http.NewRequest("GET", r.Base.String()+attachURL, nil)
-	resp, _ := r.Client.Do(req)
+	req, _ := http.NewRequest("GET", r.Base+attachURL, nil)
+	resp, _ := http.DefaultClient.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
 		return nil, errors.New("get rs pod fail")
@@ -133,8 +133,8 @@ func (r RESTClient) UpdateRSStatus(ctx context.Context, replicaSet *object.Repli
 	reqBody := bytes.NewBuffer(body)
 	attachURL := "/rs/" + replicaSet.Name + "/" + "status"
 
-	req, _ := http.NewRequest("PUT", r.Base.String()+attachURL, reqBody)
-	resp, _ := r.Client.Do(req)
+	req, _ := http.NewRequest("PUT", r.Base+attachURL, reqBody)
+	resp, _ := http.DefaultClient.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
 		return nil, errors.New("update rs fail")
@@ -153,8 +153,34 @@ func (r RESTClient) UpdateRSStatus(ctx context.Context, replicaSet *object.Repli
 
 /********************************Node*****************************/
 
-func (r RESTClient) GetNodes() ([]*object.Node, error) {
-	return nil, nil
+func GetNodes(ls *listerwatcher.ListerWatcher) ([]*object.Node, error) {
+	raw, err := ls.List("/registry/node/default")
+	if err != nil {
+		fmt.Printf("[GetNodes] fail to get nodes")
+	}
+	var nodes []*object.Node
+	err = json.Unmarshal(raw, nodes)
+	if err != nil {
+		fmt.Printf("[GetNodes] unmarshal fail")
+	}
+	return nodes, nil
+}
+
+func (r RESTClient) RegisterNode(node *object.Node) error {
+	if node.Name == "" {
+		return errors.New("invalid node name")
+	}
+	attachURL := "/registry/node/default/" + node.Name
+	body, err := json.Marshal(node)
+	reqBody := bytes.NewBuffer(body)
+
+	req, _ := http.NewRequest("PUT", r.Base+attachURL, reqBody)
+	resp, _ := http.DefaultClient.Do(req)
+
+	if err != nil || resp.StatusCode != 200 {
+		fmt.Printf("[GetNodes] unmarshal fail")
+	}
+	return nil
 }
 
 /********************************watch*****************************/
@@ -165,8 +191,8 @@ func (r RESTClient) WatchRegister(resource string, name string, withPrefix bool)
 	if !withPrefix {
 		attachURL += "/" + name
 	}
-	req, _ := http.NewRequest("PUT", r.Base.String()+attachURL, nil)
-	resp, _ := r.Client.Do(req)
+	req, _ := http.NewRequest("PUT", r.Base+attachURL, nil)
+	resp, _ := http.DefaultClient.Do(req)
 
 	if resp.StatusCode != 200 {
 		return nil, nil, errors.New("api server register fail")

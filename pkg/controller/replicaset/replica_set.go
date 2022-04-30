@@ -9,8 +9,6 @@ import (
 	"minik8s/pkg/controller"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/queue"
-	"net/http"
-	"net/url"
 	"time"
 
 	"minik8s/pkg/messaging"
@@ -29,10 +27,9 @@ type ReplicaSetController struct {
 }
 
 func NewReplicaSetController(msgConfig messaging.QConfig, clientConfig client.Config) *ReplicaSetController {
-	subscriber, _ := messaging.NewSubscriber(msgConfig)
+	subscriber, _ := messaging.NewSubscriber(&msgConfig)
 	restClient := client.RESTClient{
-		Client: &http.Client{},
-		Base:   &url.URL{Host: "http://" + clientConfig.Host},
+		Base: "http://" + clientConfig.Host,
 	}
 	rsc := &ReplicaSetController{
 		Subscriber: subscriber,

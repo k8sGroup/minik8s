@@ -4,56 +4,53 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/streadway/amqp"
+	"fmt"
 	"math/rand"
 	"minik8s/object"
 	"minik8s/pkg/client"
+	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
-	"minik8s/pkg/messaging"
+	"minik8s/pkg/listerwatcher"
 	"minik8s/pkg/queue"
-	"net/http"
-	"net/url"
 	"time"
 )
 
 type Scheduler struct {
-	// watcher
-	Subscriber *messaging.Subscriber
-	stopCh     <-chan struct{}
-
-	queue  queue.ConcurrentQueue
-	Client client.RESTClient
+	ls          *listerwatcher.ListerWatcher
+	stopChannel <-chan struct{}
+	queue       queue.ConcurrentQueue
+	Client      client.RESTClient
 }
 
-func NewScheduler(msgConfig messaging.QConfig, clientConfig client.Config) *Scheduler {
-	subscriber, _ := messaging.NewSubscriber(msgConfig)
-	restClient := client.RESTClient{
-		Client: &http.Client{},
-		Base:   &url.URL{Host: "http://" + clientConfig.Host},
+func NewScheduler(lsConfig *listerwatcher.Config, clientConfig client.Config) *Scheduler {
+	ls, err := listerwatcher.NewListerWatcher(lsConfig)
+	if err != nil {
+		fmt.Printf("[Scheduler] list watch start fail...")
 	}
+
+	restClient := client.RESTClient{
+		Base: "http://" + clientConfig.Host,
+	}
+
 	rsc := &Scheduler{
-		Subscriber: subscriber,
-		Client:     restClient,
+		ls:     ls,
+		Client: restClient,
 	}
 	return rsc
 }
 
 // Run begins watching and syncing.
 func (sched *Scheduler) Run(ctx context.Context) {
-	klog.Debugf("[ReplicaSetController]start running\n")
+	klog.Debugf("[Scheduler]start running\n")
 	sched.register()
 	go sched.worker(ctx)
 	<-ctx.Done()
 }
 
 func (sched *Scheduler) register() {
-	exchangeName, _, err := sched.Client.WatchRegister("node", "", true)
+	err := sched.ls.Watch("/registry/pod/default", sched.watchNewPod, sched.stopChannel)
 	if err != nil {
-		klog.Errorf("register watchNewPod fail\n")
-	}
-	err = sched.Subscriber.Subscribe(*exchangeName, sched.watchNewPod, sched.stopCh)
-	if err != nil {
-		klog.Errorf("subscribe watchNewPod fail\n")
+		fmt.Printf("[Scheduler] ListWatch init fail...")
 	}
 }
 
@@ -71,9 +68,10 @@ func (sched *Scheduler) worker(ctx context.Context) {
 }
 
 func (sched *Scheduler) schedulePod(ctx context.Context, pod *object.Pod) error {
-	nodes, _ := sched.Client.GetNodes()
+	nodes, _ := client.GetNodes(sched.ls)
 	// select a host for the pod
 	nodeName, _ := selectHost(nodes)
+	fmt.Printf("[schedulePod]assign pod to node:%s\n", nodeName)
 	// modify pod host
 	pod.Spec.NodeName = nodeName
 	// update pod to api server
@@ -94,9 +92,10 @@ func selectHost(nodes []*object.Node) (string, error) {
 }
 
 // watch the change of new pods
-func (sched *Scheduler) watchNewPod(d amqp.Delivery) {
+func (sched *Scheduler) watchNewPod(res etcdstore.WatchRes) {
+	fmt.Printf("[watchNewPod] new message from watcher...")
 	pod := &object.Pod{}
-	err := json.Unmarshal(d.Body, pod)
+	err := json.Unmarshal(res.ValueBytes, pod)
 	if err != nil {
 		klog.Warnf("watchNewPod bad message\n")
 	}
