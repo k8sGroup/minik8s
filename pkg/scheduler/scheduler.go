@@ -11,7 +11,7 @@ import (
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/listerwatcher"
-	"minik8s/pkg/queue"
+	"minik8s/util/queue"
 	"time"
 )
 
