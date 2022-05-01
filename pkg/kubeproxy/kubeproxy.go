@@ -10,6 +10,7 @@ import (
 type Kubeproxy struct {
 	portMappings []iptablesManager.PortMapping
 	rwLock       sync.RWMutex
+	
 	//存一份snapshoop
 	kubeproxySnapShoot KubeproxySnapShoot
 }
