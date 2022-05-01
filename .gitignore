@@ -59,3 +59,5 @@ node_modules/
 
 # docker-compose #
 docker/
+
+bin/

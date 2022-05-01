@@ -4,24 +4,24 @@ import (
 	"fmt"
 	"github.com/go-yaml/yaml"
 	"io/ioutil"
+	"minik8s/pkg/client"
 	"minik8s/pkg/kubelet"
 	"minik8s/pkg/kubelet/module"
 )
 
 func main() {
-	//sysType := runtime.GOOS
-	p := kubelet.NewKubelet()
+
+	// host is the address of master node
+	clientConfig := client.Config{Host: "127.0.0.1:8080"}
+	p := kubelet.NewKubelet(clientConfig)
+	err := p.Register()
+
+	if err != nil {
+		fmt.Printf("[Kubelete] register node fail")
+	}
 	var data []byte
-	var err error
-	//if sysType == "linux" {
-	//	//InLinux
-	//	data, err = ioutil.ReadFile("/home/minik8s/cmd/kubelet/example.yaml")
-	//}
-	//if sysType == "windows" {
-	//	data, err = ioutil.ReadFile("D:\\goLandProject\\minik8s\\minik8s\\cmd\\kubelet\\exampleWin.yaml")
-	//}
+
 	data, err = ioutil.ReadFile("./cmd/kubelet/example.yaml")
-	//InWindows
 
 	if err != nil {
 		fmt.Printf(err.Error())

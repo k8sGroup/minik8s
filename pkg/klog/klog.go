@@ -20,7 +20,7 @@ func init() {
 		output = os.Stderr
 		return
 	}
-	logFile, err := os.OpenFile(pathName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	logFile, err := os.OpenFile(pathName, os.O_CREATE|os.O_WRONLY|os.O_APPEND|os.O_TRUNC, 0644)
 	if err != nil {
 		fmt.Printf("open log file failed, output to stderr\n")
 		output = os.Stderr

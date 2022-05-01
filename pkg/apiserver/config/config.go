@@ -46,7 +46,7 @@ type ServerConfig struct {
 func DefaultServerConfig() *ServerConfig {
 	return &ServerConfig{
 		HttpPort:       8080,
-		ValidResources: []string{"pod"},
+		ValidResources: []string{"pod", "rs", "node", "test"},
 		EtcdEndpoints:  []string{"localhost:2379"},
 		EtcdTimeout:    5 * time.Second,
 		QueueConfig:    messaging.DefaultQConfig(),

@@ -84,6 +84,7 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 }
 
 func (s *Server) Run() error {
+	// start web api
 	err := s.engine.Run(fmt.Sprintf(":%d", s.port))
 	if err != nil {
 		return err
@@ -159,6 +160,7 @@ client收到返回值之后检查是否是200，如果是200
 
 */
 func (s *Server) watch(ctx *gin.Context) {
+	fmt.Println("watch match...")
 	key := ctx.Request.URL.Path
 	ticketStr, status := ctx.GetPostForm("ticket")
 	if !status {
