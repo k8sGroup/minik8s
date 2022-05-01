@@ -78,6 +78,11 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 		engine.POST(config.PrefixPath, s.validate, s.prefixWatch)
 	}
 
+	{
+		engine.DELETE(config.RS, s.deleteRS)
+		engine.DELETE(config.RS, s.deletePod)
+	}
+
 	go s.daemon(watcherChan)
 
 	return s, nil

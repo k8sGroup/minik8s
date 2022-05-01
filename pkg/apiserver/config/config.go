@@ -34,6 +34,13 @@ apiServer 的路径是 /registry/{resource}/{namespace}/{resource_name}
 const Path = "/registry/:resource/:namespace/:resourceName"
 const PrefixPath = "/registry/:resource/:namespace"
 const ParamResource = "resource"
+const ParamResourceName = "resourceName"
+
+// path for kube client
+const (
+	RS  = "/rs/:resourceName"
+	POD = "/pod/:resourceName"
+)
 
 type ServerConfig struct {
 	HttpPort       int

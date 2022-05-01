@@ -1,8 +1,6 @@
 package types
 
-import (
-	"minik8s/pkg/kubelet/pod"
-)
+import "minik8s/object"
 
 type PodOperation int
 
@@ -33,7 +31,7 @@ const (
 )
 
 type PodUpdate struct {
-	Pods   []*pod.Pod
+	Pods   []*object.Pod
 	Op     PodOperation
 	Source string
 }

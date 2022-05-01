@@ -3,37 +3,41 @@ package replicaset
 import (
 	"context"
 	"encoding/json"
-	"github.com/streadway/amqp"
+	"fmt"
+	"minik8s/cmd/kube-controller-manager/app"
 	"minik8s/object"
 	"minik8s/pkg/client"
 	"minik8s/pkg/controller"
+	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
-	"minik8s/pkg/queue"
+	"minik8s/pkg/listerwatcher"
+	concurrent_map "minik8s/util/map"
+	"minik8s/util/queue"
 	"time"
-
-	"minik8s/pkg/messaging"
 )
 
 type ReplicaSetController struct {
-	// watcher
-	Subscriber   *messaging.Subscriber
-	ExchangeName string
-	stopCh       <-chan struct{}
+	ls          *listerwatcher.ListerWatcher
+	stopChannel <-chan struct{}
 
 	// working queue
 	queue queue.ConcurrentQueue
+	cp    *concurrent_map.ConcurrentMap
 
 	Client client.RESTClient
 }
 
-func NewReplicaSetController(msgConfig messaging.QConfig, clientConfig client.Config) *ReplicaSetController {
-	subscriber, _ := messaging.NewSubscriber(&msgConfig)
+func NewReplicaSetController(ctx context.Context, controllerCtx app.ControllerContext) *ReplicaSetController {
 	restClient := client.RESTClient{
-		Base: "http://" + clientConfig.Host,
+		Base: "http://" + controllerCtx.MasterIP,
 	}
+
+	cp := concurrent_map.NewConcurrentMap()
+
 	rsc := &ReplicaSetController{
-		Subscriber: subscriber,
-		Client:     restClient,
+		ls:     controllerCtx.GetListerWatcher(),
+		cp:     cp,
+		Client: restClient,
 	}
 	return rsc
 }
@@ -47,31 +51,14 @@ func (rsc *ReplicaSetController) Run(ctx context.Context) {
 }
 
 func (rsc *ReplicaSetController) register() {
-	exchangeName, _, err := rsc.Client.WatchRegister("rs", "", true)
+	err := rsc.ls.Watch("/registry/rs/default", rsc.addRS, rsc.stopChannel)
 	if err != nil {
-		klog.Errorf("register watchNewPod fail\n")
-	}
-	err = rsc.Subscriber.Subscribe(*exchangeName, rsc.addRS, rsc.stopCh)
-	if err != nil {
-		klog.Errorf("subscribe watchNewPod fail\n")
+		fmt.Printf("[Scheduler] ListWatch init fail...")
 	}
 
-	exchangeName, _, err = rsc.Client.WatchRegister("rs", "", true)
+	err = rsc.ls.Watch("/registry/rs/default", rsc.deleteRS, rsc.stopChannel)
 	if err != nil {
-		klog.Errorf("register watchNewPod fail\n")
-	}
-	err = rsc.Subscriber.Subscribe(*exchangeName, rsc.deleteRS, rsc.stopCh)
-	if err != nil {
-		klog.Errorf("subscribe watchNewPod fail\n")
-	}
-
-	exchangeName, _, err = rsc.Client.WatchRegister("rs", "", true)
-	if err != nil {
-		klog.Errorf("register watchNewPod fail\n")
-	}
-	err = rsc.Subscriber.Subscribe(*exchangeName, rsc.updateRS, rsc.stopCh)
-	if err != nil {
-		klog.Errorf("subscribe watchNewPod fail\n")
+		fmt.Printf("[Scheduler] ListWatch init fail...")
 	}
 
 	klog.Debugf("success register\n")
@@ -91,31 +78,56 @@ func (rsc *ReplicaSetController) worker(ctx context.Context) {
 	}
 }
 
-func (rsc *ReplicaSetController) addRS(d amqp.Delivery) {
+func (rsc *ReplicaSetController) addRS(res etcdstore.WatchRes) {
+	if res.ResType != etcdstore.PUT {
+		return
+	}
+
+	fmt.Printf("[addRS] message receive...")
+
 	rs := &object.ReplicaSet{}
-	err := json.Unmarshal(d.Body, rs)
+	err := json.Unmarshal(res.ValueBytes, rs)
 	if err != nil {
 		klog.Warnf("addRS bad message\n")
 	}
 	// encode object to key
 	key := getKey(rs)
+	rsc.cp.Put(key, rs)
 	// enqueue key
 	rsc.queue.Enqueue(key)
 }
 
-func (rsc *ReplicaSetController) updateRS(d amqp.Delivery) {
+func (rsc *ReplicaSetController) deleteRS(res etcdstore.WatchRes) {
 
-}
+	rs := &object.ReplicaSet{}
+	err := json.Unmarshal(res.ValueBytes, rs)
+	if err != nil {
+		klog.Warnf("bad message\n")
+	}
 
-func (rsc *ReplicaSetController) deleteRS(d amqp.Delivery) {
+	// check whether the message is deletion
+	if *rs.Spec.Replicas != 0 {
+		return
+	}
+
+	fmt.Printf("[deleteRS] message receive...")
+
+	// reset replicas to zero
+	*rs.Spec.Replicas = 0
+
+	// encode object to key
+	key := getKey(rs)
+	rsc.cp.Put(key, rs)
+	// enqueue key
+	rsc.queue.Enqueue(key)
 
 }
 
 func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
 	// get name of key
 	name := key
-	// get all replica sets of the name
-	rs, _ := rsc.Client.GetRS(name)
+	// get expected replica set
+	rs, _ := rsc.cp.Get(key).(*object.ReplicaSet)
 	// get all actual pods of the rs
 	allPods, _ := rsc.Client.GetRSPods(name)
 	// filter all inactive pods
@@ -176,7 +188,6 @@ func getPodsToDelete(filteredPods, relatedPods []*object.Pod, diff int) []*objec
 	return filteredPods[:diff]
 }
 
-// TODO: key is the resource name
 func getKey(rs *object.ReplicaSet) string {
 	return rs.Name
 }
