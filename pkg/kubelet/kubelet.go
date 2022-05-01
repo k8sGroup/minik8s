@@ -1,24 +1,32 @@
 package kubelet
 
 import (
+	"encoding/json"
 	"fmt"
 	"minik8s/object"
 	"minik8s/pkg/client"
+	"minik8s/pkg/etcdstore"
+	"minik8s/pkg/klog"
+	"minik8s/pkg/kubelet/config"
 	"minik8s/pkg/kubelet/module"
-	"minik8s/pkg/kubelet/pod"
 	"minik8s/pkg/kubelet/podManager"
 	"minik8s/pkg/kubelet/types"
 	"minik8s/pkg/kubeproxy"
 	"minik8s/pkg/kubeproxy/iptablesManager"
+	"minik8s/pkg/listerwatcher"
 )
 
 type Kubelet struct {
 	podManager *podManager.PodManager
 	kubeproxy  *kubeproxy.Kubeproxy
-	Client     client.RESTClient
+	PodConfig  *config.PodConfig
+
+	ls          *listerwatcher.ListerWatcher
+	stopChannel <-chan struct{}
+	Client      client.RESTClient
 }
 
-func NewKubelet(clientConfig client.Config) *Kubelet {
+func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kubelet {
 	kubelet := &Kubelet{}
 	kubelet.podManager = podManager.NewPodManager()
 	kubelet.kubeproxy = kubeproxy.NewKubeproxy()
@@ -28,17 +36,55 @@ func NewKubelet(clientConfig client.Config) *Kubelet {
 	}
 	kubelet.Client = restClient
 
+	// initialize list watch
+	ls, err := listerwatcher.NewListerWatcher(lsConfig)
+	if err != nil {
+		fmt.Printf("[NewKubelet] list watch start fail...")
+	}
+	kubelet.ls = ls
+
+	// initialize pod config
+	kubelet.PodConfig = config.NewPodConfig()
+
 	return kubelet
 }
 
-func (k *Kubelet) Register() error {
+// Register TODO: node register to apiserver config
+func (kl *Kubelet) register() error {
 	meta := object.ObjectMeta{
 		Name: "node1",
 	}
 	node := object.Node{
 		ObjectMeta: meta,
 	}
-	return k.Client.RegisterNode(&node)
+	err := kl.Client.RegisterNode(&node)
+	if err != nil {
+		fmt.Printf("[Kubelet] Register Node fail...")
+	}
+
+	err = kl.ls.Watch("/registry/pod/default", kl.watchPod, kl.stopChannel)
+	if err != nil {
+		fmt.Printf("[Kubelet] ListWatch init fail...")
+	}
+
+	return nil
+}
+
+func (kl *Kubelet) Run() {
+	err := kl.register()
+	if err != nil {
+		fmt.Printf("[Kubelet] Register fail...")
+		return
+	}
+
+	updates := kl.PodConfig.GetUpdates()
+	kl.syncLoop(updates, kl)
+}
+
+func (kl *Kubelet) syncLoop(updates <-chan types.PodUpdate, handler SyncHandler) {
+	for {
+		kl.syncLoopIteration(updates, handler)
+	}
 }
 
 func (k *Kubelet) AddPodFromConfig(config module.Config) error {
@@ -69,14 +115,15 @@ func (k *Kubelet) GetPodMappingInfo() []iptablesManager.PortMapping {
 }
 
 type SyncHandler interface {
-	HandlePodAdditions(pods []*pod.Pod)
-	HandlePodUpdates(pods []*pod.Pod)
-	HandlePodRemoves(pods []*pod.Pod)
-	HandlePodReconcile(pods []*pod.Pod)
-	HandlePodSyncs(pods []*pod.Pod)
+	HandlePodAdditions(pods []*object.Pod)
+	HandlePodUpdates(pods []*object.Pod)
+	HandlePodRemoves(pods []*object.Pod)
+	HandlePodReconcile(pods []*object.Pod)
+	HandlePodSyncs(pods []*object.Pod)
 	HandlePodCleanups() error
 }
 
+// TODO: channel pod type?
 func (kl *Kubelet) syncLoopIteration(ch <-chan types.PodUpdate, handler SyncHandler) bool {
 	select {
 	case u, open := <-ch:
@@ -99,4 +146,55 @@ func (kl *Kubelet) syncLoopIteration(ch <-chan types.PodUpdate, handler SyncHand
 		}
 	}
 	return true
+}
+
+func (kl *Kubelet) watchPod(res etcdstore.WatchRes) {
+	pod := &object.Pod{}
+	err := json.Unmarshal(res.ValueBytes, pod)
+	if err != nil {
+		klog.Warnf("watchNewPod bad message\n")
+	}
+	pods := []*object.Pod{pod}
+
+	op := kl.getOpFromPod(pod)
+
+	podUp := types.PodUpdate{
+		Pods: pods,
+		Op:   op,
+	}
+	kl.PodConfig.GetUpdates() <- podUp
+}
+
+func (kl *Kubelet) getOpFromPod(pod *object.Pod) types.PodOperation {
+	op := types.ADD
+	if pod.Status.Phase == object.PodFailed {
+		op = types.DELETE
+	}
+	return op
+}
+
+func (kl *Kubelet) HandlePodAdditions(pods []*object.Pod) {
+	for _, pod := range pods {
+		kl.podManager.AddPod(pod)
+	}
+}
+
+func (kl *Kubelet) HandlePodUpdates(pods []*object.Pod) {
+
+}
+
+func (kl *Kubelet) HandlePodRemoves(pods []*object.Pod) {
+
+}
+
+func (kl *Kubelet) HandlePodReconcile(pods []*object.Pod) {
+
+}
+
+func (kl *Kubelet) HandlePodSyncs(pods []*object.Pod) {
+
+}
+
+func (kl *Kubelet) HandlePodCleanups() error {
+	return nil
 }

@@ -3,6 +3,7 @@ package podManager
 import (
 	"errors"
 	"github.com/pquerna/ffjson/ffjson"
+	"minik8s/object"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/kubelet/dockerClient"
 	"minik8s/pkg/kubelet/message"
@@ -49,6 +50,7 @@ func (p *PodManager) GetPodInfo(podName string) ([]byte, error) {
 	res := pod.GetPodSnapShoot()
 	return ffjson.Marshal(res)
 }
+
 func (p *PodManager) GetPodSnapShoot(podName string) (*pod.PodSnapShoot, error) {
 	uid, ok := p.name2uuid[podName]
 	if !ok {
@@ -59,10 +61,12 @@ func (p *PodManager) GetPodSnapShoot(podName string) (*pod.PodSnapShoot, error) 
 	res := pod.GetPodSnapShoot()
 	return &res, nil
 }
+
 func (p *PodManager) CheckIfPodExist(podName string) bool {
 	_, ok := p.name2uuid[podName]
 	return ok
 }
+
 func (p *PodManager) DeletePod(podName string) error {
 	if !p.CheckIfPodExist(podName) {
 		//不存在该pod
@@ -75,6 +79,11 @@ func (p *PodManager) DeletePod(podName string) error {
 	delete(p.uid2pod, uid)
 	return nil
 }
+
+func (p *PodManager) AddPod(pod *object.Pod) {
+
+}
+
 func (p *PodManager) AddPodFromConfig(config module.Config) error {
 	//首先检查name对应的pod是否存在， 存在的话报错
 	if p.CheckIfPodExist(config.MetaData.Name) {

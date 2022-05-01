@@ -18,7 +18,12 @@ type Controller interface {
 }
 
 type ControllerContext struct {
-	ls *listerwatcher.ListerWatcher
+	ls       *listerwatcher.ListerWatcher
+	MasterIP string
+}
+
+func (cc ControllerContext) GetListerWatcher() *listerwatcher.ListerWatcher {
+	return cc.ls
 }
 
 type InitFunc func(ctx context.Context, controllerCtx ControllerContext) (err error)
@@ -54,18 +59,22 @@ func Run(c *config.CompletedConfig) error {
 	if err := StartControllers(context.TODO(), controllerContext, NewControllerInitializers()); err != nil {
 		klog.Fatalf("error starting controllers: %v\n", err)
 	}
-	// TODO
+	// TODO: give each controller a new unique ls
 	select {}
 
 	return nil
 }
 
+// CreateControllerContext TODO: make global config variable
 func CreateControllerContext() (*ControllerContext, error) {
 	ls, err := listerwatcher.NewListerWatcher(listerwatcher.DefaultConfig())
 	if err != nil {
 		return nil, err
 	}
-	controllerContext := &ControllerContext{ls: ls}
+	controllerContext := &ControllerContext{
+		ls:       ls,
+		MasterIP: "127.0.0.1:8080",
+	}
 	return controllerContext, nil
 }
 

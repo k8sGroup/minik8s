@@ -13,7 +13,7 @@ const (
 )
 
 type ObjectMeta struct {
-	Name string
+	Name string `json:"name" yaml:"name"`
 }
 
 /*******************ReplicaSet*************************/
@@ -41,21 +41,21 @@ type LabelSelector struct {
 /*******************Pod*************************/
 
 type Pod struct {
-	ObjectMeta
-	Spec   PodSpec
-	Status PodStatus
+	ObjectMeta `json:"metadata" yaml:"metadata"`
+	Spec       PodSpec   `json:"spec" yaml:"spec"`
+	Status     PodStatus `json:"status" yaml:"status"`
 }
 
 type PodSpec struct {
-	NodeName string
+	NodeName string `json:"nodeName" yaml:"nodeName"`
 }
 
 type PodStatus struct {
-	Phase string
+	Phase string `json:"phase" yaml:"phase"`
 	// IP address when the pod is assigned
-	HostIP string
+	HostIP string `json:"hostIP" yaml:"hostIP"`
 	// IP address allocated to the pod. Routable at least within the cluster
-	PodIP string
+	PodIP string `json:"podIP" yaml:"podIP"`
 }
 
 type PodTemplateSpec struct {
@@ -72,13 +72,13 @@ type ListOptions struct {
 /*******************Node*************************/
 
 type Node struct {
-	ObjectMeta
-	Spec   NodeSpec
-	Status NodeStatus
+	ObjectMeta `json:"metadata" yaml:"metadata"`
+	Spec       NodeSpec   `json:"spec" yaml:"spec"`
+	Status     NodeStatus `json:"status" yaml:"status"`
 }
 
 type NodeList struct {
-	Items []Node
+	Items []Node `json:"items" yaml:"items"`
 }
 
 type NodeSpec struct {

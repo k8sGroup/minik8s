@@ -33,6 +33,7 @@ const CONTAINER_CREATED_STATUS = "created"
 
 //pod探针间隔,为了防止探针command拥堵，要等上一次的response
 const PROBE_INTERVAL = 60 //探针间隔，单位为秒
+
 type Pod struct {
 	name  string
 	Label map[string]string
@@ -59,6 +60,7 @@ type Pod struct {
 	podSnapShoot PodSnapShoot
 	podNetWork   PodNetWork
 }
+
 type PodNetWork struct {
 	OpenPortSet []string //开放端口集合
 	GateWay     string   //网关地址 ip4
@@ -135,6 +137,7 @@ func NewPodfromConfig(config *module.Config) *Pod {
 	newPod.StartPod()
 	return newPod
 }
+
 func (p *Pod) StartPod() {
 	go p.podWorker.SyncLoop(p.commandChan, p.responseChan)
 	go p.listeningResponse()
@@ -198,9 +201,11 @@ func (p *Pod) listeningResponse() {
 		}
 	}
 }
+
 func (p *Pod) ReceivePodCommand(podCommand message.PodCommand) {
 	p.commandChan <- podCommand
 }
+
 func (p *Pod) AddVolumes(volumes []module.Volume) error {
 	p.tmpDirMap = make(map[string]string)
 	p.hostDirMap = make(map[string]string)

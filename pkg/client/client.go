@@ -86,7 +86,7 @@ func GetPodFromTemplate(template *object.PodTemplateSpec) (*object.Pod, error) {
 /********************************RS*****************************/
 
 func (r RESTClient) GetRS(name string) (*object.ReplicaSet, error) {
-	attachURL := "/rs/" + name
+	attachURL := "/registry/rs/default/" + name
 
 	req, _ := http.NewRequest("GET", r.Base+attachURL, nil)
 	resp, _ := http.DefaultClient.Do(req)
