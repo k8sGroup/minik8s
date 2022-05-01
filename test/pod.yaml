@@ -1,0 +1,5 @@
+metadata:
+  name: pod1
+spec:
+  containers:
+    - name: string
