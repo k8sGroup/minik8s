@@ -17,7 +17,7 @@ type PortMapping struct {
 	HostPort   string
 }
 
-//修改路由表的工具函数
+//修改iptable表的工具函数
 //Docker chain 的编辑
 //建立端口映射, 使得外界可以以 hostIp + hostPort的形式访问到docker
 func AddDockerChainMappingRule(dockerIp string, dockerPort string, hostPort string) (PortMapping, error) {

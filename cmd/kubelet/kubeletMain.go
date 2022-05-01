@@ -6,22 +6,21 @@ import (
 	"io/ioutil"
 	"minik8s/pkg/kubelet"
 	"minik8s/pkg/kubelet/module"
-	"runtime"
 )
 
 func main() {
-	sysType := runtime.GOOS
+	//sysType := runtime.GOOS
 	p := kubelet.NewKubelet()
 	var data []byte
 	var err error
-	if sysType == "linux" {
-		//InLinux
-		data, err = ioutil.ReadFile("/home/minik8s/cmd/kubelet/example.yaml")
-	}
-	if sysType == "windows" {
-		data, err = ioutil.ReadFile("D:\\goLandProject\\minik8s\\minik8s\\cmd\\kubelet\\exampleWin.yaml")
-	}
-
+	//if sysType == "linux" {
+	//	//InLinux
+	//	data, err = ioutil.ReadFile("/home/minik8s/cmd/kubelet/example.yaml")
+	//}
+	//if sysType == "windows" {
+	//	data, err = ioutil.ReadFile("D:\\goLandProject\\minik8s\\minik8s\\cmd\\kubelet\\exampleWin.yaml")
+	//}
+	data, err = ioutil.ReadFile("./cmd/kubelet/example.yaml")
 	//InWindows
 
 	if err != nil {
