@@ -2,13 +2,11 @@ package app
 
 import (
 	"context"
+	"github.com/spf13/cobra"
 	"minik8s/cmd/kube-controller-manager/app/config"
 	"minik8s/cmd/kube-controller-manager/app/options"
 	"minik8s/pkg/klog"
-
 	"minik8s/pkg/listerwatcher"
-
-	"github.com/spf13/cobra"
 )
 
 type Informer struct {
@@ -61,8 +59,6 @@ func Run(c *config.CompletedConfig) error {
 	}
 	// TODO: give each controller a new unique ls
 	select {}
-
-	return nil
 }
 
 // CreateControllerContext TODO: make global config variable

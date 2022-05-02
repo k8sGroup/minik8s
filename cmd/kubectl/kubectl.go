@@ -1,7 +1,7 @@
 package main
 
-import "fmt"
+import "minik8s/cmd/kubectl/app"
 
 func main() {
-	fmt.Println("kubectl.go")
+	_ = app.Execute()
 }
