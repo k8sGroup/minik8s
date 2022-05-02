@@ -32,3 +32,33 @@ func (cp *ConcurrentMap) Contains(key interface{}) bool {
 	_, ok := cp.m[key]
 	return ok
 }
+
+type ConcurrentMapTrait[KEY, VALUE] struct {
+	innerMap map[KEY]VALUE
+	mtx      sync.Mutex
+}
+
+func NewConcurrentMapTrait[KEY, VALUE]() *ConcurrentMapTrait[KEY, VALUE] {
+	return &ConcurrentMapTrait[KEY, VALUE]{
+		innerMap: make(map[KEY]VALUE),
+	}
+}
+
+func (c *ConcurrentMapTrait[KEY, VALUE]) Get(key KEY) VALUE {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+	return c.innerMap[key]
+}
+
+func (c *ConcurrentMapTrait[KEY, VALUE]) Put(key KEY, val VALUE) {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+	c.innerMap[key] = val
+}
+
+func (c *ConcurrentMapTrait[KEY, VALUE]) Contains(key KEY) bool {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+	_, ok := c.innerMap[key]
+	return ok
+}
