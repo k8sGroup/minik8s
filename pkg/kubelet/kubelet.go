@@ -8,7 +8,6 @@ import (
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/kubelet/config"
-	"minik8s/pkg/kubelet/module"
 	"minik8s/pkg/kubelet/podManager"
 	"minik8s/pkg/kubelet/types"
 	"minik8s/pkg/kubeproxy"
@@ -87,8 +86,8 @@ func (kl *Kubelet) syncLoop(updates <-chan types.PodUpdate, handler SyncHandler)
 	}
 }
 
-func (k *Kubelet) AddPodFromConfig(config module.Config) error {
-	return k.podManager.AddPodFromConfig(config)
+func (k *Kubelet) AddPod(pod *object.Pod) error {
+	return k.podManager.AddPod(pod)
 }
 func (k *Kubelet) GetPodInfo(podName string) ([]byte, error) {
 	return k.podManager.GetPodInfo(podName)
@@ -175,7 +174,11 @@ func (kl *Kubelet) getOpFromPod(pod *object.Pod) types.PodOperation {
 
 func (kl *Kubelet) HandlePodAdditions(pods []*object.Pod) {
 	for _, pod := range pods {
-		kl.podManager.AddPod(pod)
+		fmt.Printf("[Kubelet] Prepare add pod:%+v\n", pod)
+		err := kl.podManager.AddPod(pod)
+		if err != nil {
+			fmt.Printf("[Kubelet] Add pod fail...")
+		}
 	}
 }
 
@@ -184,7 +187,13 @@ func (kl *Kubelet) HandlePodUpdates(pods []*object.Pod) {
 }
 
 func (kl *Kubelet) HandlePodRemoves(pods []*object.Pod) {
-
+	for _, pod := range pods {
+		fmt.Printf("[Kubelet] Prepare delete pod:%+v\n", pod)
+		err := kl.podManager.DeletePod(pod.Name)
+		if err != nil {
+			fmt.Printf("[Kubelet] Add pod fail...")
+		}
+	}
 }
 
 func (kl *Kubelet) HandlePodReconcile(pods []*object.Pod) {

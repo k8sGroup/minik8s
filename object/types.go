@@ -13,7 +13,8 @@ const (
 )
 
 type ObjectMeta struct {
-	Name string `json:"name" yaml:"name"`
+	Name   string            `json:"name" yaml:"name"`
+	Labels map[string]string `json:"labels" yaml:"labels"`
 }
 
 /*******************ReplicaSet*************************/
@@ -47,7 +48,9 @@ type Pod struct {
 }
 
 type PodSpec struct {
-	NodeName string `json:"nodeName" yaml:"nodeName"`
+	Volumes    []Volume
+	Containers []Container
+	NodeName   string `json:"nodeName" yaml:"nodeName"`
 }
 
 type PodStatus struct {
@@ -67,6 +70,48 @@ type PodList struct {
 }
 
 type ListOptions struct {
+}
+
+type Volume struct {
+	Name string `yaml:"name"`
+	Type string `yaml:"type"`
+	Path string `yaml:"path"`
+}
+
+type Container struct {
+	Name         string        `yaml:"name"`
+	Image        string        `yaml:"image"`
+	Command      []string      `yaml:"command"`
+	Args         []string      `yaml:"args"`
+	VolumeMounts []VolumeMount `yaml:"volumeMounts"`
+	Limits       Limit         `yaml:"limits"`
+	Ports        []Port        `yaml:"ports"`
+	Env          []EnvEntry    `yaml:"env"`
+}
+
+type VolumeMount struct {
+	Name      string `yaml:"name"`
+	MountPath string `yaml:"mountPath"`
+}
+
+type ContainerMeta struct {
+	OriginName  string
+	RealName    string
+	ContainerId string
+}
+
+type Limit struct {
+	Cpu    string `yaml:"cpu"`
+	Memory string `yaml:"memory"`
+}
+
+type Port struct {
+	ContainerPort string `yaml:"containerPort"`
+}
+
+type EnvEntry struct {
+	Name  string `yaml:"name"`
+	Value string `yaml:"value"`
 }
 
 /*******************Node*************************/
