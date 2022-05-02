@@ -2,16 +2,18 @@ package dockerClient
 
 import (
 	"context"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"minik8s/object"
 	"minik8s/pkg/kubelet/message"
 	"unsafe"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 )
 
 func GetNewClient() (*client.Client, error) {
@@ -112,18 +114,21 @@ func dockerClientPullImages(images []string) error {
 
 //注意， 调用ImagePull 函数， 拉取进程在后台运行，因此要保证前台挂起足够时间保证拉取成功
 func dockerClientPullSingleImage(image string) error {
+	fmt.Printf("[PullSingleImage] Prepare pull image:%s\n", image)
 	cli, err2 := getNewClient()
 	if err2 != nil {
 		return err2
 	}
 	out, err := cli.ImagePull(context.Background(), image, types.ImagePullOptions{})
 	if err != nil {
+		fmt.Printf("[PullSingleImage] Fail to pull image, err:%v\n", err)
 		return err
 	}
 	defer out.Close()
 	io.Copy(ioutil.Discard, out)
 	return nil
 }
+
 func runContainers(containerIds []object.ContainerMeta) error {
 	cli, err2 := getNewClient()
 	if err2 != nil {

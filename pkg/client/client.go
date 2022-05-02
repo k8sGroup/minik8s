@@ -159,10 +159,18 @@ func GetNodes(ls *listerwatcher.ListerWatcher) ([]*object.Node, error) {
 		fmt.Printf("[GetNodes] fail to get nodes\n")
 	}
 
-	fmt.Println(string(raw))
-
 	var nodes []*object.Node
-	err = json.Unmarshal(raw, &nodes)
+
+	if len(raw) == 0 {
+		return nodes, nil
+	}
+
+	for _, rawNode := range raw {
+		node := &object.Node{}
+		err = json.Unmarshal(rawNode.ValueBytes, &node)
+		nodes = append(nodes, node)
+	}
+
 	if err != nil {
 		fmt.Printf("[GetNodes] unmarshal fail\n")
 	}
