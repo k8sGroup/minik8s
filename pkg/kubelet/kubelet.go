@@ -48,8 +48,15 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 	return kubelet
 }
 
+func (kl *Kubelet) register() {
+	err := kl.ls.Watch("/registry/pod/default", kl.watchPod, kl.stopChannel)
+	if err != nil {
+		fmt.Printf("[Kubelet] ListWatch init fail...")
+	}
+}
+
 // Register TODO: node register to apiserver config
-func (kl *Kubelet) register() error {
+func (kl *Kubelet) registerNode() {
 	meta := object.ObjectMeta{
 		Name: "node1",
 	}
@@ -60,21 +67,11 @@ func (kl *Kubelet) register() error {
 	if err != nil {
 		fmt.Printf("[Kubelet] Register Node fail...")
 	}
-
-	err = kl.ls.Watch("/registry/pod/default", kl.watchPod, kl.stopChannel)
-	if err != nil {
-		fmt.Printf("[Kubelet] ListWatch init fail...")
-	}
-
-	return nil
 }
 
 func (kl *Kubelet) Run() {
-	err := kl.register()
-	if err != nil {
-		fmt.Printf("[Kubelet] Register fail...")
-		return
-	}
+	kl.registerNode()
+	go kl.register()
 
 	updates := kl.PodConfig.GetUpdates()
 	kl.syncLoop(updates, kl)
@@ -147,6 +144,7 @@ func (kl *Kubelet) syncLoopIteration(ch <-chan types.PodUpdate, handler SyncHand
 	return true
 }
 
+// TODO: check the message by node name. DO NOT handle pods not belong to this node
 func (kl *Kubelet) watchPod(res etcdstore.WatchRes) {
 	pod := &object.Pod{}
 	err := json.Unmarshal(res.ValueBytes, pod)

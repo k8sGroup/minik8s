@@ -48,9 +48,9 @@ type Pod struct {
 }
 
 type PodSpec struct {
-	Volumes    []Volume
-	Containers []Container
-	NodeName   string `json:"nodeName" yaml:"nodeName"`
+	Volumes    []Volume    `json:"volume" yaml:"volume"`
+	Containers []Container `json:"containers" yaml:"containers"`
+	NodeName   string      `json:"nodeName" yaml:"nodeName"`
 }
 
 type PodStatus struct {
@@ -73,25 +73,25 @@ type ListOptions struct {
 }
 
 type Volume struct {
-	Name string `yaml:"name"`
-	Type string `yaml:"type"`
-	Path string `yaml:"path"`
+	Name string `json:"name" yaml:"name"`
+	Type string `json:"type" yaml:"type"`
+	Path string `json:"path" yaml:"path"`
 }
 
 type Container struct {
-	Name         string        `yaml:"name"`
-	Image        string        `yaml:"image"`
-	Command      []string      `yaml:"command"`
-	Args         []string      `yaml:"args"`
-	VolumeMounts []VolumeMount `yaml:"volumeMounts"`
-	Limits       Limit         `yaml:"limits"`
-	Ports        []Port        `yaml:"ports"`
-	Env          []EnvEntry    `yaml:"env"`
+	Name         string        `json:"path" yaml:"name"`
+	Image        string        `json:"image" yaml:"image"`
+	Command      []string      `json:"command" yaml:"command"`
+	Args         []string      `json:"args" yaml:"args"`
+	VolumeMounts []VolumeMount `json:"volumeMounts" yaml:"volumeMounts"`
+	Limits       Limit         `json:"limits" yaml:"limits"`
+	Ports        []Port        `json:"ports" yaml:"ports"`
+	Env          []EnvEntry    `json:"env" yaml:"env"`
 }
 
 type VolumeMount struct {
-	Name      string `yaml:"name"`
-	MountPath string `yaml:"mountPath"`
+	Name      string `json:"name" yaml:"name"`
+	MountPath string `json:"mountPath" yaml:"mountPath"`
 }
 
 type ContainerMeta struct {
@@ -101,17 +101,17 @@ type ContainerMeta struct {
 }
 
 type Limit struct {
-	Cpu    string `yaml:"cpu"`
-	Memory string `yaml:"memory"`
+	Cpu    string `json:"cpu" yaml:"cpu"`
+	Memory string `json:"memory" yaml:"memory"`
 }
 
 type Port struct {
-	ContainerPort string `yaml:"containerPort"`
+	ContainerPort string `json:"containerPort" yaml:"containerPort"`
 }
 
 type EnvEntry struct {
-	Name  string `yaml:"name"`
-	Value string `yaml:"value"`
+	Name  string `json:"name" yaml:"name"`
+	Value string `json:"value" yaml:"value"`
 }
 
 /*******************Node*************************/

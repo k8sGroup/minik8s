@@ -45,9 +45,9 @@ func NewReplicaSetController(ctx context.Context, controllerCtx util.ControllerC
 // Run begins watching and syncing.
 func (rsc *ReplicaSetController) Run(ctx context.Context) {
 	klog.Debugf("[ReplicaSetController]start running\n")
-	rsc.register()
+	go rsc.register()
 	go rsc.worker(ctx)
-	<-ctx.Done()
+	select {}
 }
 
 func (rsc *ReplicaSetController) register() {

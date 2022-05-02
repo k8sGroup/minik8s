@@ -80,7 +80,7 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 
 	{
 		engine.DELETE(config.RS, s.deleteRS)
-		engine.DELETE(config.RS, s.deletePod)
+		engine.DELETE(config.POD, s.deletePod)
 	}
 
 	go s.daemon(watcherChan)

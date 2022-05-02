@@ -29,7 +29,7 @@ func (r RESTClient) CreatePods(ctx context.Context, template *object.PodTemplate
 	reqBody := bytes.NewBuffer(podRaw)
 	attachURL := "/registry/pod/default"
 
-	req, _ := http.NewRequest("POST", r.Base+attachURL, reqBody)
+	req, _ := http.NewRequest("PUT", r.Base+attachURL, reqBody)
 	resp, _ := http.DefaultClient.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
@@ -42,7 +42,7 @@ func (r RESTClient) CreatePods(ctx context.Context, template *object.PodTemplate
 
 	err := json.Unmarshal(body, result)
 	if err != nil {
-		klog.Infof("[CreatePods] Body Pods Unmarshal fail")
+		klog.Infof("[CreatePods] Body Pods Unmarshal fail\n")
 	}
 	return err
 }
@@ -50,9 +50,9 @@ func (r RESTClient) CreatePods(ctx context.Context, template *object.PodTemplate
 func (r RESTClient) UpdatePods(ctx context.Context, pod *object.Pod) error {
 	podRaw, _ := json.Marshal(pod)
 	reqBody := bytes.NewBuffer(podRaw)
-	attachURL := "/pod"
+	attachURL := "/registry/pod/default/" + pod.Name
 
-	req, _ := http.NewRequest("POST", r.Base+attachURL, reqBody)
+	req, _ := http.NewRequest("PUT", r.Base+attachURL, reqBody)
 	resp, _ := http.DefaultClient.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
@@ -101,7 +101,7 @@ func (r RESTClient) GetRS(name string) (*object.ReplicaSet, error) {
 
 	err := json.Unmarshal(body, result)
 	if err != nil {
-		klog.Infof("[CreatePods] Body Pods Unmarshal fail")
+		klog.Infof("[GetRS] Body Pods Unmarshal fail\n")
 	}
 	return result, nil
 }
@@ -122,7 +122,7 @@ func (r RESTClient) GetRSPods(name string) ([]*object.Pod, error) {
 
 	err := json.Unmarshal(body, &result)
 	if err != nil {
-		klog.Infof("[GetRSPods] Body Pods Unmarshal fail")
+		klog.Infof("[GetRSPods] Body Pods Unmarshal fail\n")
 	}
 
 	return result, nil
@@ -146,7 +146,7 @@ func (r RESTClient) UpdateRSStatus(ctx context.Context, replicaSet *object.Repli
 
 	err := json.Unmarshal(body, result)
 	if err != nil {
-		klog.Infof("[CreatePods] Body Pods Unmarshal fail")
+		klog.Infof("[UpdateRSStatus] Body Pods Unmarshal fail\n")
 	}
 	return result, nil
 }
@@ -156,12 +156,15 @@ func (r RESTClient) UpdateRSStatus(ctx context.Context, replicaSet *object.Repli
 func GetNodes(ls *listerwatcher.ListerWatcher) ([]*object.Node, error) {
 	raw, err := ls.List("/registry/node/default")
 	if err != nil {
-		fmt.Printf("[GetNodes] fail to get nodes")
+		fmt.Printf("[GetNodes] fail to get nodes\n")
 	}
+
+	fmt.Println(string(raw))
+
 	var nodes []*object.Node
-	err = json.Unmarshal(raw, nodes)
+	err = json.Unmarshal(raw, &nodes)
 	if err != nil {
-		fmt.Printf("[GetNodes] unmarshal fail")
+		fmt.Printf("[GetNodes] unmarshal fail\n")
 	}
 	return nodes, nil
 }
@@ -178,7 +181,7 @@ func (r RESTClient) RegisterNode(node *object.Node) error {
 	resp, _ := http.DefaultClient.Do(req)
 
 	if err != nil || resp.StatusCode != 200 {
-		fmt.Printf("[GetNodes] unmarshal fail")
+		fmt.Printf("[RegisterNode] unmarshal fail\n")
 	}
 	return nil
 }
@@ -203,8 +206,7 @@ func (r RESTClient) WatchRegister(resource string, name string, withPrefix bool)
 	result := &TicketResponse{}
 	err := json.Unmarshal(body, result)
 	if err != nil {
-		klog.Infof("[CreatePods] Body Pods Unmarshal fail")
+		klog.Infof("[CreatePods] Body Pods Unmarshal fail\n")
 	}
 	return &attachURL, &result.Ticket, nil
-
 }
