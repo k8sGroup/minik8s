@@ -1,5 +1,19 @@
 package main
 
+import (
+	"minik8s/pkg/client"
+	"minik8s/pkg/kubelet"
+	"minik8s/pkg/listerwatcher"
+)
+
+func main() {
+	// host is the address of master node
+	clientConfig := client.Config{Host: "127.0.0.1:8080"}
+	kube := kubelet.NewKubelet(listerwatcher.DefaultConfig(), clientConfig)
+	kube.Run()
+
+}
+
 //
 //func main() {
 //	sysType := runtime.GOOS

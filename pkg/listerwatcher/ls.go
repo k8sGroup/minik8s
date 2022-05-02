@@ -35,7 +35,7 @@ func NewListerWatcher(c *Config) (*ListerWatcher, error) {
 	return ls, nil
 }
 
-func (ls *ListerWatcher) List(key string) ([]byte, error) {
+func (ls *ListerWatcher) List(key string) ([]etcdstore.ListRes, error) {
 	resourceURL := ls.rootURL + key
 	request, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {
@@ -53,7 +53,12 @@ func (ls *ListerWatcher) List(key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	var resList []etcdstore.ListRes
+	err = json.Unmarshal(data, &resList)
+	if err != nil {
+		return nil, err
+	}
+	return resList, nil
 }
 
 // Watch should never return until stopChannel is closed

@@ -8,7 +8,6 @@ import (
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/kubelet/config"
-	"minik8s/pkg/kubelet/module"
 	"minik8s/pkg/kubelet/podManager"
 	"minik8s/pkg/kubelet/types"
 	"minik8s/pkg/kubeproxy"
@@ -49,8 +48,15 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 	return kubelet
 }
 
+func (kl *Kubelet) register() {
+	err := kl.ls.Watch("/registry/pod/default", kl.watchPod, kl.stopChannel)
+	if err != nil {
+		fmt.Printf("[Kubelet] ListWatch init fail...")
+	}
+}
+
 // Register TODO: node register to apiserver config
-func (kl *Kubelet) register() error {
+func (kl *Kubelet) registerNode() {
 	meta := object.ObjectMeta{
 		Name: "node1",
 	}
@@ -61,21 +67,11 @@ func (kl *Kubelet) register() error {
 	if err != nil {
 		fmt.Printf("[Kubelet] Register Node fail...")
 	}
-
-	err = kl.ls.Watch("/registry/pod/default", kl.watchPod, kl.stopChannel)
-	if err != nil {
-		fmt.Printf("[Kubelet] ListWatch init fail...")
-	}
-
-	return nil
 }
 
 func (kl *Kubelet) Run() {
-	err := kl.register()
-	if err != nil {
-		fmt.Printf("[Kubelet] Register fail...")
-		return
-	}
+	kl.registerNode()
+	go kl.register()
 
 	updates := kl.PodConfig.GetUpdates()
 	kl.syncLoop(updates, kl)
@@ -87,8 +83,8 @@ func (kl *Kubelet) syncLoop(updates <-chan types.PodUpdate, handler SyncHandler)
 	}
 }
 
-func (k *Kubelet) AddPodFromConfig(config module.Config) error {
-	return k.podManager.AddPodFromConfig(config)
+func (k *Kubelet) AddPod(pod *object.Pod) error {
+	return k.podManager.AddPod(pod)
 }
 func (k *Kubelet) GetPodInfo(podName string) ([]byte, error) {
 	return k.podManager.GetPodInfo(podName)
@@ -148,6 +144,7 @@ func (kl *Kubelet) syncLoopIteration(ch <-chan types.PodUpdate, handler SyncHand
 	return true
 }
 
+// TODO: check the message by node name. DO NOT handle pods not belong to this node
 func (kl *Kubelet) watchPod(res etcdstore.WatchRes) {
 	pod := &object.Pod{}
 	err := json.Unmarshal(res.ValueBytes, pod)
@@ -175,7 +172,11 @@ func (kl *Kubelet) getOpFromPod(pod *object.Pod) types.PodOperation {
 
 func (kl *Kubelet) HandlePodAdditions(pods []*object.Pod) {
 	for _, pod := range pods {
-		kl.podManager.AddPod(pod)
+		fmt.Printf("[Kubelet] Prepare add pod:%+v\n", pod)
+		err := kl.podManager.AddPod(pod)
+		if err != nil {
+			fmt.Printf("[Kubelet] Add pod fail...")
+		}
 	}
 }
 
@@ -184,7 +185,13 @@ func (kl *Kubelet) HandlePodUpdates(pods []*object.Pod) {
 }
 
 func (kl *Kubelet) HandlePodRemoves(pods []*object.Pod) {
-
+	for _, pod := range pods {
+		fmt.Printf("[Kubelet] Prepare delete pod:%+v\n", pod)
+		err := kl.podManager.DeletePod(pod.Name)
+		if err != nil {
+			fmt.Printf("[Kubelet] Add pod fail...")
+		}
+	}
 }
 
 func (kl *Kubelet) HandlePodReconcile(pods []*object.Pod) {

@@ -9,8 +9,8 @@ import (
 	"github.com/docker/go-connections/nat"
 	"io"
 	"io/ioutil"
+	"minik8s/object"
 	"minik8s/pkg/kubelet/message"
-	"minik8s/pkg/kubelet/module"
 	"unsafe"
 )
 
@@ -124,7 +124,7 @@ func dockerClientPullSingleImage(image string) error {
 	io.Copy(ioutil.Discard, out)
 	return nil
 }
-func runContainers(containerIds []module.ContainerMeta) error {
+func runContainers(containerIds []object.ContainerMeta) error {
 	cli, err2 := getNewClient()
 	if err2 != nil {
 		return err2
@@ -154,7 +154,7 @@ func getContainersInfo(containerIds []string) ([]types.ContainerJSON, error) {
 }
 
 //创建pause容器
-func createPause(ports []module.Port, name string) (container.ContainerCreateCreatedBody, error) {
+func createPause(ports []object.Port, name string) (container.ContainerCreateCreatedBody, error) {
 	cli, err2 := getNewClient()
 	if err2 != nil {
 		return container.ContainerCreateCreatedBody{}, err2
@@ -258,15 +258,15 @@ func getContainerNetInfo(name string) (*types.NetworkSettings, error) {
 	}
 	return res.NetworkSettings, nil
 }
-func createContainersOfPod(containers []module.Container) ([]module.ContainerMeta, *types.NetworkSettings, error) {
+func createContainersOfPod(containers []object.Container) ([]object.ContainerMeta, *types.NetworkSettings, error) {
 	cli, err2 := getNewClient()
 	if err2 != nil {
 		return nil, nil, err2
 	}
 	var firstContainerId string
-	var result []module.ContainerMeta
+	var result []object.ContainerMeta
 	//先生成所有要暴露的port集合
-	var totlePort []module.Port
+	var totlePort []object.Port
 	images := []string{"gcr.io/google_containers/pause-amd64:3.0"}
 	//防止重名，先检查是否重名，有的话删除
 	var names []string
@@ -295,7 +295,7 @@ func createContainersOfPod(containers []module.Container) ([]module.ContainerMet
 		return nil, nil, err
 	}
 	firstContainerId = pause.ID
-	result = append(result, module.ContainerMeta{
+	result = append(result, object.ContainerMeta{
 		RealName:    pauseName,
 		ContainerId: firstContainerId,
 	})
@@ -332,7 +332,7 @@ func createContainersOfPod(containers []module.Container) ([]module.ContainerMet
 		if err != nil {
 			return nil, nil, err
 		}
-		result = append(result, module.ContainerMeta{
+		result = append(result, object.ContainerMeta{
 			RealName:    value.Name,
 			ContainerId: resp.ID,
 		})

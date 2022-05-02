@@ -14,14 +14,14 @@ import (
 func (s *Server) deletePod(ctx *gin.Context) {
 	name := ctx.Param(config.ParamResourceName)
 	key := "/registry/pod/default/" + name
-	value, err := s.store.Get(key)
-	if err != nil {
+	resList, err := s.store.Get(key)
+	if err != nil || len(resList) == 0 {
 		fmt.Printf("[deletePod] pod not exist:%s\n", name)
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
 	pod := object.Pod{}
-	err = json.Unmarshal(value, &pod)
+	err = json.Unmarshal(resList[0].ValueBytes, &pod)
 	if err != nil {
 		fmt.Printf("[deletePod] pod unmarshal fail\n")
 		ctx.AbortWithStatus(http.StatusBadRequest)
@@ -42,15 +42,14 @@ func (s *Server) deletePod(ctx *gin.Context) {
 func (s *Server) deleteRS(ctx *gin.Context) {
 	name := ctx.Param(config.ParamResourceName)
 	key := "/registry/rs/default/" + name
-	value, err := s.store.Get(key)
-	if err != nil {
+	resList, err := s.store.Get(key)
+	if err != nil || len(resList) == 0 {
 		fmt.Printf("[deleteRS] rs not exist:%s\n", name)
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-
 	rs := object.ReplicaSet{}
-	err = json.Unmarshal(value, &rs)
+	err = json.Unmarshal(resList[0].ValueBytes, &rs)
 	if err != nil {
 		fmt.Printf("[deleteRS] pod unmarshal fail\n")
 		ctx.AbortWithStatus(http.StatusBadRequest)

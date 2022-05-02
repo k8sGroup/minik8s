@@ -7,7 +7,6 @@ import (
 	"minik8s/pkg/klog"
 	"minik8s/pkg/kubelet/dockerClient"
 	"minik8s/pkg/kubelet/message"
-	"minik8s/pkg/kubelet/module"
 	"minik8s/pkg/kubelet/pod"
 )
 
@@ -80,16 +79,12 @@ func (p *PodManager) DeletePod(podName string) error {
 	return nil
 }
 
-func (p *PodManager) AddPod(pod *object.Pod) {
-
-}
-
-func (p *PodManager) AddPodFromConfig(config module.Config) error {
+func (p *PodManager) AddPod(config *object.Pod) error {
 	//首先检查name对应的pod是否存在， 存在的话报错
-	if p.CheckIfPodExist(config.MetaData.Name) {
-		return errors.New(config.MetaData.Name + "对应的pod已经存在，请先删除原pod")
+	if p.CheckIfPodExist(config.ObjectMeta.Name) {
+		return errors.New(config.ObjectMeta.Name + "对应的pod已经存在，请先删除原pod")
 	}
-	newPod := pod.NewPodfromConfig(&config)
+	newPod := pod.NewPodfromConfig(config)
 	newPodShoot := newPod.GetPodSnapShoot()
 	p.uid2pod[newPodShoot.Uid] = newPod
 	p.name2uuid[newPodShoot.Name] = newPodShoot.Uid
