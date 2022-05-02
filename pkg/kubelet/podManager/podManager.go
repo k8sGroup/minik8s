@@ -2,6 +2,7 @@ package podManager
 
 import (
 	"errors"
+	"fmt"
 	"github.com/pquerna/ffjson/ffjson"
 	"minik8s/object"
 	"minik8s/pkg/klog"
@@ -72,8 +73,9 @@ func (p *PodManager) DeletePod(podName string) error {
 		return errors.New(podName + "对应的pod不存在")
 	}
 	uid, _ := p.name2uuid[podName]
-	pod, _ := p.uid2pod[uid]
-	pod.DeletePod()
+	pod_, _ := p.uid2pod[uid]
+	fmt.Printf("[DeletePod] Prepare delete pod")
+	pod_.DeletePod()
 	delete(p.name2uuid, podName)
 	delete(p.uid2pod, uid)
 	return nil
