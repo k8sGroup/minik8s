@@ -1,6 +1,7 @@
 package kubelet
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"minik8s/object"
@@ -148,9 +149,20 @@ func (kl *Kubelet) syncLoopIteration(ch <-chan types.PodUpdate, handler SyncHand
 func (kl *Kubelet) watchPod(res etcdstore.WatchRes) {
 	pod := &object.Pod{}
 	err := json.Unmarshal(res.ValueBytes, pod)
+
 	if err != nil {
 		klog.Warnf("watchNewPod bad message\n")
+		return
 	}
+
+	// TODO: filter message by node name
+	// reject message if pod not assign pod or not belong to the node
+	if pod.Spec.NodeName == "" {
+		return
+	}
+
+	fmt.Printf("[watchPod] New message...\n")
+
 	pods := []*object.Pod{pod}
 
 	op := kl.getOpFromPod(pod)
@@ -159,6 +171,7 @@ func (kl *Kubelet) watchPod(res etcdstore.WatchRes) {
 		Pods: pods,
 		Op:   op,
 	}
+
 	kl.PodConfig.GetUpdates() <- podUp
 }
 
@@ -172,10 +185,17 @@ func (kl *Kubelet) getOpFromPod(pod *object.Pod) types.PodOperation {
 
 func (kl *Kubelet) HandlePodAdditions(pods []*object.Pod) {
 	for _, pod := range pods {
-		fmt.Printf("[Kubelet] Prepare add pod:%+v\n", pod)
+		fmt.Printf("[Kubelet] Prepare add pod:%s\n", pod.Name)
 		err := kl.podManager.AddPod(pod)
+
 		if err != nil {
-			fmt.Printf("[Kubelet] Add pod fail...")
+			fmt.Printf("[Kubelet] Add pod fail...,err:%v\n", err)
+		} else {
+			// update pod status
+			p, _ := kl.podManager.GetPodSnapShoot(pod.Name)
+			//p.Status = object.PodRunning
+			pod.Status.Phase = p.Status
+			kl.Client.UpdatePods(context.TODO(), pod)
 		}
 	}
 }
@@ -188,8 +208,9 @@ func (kl *Kubelet) HandlePodRemoves(pods []*object.Pod) {
 	for _, pod := range pods {
 		fmt.Printf("[Kubelet] Prepare delete pod:%+v\n", pod)
 		err := kl.podManager.DeletePod(pod.Name)
+		// already modify pod status to failed in api server
 		if err != nil {
-			fmt.Printf("[Kubelet] Add pod fail...")
+			fmt.Printf("[Kubelet] Delete pod fail...")
 		}
 	}
 }
