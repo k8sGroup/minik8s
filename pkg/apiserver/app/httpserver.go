@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -106,11 +105,12 @@ func (s *Server) validate(c *gin.Context) {
 
 func (s *Server) get(ctx *gin.Context) {
 	key := ctx.Request.URL.Path
-	value, err := s.store.Get(key)
+	listRes, err := s.store.Get(key)
 	if err != nil {
 		ctx.AbortWithStatus(http.StatusBadRequest)
 	}
-	ctx.Data(http.StatusOK, "application/json", value)
+	data, err := json.Marshal(listRes)
+	ctx.Data(http.StatusOK, "application/json", data)
 }
 
 func (s *Server) put(ctx *gin.Context) {
@@ -137,14 +137,11 @@ func (s *Server) del(ctx *gin.Context) {
 
 func (s *Server) prefixGet(ctx *gin.Context) {
 	prefixKey := ctx.Request.URL.Path
-	vals, err := s.store.PrefixGet(prefixKey)
+	listResList, err := s.store.PrefixGet(prefixKey)
 	if err != nil {
 		ctx.AbortWithStatus(http.StatusBadRequest)
 	}
-	merged := bytes.Join(vals, []byte{','})
-	var data []byte
-	data = append([]byte{'['}, merged...)
-	data = append(data, ']')
+	data, err := json.Marshal(listResList)
 	ctx.Data(http.StatusOK, "application/json", data)
 }
 
