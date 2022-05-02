@@ -16,7 +16,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.11.0
 	github.com/streadway/amqp v1.0.0
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	go.etcd.io/etcd/client/v3 v3.5.4
 	go.uber.org/atomic v1.7.0
 	gotest.tools/v3 v3.2.0
@@ -52,6 +52,9 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799 // indirect
+	github.com/pelletier/go-toml v1.9.4 // indirect
+	github.com/pelletier/go-toml/v2 v2.0.0-beta.8 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/afero v1.8.2 // indirect
 	github.com/spf13/cast v1.4.1 // indirect

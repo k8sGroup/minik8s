@@ -2,7 +2,7 @@ package message
 
 import (
 	"github.com/docker/docker/api/types"
-	"minik8s/pkg/kubelet/module"
+	"minik8s/object"
 )
 
 //---------------------------Container Part---------------------------------------//
@@ -33,7 +33,7 @@ type CommandWithId struct {
 }
 type CommandWithConfig struct {
 	Command
-	Group []module.Container
+	Group []object.Container
 }
 
 type CommandWithImages struct {
@@ -58,7 +58,7 @@ type ResponseWithContainInfo struct {
 
 type ResponseWithContainIds struct {
 	Response
-	Containers   []module.ContainerMeta
+	Containers   []object.ContainerMeta
 	NetWorkInfos *types.NetworkSettings
 }
 

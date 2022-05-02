@@ -9,7 +9,6 @@ import (
 	"minik8s/object"
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
-	"minik8s/pkg/klog"
 	"minik8s/pkg/listerwatcher"
 	"minik8s/util/queue"
 	"time"
@@ -41,20 +40,21 @@ func NewScheduler(lsConfig *listerwatcher.Config, clientConfig client.Config) *S
 
 // Run begins watching and syncing.
 func (sched *Scheduler) Run(ctx context.Context) {
-	klog.Debugf("[Scheduler]start running\n")
-	sched.register()
+	fmt.Printf("[Scheduler]start running\n")
+	go sched.register()
 	go sched.worker(ctx)
-	<-ctx.Done()
+	select {}
 }
 
 func (sched *Scheduler) register() {
 	err := sched.ls.Watch("/registry/pod/default", sched.watchNewPod, sched.stopChannel)
 	if err != nil {
-		fmt.Printf("[Scheduler] ListWatch init fail...")
+		fmt.Printf("[Scheduler] ListWatch init fail...\n")
 	}
 }
 
 func (sched *Scheduler) worker(ctx context.Context) {
+	fmt.Printf("[worker] Starting...\n")
 	for {
 		if !sched.queue.Empty() {
 			podPtr := sched.queue.Front()
@@ -63,11 +63,11 @@ func (sched *Scheduler) worker(ctx context.Context) {
 		} else {
 			time.Sleep(time.Second)
 		}
-		klog.Infof("do some work\n")
 	}
 }
 
 func (sched *Scheduler) schedulePod(ctx context.Context, pod *object.Pod) error {
+	fmt.Printf("[schedulePod] Begin scheduling\n")
 	nodes, _ := client.GetNodes(sched.ls)
 	// select a host for the pod
 	nodeName, _ := selectHost(nodes)
@@ -86,18 +86,23 @@ func selectHost(nodes []*object.Node) (string, error) {
 		return "", errors.New("empty nodes")
 	}
 	num := len(nodes)
-	rand.Seed(time.Now().UnixNano())
-	idx := rand.Intn(num - 1)
+	var idx int
+	if num == 1 {
+		idx = 0
+	} else {
+		rand.Seed(time.Now().UnixNano())
+		idx = rand.Intn(num - 1)
+	}
 	return nodes[idx].Name, nil
 }
 
 // watch the change of new pods
 func (sched *Scheduler) watchNewPod(res etcdstore.WatchRes) {
-	fmt.Printf("[watchNewPod] new message from watcher...")
 	pod := &object.Pod{}
 	err := json.Unmarshal(res.ValueBytes, pod)
 	if err != nil {
-		klog.Warnf("watchNewPod bad message\n")
+		fmt.Printf("watchNewPod bad message\n")
 	}
+	fmt.Printf("[watchNewPod] new message from watcher...\n")
 	sched.queue.Enqueue(pod)
 }

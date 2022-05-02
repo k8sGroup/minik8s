@@ -13,7 +13,8 @@ const (
 )
 
 type ObjectMeta struct {
-	Name string `json:"name" yaml:"name"`
+	Name   string            `json:"name" yaml:"name"`
+	Labels map[string]string `json:"labels" yaml:"labels"`
 }
 
 /*******************ReplicaSet*************************/
@@ -47,7 +48,9 @@ type Pod struct {
 }
 
 type PodSpec struct {
-	NodeName string `json:"nodeName" yaml:"nodeName"`
+	Volumes    []Volume    `json:"volume" yaml:"volume"`
+	Containers []Container `json:"containers" yaml:"containers"`
+	NodeName   string      `json:"nodeName" yaml:"nodeName"`
 }
 
 type PodStatus struct {
@@ -67,6 +70,48 @@ type PodList struct {
 }
 
 type ListOptions struct {
+}
+
+type Volume struct {
+	Name string `json:"name" yaml:"name"`
+	Type string `json:"type" yaml:"type"`
+	Path string `json:"path" yaml:"path"`
+}
+
+type Container struct {
+	Name         string        `json:"path" yaml:"name"`
+	Image        string        `json:"image" yaml:"image"`
+	Command      []string      `json:"command" yaml:"command"`
+	Args         []string      `json:"args" yaml:"args"`
+	VolumeMounts []VolumeMount `json:"volumeMounts" yaml:"volumeMounts"`
+	Limits       Limit         `json:"limits" yaml:"limits"`
+	Ports        []Port        `json:"ports" yaml:"ports"`
+	Env          []EnvEntry    `json:"env" yaml:"env"`
+}
+
+type VolumeMount struct {
+	Name      string `json:"name" yaml:"name"`
+	MountPath string `json:"mountPath" yaml:"mountPath"`
+}
+
+type ContainerMeta struct {
+	OriginName  string
+	RealName    string
+	ContainerId string
+}
+
+type Limit struct {
+	Cpu    string `json:"cpu" yaml:"cpu"`
+	Memory string `json:"memory" yaml:"memory"`
+}
+
+type Port struct {
+	ContainerPort string `json:"containerPort" yaml:"containerPort"`
+}
+
+type EnvEntry struct {
+	Name  string `json:"name" yaml:"name"`
+	Value string `json:"value" yaml:"value"`
 }
 
 /*******************Node*************************/
