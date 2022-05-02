@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 	"minik8s/cmd/kube-controller-manager/app/config"
 	"minik8s/cmd/kube-controller-manager/app/options"
+	"minik8s/cmd/kube-controller-manager/util"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/listerwatcher"
 )
@@ -15,16 +16,7 @@ type Informer struct {
 type Controller interface {
 }
 
-type ControllerContext struct {
-	ls       *listerwatcher.ListerWatcher
-	MasterIP string
-}
-
-func (cc ControllerContext) GetListerWatcher() *listerwatcher.ListerWatcher {
-	return cc.ls
-}
-
-type InitFunc func(ctx context.Context, controllerCtx ControllerContext) (err error)
+type InitFunc func(ctx context.Context, controllerCtx util.ControllerContext) (err error)
 
 func NewControllerManagerCommand() *cobra.Command {
 	opts, err := options.NewKubeControllerManagerOptions()
@@ -62,13 +54,13 @@ func Run(c *config.CompletedConfig) error {
 }
 
 // CreateControllerContext TODO: make global config variable
-func CreateControllerContext() (*ControllerContext, error) {
+func CreateControllerContext() (*util.ControllerContext, error) {
 	ls, err := listerwatcher.NewListerWatcher(listerwatcher.DefaultConfig())
 	if err != nil {
 		return nil, err
 	}
-	controllerContext := &ControllerContext{
-		ls:       ls,
+	controllerContext := &util.ControllerContext{
+		Ls:       ls,
 		MasterIP: "127.0.0.1:8080",
 	}
 	return controllerContext, nil
@@ -81,7 +73,7 @@ func NewControllerInitializers() map[string]InitFunc {
 	return controller
 }
 
-func StartControllers(ctx context.Context, controllerContext *ControllerContext, controllers map[string]InitFunc) error {
+func StartControllers(ctx context.Context, controllerContext *util.ControllerContext, controllers map[string]InitFunc) error {
 	for controllerName, initFunc := range controllers {
 		klog.Infof("Starting controller %s\n", controllerName)
 		err := initFunc(ctx, *controllerContext)

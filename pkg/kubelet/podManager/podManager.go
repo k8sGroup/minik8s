@@ -84,7 +84,7 @@ func (p *PodManager) AddPod(config *object.Pod) error {
 	if p.CheckIfPodExist(config.ObjectMeta.Name) {
 		return errors.New(config.ObjectMeta.Name + "对应的pod已经存在，请先删除原pod")
 	}
-	newPod := pod.NewPodfromConfig(&config)
+	newPod := pod.NewPodfromConfig(config)
 	newPodShoot := newPod.GetPodSnapShoot()
 	p.uid2pod[newPodShoot.Uid] = newPod
 	p.name2uuid[newPodShoot.Name] = newPodShoot.Uid

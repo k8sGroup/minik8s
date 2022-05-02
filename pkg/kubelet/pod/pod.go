@@ -3,9 +3,9 @@ package pod
 import (
 	"github.com/docker/docker/api/types"
 	"github.com/satori/go.uuid"
+	"minik8s/object"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/kubelet/message"
-	"minik8s/pkg/kubelet/module"
 	"minik8s/pkg/kubelet/podWorker"
 	"os"
 	"path"
@@ -40,7 +40,7 @@ type Pod struct {
 	uid   string
 	//create time
 	ctime       string
-	containers  []module.ContainerMeta
+	containers  []object.ContainerMeta
 	tmpDirMap   map[string]string
 	hostDirMap  map[string]string
 	hostFileMap map[string]string
@@ -74,7 +74,7 @@ type PodSnapShoot struct {
 	Uid         string
 	Ctime       string
 	Label       map[string]string
-	Containers  []module.ContainerMeta
+	Containers  []object.ContainerMeta
 	TmpDirMap   map[string]string
 	HostDirMap  map[string]string
 	HostFileMap map[string]string
@@ -84,13 +84,13 @@ type PodSnapShoot struct {
 }
 
 //------初始化相关函数--------//
-func NewPodfromConfig(config *module.Config) *Pod {
+func NewPodfromConfig(config *object.Pod) *Pod {
 	newPod := &Pod{}
-	newPod.name = config.MetaData.Name
+	newPod.name = config.ObjectMeta.Name
 	newPod.uid = uuid.NewV4().String()
 	newPod.ctime = time.Now().String()
 	newPod.canProbeWork = true
-	newPod.Label = config.MetaData.Labels
+	newPod.Label = config.ObjectMeta.Labels
 	var rwLock sync.RWMutex
 	newPod.rwLock = rwLock
 	newPod.commandChan = make(chan message.PodCommand, 100)
@@ -98,14 +98,14 @@ func NewPodfromConfig(config *module.Config) *Pod {
 	newPod.podWorker = &podWorker.PodWorker{}
 	//创建pod里的containers同时把config里的originName替换为realName
 	//先填第一个pause容器
-	newPod.containers = append(newPod.containers, module.ContainerMeta{
+	newPod.containers = append(newPod.containers, object.ContainerMeta{
 		OriginName: "pause",
 		RealName:   "", //先设置为空
 	})
 	pauseRealName := "pause"
 	for index, value := range config.Spec.Containers {
 		realName := newPod.name + "_" + value.Name
-		newPod.containers = append(newPod.containers, module.ContainerMeta{
+		newPod.containers = append(newPod.containers, object.ContainerMeta{
 			OriginName: value.Name,
 			RealName:   realName,
 		})
@@ -206,7 +206,7 @@ func (p *Pod) ReceivePodCommand(podCommand message.PodCommand) {
 	p.commandChan <- podCommand
 }
 
-func (p *Pod) AddVolumes(volumes []module.Volume) error {
+func (p *Pod) AddVolumes(volumes []object.Volume) error {
 	p.tmpDirMap = make(map[string]string)
 	p.hostDirMap = make(map[string]string)
 	p.hostFileMap = make(map[string]string)
@@ -253,7 +253,7 @@ func (p *Pod) SetStatusAndErr(status string, err error) {
 	p.status = status
 	p.err = err
 }
-func (p *Pod) SetContainers(containers []module.ContainerMeta, status string) {
+func (p *Pod) SetContainers(containers []object.ContainerMeta, status string) {
 	for _, value := range containers {
 		for index, it := range p.containers {
 			if it.RealName == value.RealName {

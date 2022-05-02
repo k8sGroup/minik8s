@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"minik8s/cmd/kube-controller-manager/app"
+	"minik8s/cmd/kube-controller-manager/util"
 	"minik8s/object"
 	"minik8s/pkg/client"
 	"minik8s/pkg/controller"
@@ -27,7 +27,7 @@ type ReplicaSetController struct {
 	Client client.RESTClient
 }
 
-func NewReplicaSetController(ctx context.Context, controllerCtx app.ControllerContext) *ReplicaSetController {
+func NewReplicaSetController(ctx context.Context, controllerCtx util.ControllerContext) *ReplicaSetController {
 	restClient := client.RESTClient{
 		Base: "http://" + controllerCtx.MasterIP,
 	}
@@ -35,7 +35,7 @@ func NewReplicaSetController(ctx context.Context, controllerCtx app.ControllerCo
 	cp := concurrent_map.NewConcurrentMap()
 
 	rsc := &ReplicaSetController{
-		ls:     controllerCtx.GetListerWatcher(),
+		ls:     controllerCtx.Ls,
 		cp:     cp,
 		Client: restClient,
 	}
