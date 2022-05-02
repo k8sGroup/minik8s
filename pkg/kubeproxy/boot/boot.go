@@ -100,7 +100,7 @@ func modifyDocker0IpAndMask(ipAndMask string) error {
 //保证大网段涵盖所有node的docker网段
 //例：172.17.43.1/24   172.17.0.0/16
 func BootNetWork(Docker0IpAndMask string, BasicIpAndMask string) {
-	modifyDocker0IpAndMask(Docker0IpAndMask)
+	changeDocker0IpAndMask(Docker0IpAndMask)
 	preDownload()
 	createBr0()
 	bootBasic(BasicIpAndMask)
@@ -210,6 +210,11 @@ func setGrePortInBr0(grePort string, remoteIp string) error {
 		return err
 	}
 	return nil
+}
+func delGrePortInBr0(grePort string) error {
+	command := "del-port " + grePort
+	err := execOvsVsctlCmd(command)
+	return err
 }
 
 //ovs-vsctl cmd
