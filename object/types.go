@@ -36,19 +36,19 @@ type OwnerReference struct {
 
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 type ReplicaSet struct {
-	ObjectMeta
-	Spec   ReplicaSetSpec
-	Status ReplicaSetStatus
+	ObjectMeta `json:"metadata" yaml:"metadata"`
+	Spec       ReplicaSetSpec   `json:"spec" yaml:"spec"`
+	Status     ReplicaSetStatus `json:"status" yaml:"status"`
 }
 
 type ReplicaSetSpec struct {
-	Replicas int32
-	Template PodTemplateSpec
+	Replicas int32           `json:"replicas" yaml:"replicas"`
+	Template PodTemplateSpec `json:"template" yaml:"template"`
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 type ReplicaSetStatus struct {
-	Replicas int32
+	Replicas int32 `json:"replicas" yaml:"replicas"`
 }
 
 type LabelSelector struct {

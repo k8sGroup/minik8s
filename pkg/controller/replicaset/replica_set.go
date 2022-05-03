@@ -91,13 +91,15 @@ func (rsc *ReplicaSetController) addRS(res etcdstore.WatchRes) {
 		return
 	}
 
-	fmt.Printf("[addRS] message receive...")
-
 	rs := &object.ReplicaSet{}
 	err := json.Unmarshal(res.ValueBytes, rs)
 	if err != nil {
-		klog.Warnf("addRS bad message\n")
+		fmt.Printf("addRS bad message\n")
+		return
 	}
+
+	fmt.Printf("[addRS] message receive...\n")
+
 	// encode object to key
 	key := getKey(rs)
 	rsc.cp.Put(key, rs)
@@ -110,7 +112,8 @@ func (rsc *ReplicaSetController) deleteRS(res etcdstore.WatchRes) {
 	rs := &object.ReplicaSet{}
 	err := json.Unmarshal(res.ValueBytes, rs)
 	if err != nil {
-		klog.Warnf("bad message\n")
+		fmt.Printf("bad message\n")
+		return
 	}
 
 	// check whether the message is deletion
@@ -118,7 +121,7 @@ func (rsc *ReplicaSetController) deleteRS(res etcdstore.WatchRes) {
 		return
 	}
 
-	fmt.Printf("[deleteRS] message receive...")
+	fmt.Printf("[deleteRS] message receive...\n")
 
 	// reset replicas to zero
 	rs.Spec.Replicas = 0
