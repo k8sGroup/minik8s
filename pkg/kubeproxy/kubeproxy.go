@@ -9,7 +9,7 @@ import (
 	"minik8s/pkg/etcdstore/netConfigStore"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/kubelet/pod"
-	"minik8s/pkg/kubeproxy/commandWorker"
+	"minik8s/pkg/kubeproxy/boot"
 	"minik8s/pkg/kubeproxy/iptablesManager"
 	"minik8s/pkg/kubeproxy/netconfig"
 	"minik8s/pkg/kubeproxy/tools"
@@ -40,13 +40,45 @@ type Kubeproxy struct {
 	stopChannel            <-chan struct{}
 	netCommandChan         chan NetCommand
 	NetCommandResponseChan chan NetCommandResponse
-	commandWorker          *commandWorker.CommandWorker
+	commandWorker          *CommandWorker
 	//自己所在节点的ip
 	myClusterIp string
 	//自己分配的网段
 	myIpAndMask string
 	bootStatus  int
 	err         error
+}
+type CommandWorker struct {
+}
+
+func (worker *CommandWorker) SyncLoop(commands <-chan NetCommand, responses chan<- NetCommandResponse) {
+	for {
+		select {
+		case command, ok := <-commands:
+			if !ok {
+				return
+			}
+			switch command.Op {
+			case OP_ADD_GRE:
+				portName := netconfig.FormGrePort()
+				err := boot.SetGrePortInBr0(portName, command.ClusterIp)
+				response := NetCommandResponse{
+					Op:        command.Op,
+					ClusterIp: command.ClusterIp,
+					GrePort:   portName,
+					Err:       err,
+				}
+				responses <- response
+			case OP_BOOT_NET:
+				err := boot.BootNetWork(command.IpAndMask, tools.GetBasicIpAndMask(command.IpAndMask))
+				response := NetCommandResponse{
+					Op:  command.Op,
+					Err: err,
+				}
+				responses <- response
+			}
+		}
+	}
 }
 
 type NetCommand struct {
@@ -83,7 +115,7 @@ func NewKubeproxy(lsConfig *listerwatcher.Config, clientConfig client.Config) (*
 	newKubeproxy.netCommandChan = make(chan NetCommand, 100)
 	newKubeproxy.NetCommandResponseChan = make(chan NetCommandResponse, 100)
 	newKubeproxy.bootStatus = NOT_BOOT
-	newKubeproxy.commandWorker = &commandWorker.CommandWorker{}
+	newKubeproxy.commandWorker = &CommandWorker{}
 	ls, err2 := listerwatcher.NewListerWatcher(lsConfig)
 	if err2 != nil {
 		return nil, err2
