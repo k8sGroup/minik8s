@@ -50,26 +50,6 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 	return kubelet
 }
 
-//func (kl *Kubelet) register() {
-//	err := kl.ls.Watch("/registry/pod/default", kl.watchPod, kl.stopChannel)
-//	if err != nil {
-//		fmt.Printf("[Kubelet] ListWatch init fail...")
-//	}
-//}
-
-//func (kl *Kubelet) registerNode() {
-//	meta := object.ObjectMeta{
-//		Name: "node1",
-//	}
-//	node := object.Node{
-//		ObjectMeta: meta,
-//	}
-//	err := kl.Client.RegisterNode(&node)
-//	if err != nil {
-//		fmt.Printf("[Kubelet] Register Node fail...")
-//	}
-//}
-
 func (kl *Kubelet) Run() {
 	kl.kubeproxy.StartKubeProxy()
 	updates := kl.PodConfig.GetUpdates()
