@@ -35,7 +35,7 @@ func (cp *ConcurrentMap) Contains(key interface{}) bool {
 
 type ConcurrentMapTrait[KEY, VALUE] struct {
 	innerMap map[KEY]VALUE
-	mtx      sync.Mutex
+	mtx      sync.RWMutex
 }
 
 func NewConcurrentMapTrait[KEY, VALUE]() *ConcurrentMapTrait[KEY, VALUE] {
@@ -44,10 +44,11 @@ func NewConcurrentMapTrait[KEY, VALUE]() *ConcurrentMapTrait[KEY, VALUE] {
 	}
 }
 
-func (c *ConcurrentMapTrait[KEY, VALUE]) Get(key KEY) VALUE {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-	return c.innerMap[key]
+func (c *ConcurrentMapTrait[KEY, VALUE]) Get(key KEY) (VALUE, bool) {
+	c.mtx.RLock()
+	defer c.mtx.RUnlock()
+	val, ok := c.innerMap[key]
+	return val, ok
 }
 
 func (c *ConcurrentMapTrait[KEY, VALUE]) Put(key KEY, val VALUE) {
@@ -56,9 +57,28 @@ func (c *ConcurrentMapTrait[KEY, VALUE]) Put(key KEY, val VALUE) {
 	c.innerMap[key] = val
 }
 
-func (c *ConcurrentMapTrait[KEY, VALUE]) Contains(key KEY) bool {
+func (c *ConcurrentMapTrait[KEY, VALUE]) Del(key KEY) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
+	delete(c.innerMap, key)
+}
+
+func (c *ConcurrentMapTrait[KEY, VALUE]) Contains(key KEY) bool {
+	c.mtx.RLock()
+	defer c.mtx.RUnlock()
 	_, ok := c.innerMap[key]
 	return ok
+}
+
+func (c *ConcurrentMapTrait[KEY, VALUE]) ReplaceAll(newMap map[KEY]VALUE) {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+	c.innerMap = newMap
+}
+
+func (c *ConcurrentMapTrait[KEY, VALUE]) SnapShot() map[KEY]VALUE {
+	c.mtx.RUnlock()
+	defer c.mtx.RUnlock()
+	m2 := c.innerMap
+	return m2
 }

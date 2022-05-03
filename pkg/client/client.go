@@ -23,7 +23,7 @@ type RESTClient struct {
 
 /******************************Pod*******************************/
 
-func (r RESTClient) CreatePods(ctx context.Context, template *object.PodTemplateSpec) error {
+func (r RESTClient) CreatePods(ctx context.Context, template *object.PodTemplate) error {
 	pod, _ := GetPodFromTemplate(template)
 	podRaw, _ := json.Marshal(pod)
 	reqBody := bytes.NewBuffer(podRaw)
@@ -77,7 +77,7 @@ func (r RESTClient) DeletePod(ctx context.Context, podName string) error {
 }
 
 // GetPodFromTemplate TODO: type conversion
-func GetPodFromTemplate(template *object.PodTemplateSpec) (*object.Pod, error) {
+func GetPodFromTemplate(template *object.PodTemplate) (*object.Pod, error) {
 	pod := &object.Pod{}
 	pod.Spec = object.PodSpec{}
 	return pod, nil

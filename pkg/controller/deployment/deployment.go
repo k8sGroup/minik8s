@@ -2,7 +2,10 @@ package deployment
 
 import (
 	"context"
-	"minik8s/cmd/kube-controller-manager/app"
+	"encoding/json"
+	"fmt"
+	"minik8s/cmd/kube-controller-manager/util"
+	"minik8s/object"
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/listerwatcher"
@@ -10,48 +13,149 @@ import (
 	"time"
 )
 
-type DeploymentController struct {
-	ls          *listerwatcher.ListerWatcher
-	cm          *concurrentmap.ConcurrentMapTrait[int, int]
-	stopChannel chan struct{}
+type versionedDeployment struct {
+	version    int64
+	deployment object.Deployment
 }
 
-func NewDeploymentController(ctx context.Context, controllerCtx app.ControllerContext) *DeploymentController {
+type versionedReplicaset struct {
+	version    int64
+	replicaset object.ReplicaSet
+}
+
+type DeploymentController struct {
+	ls             *listerwatcher.ListerWatcher
+	deploymentMap  *concurrentmap.ConcurrentMapTrait[string, versionedDeployment]
+	replicasetMap  *concurrentmap.ConcurrentMapTrait[string, versionedReplicaset]
+	resyncInterval time.Duration
+	stopChannel    chan struct{}
+}
+
+func NewDeploymentController(ctx context.Context, controllerCtx util.ControllerContext) *DeploymentController {
 	dc := &DeploymentController{
-		ls:          controllerCtx.GetListerWatcher(),
-		cm:          concurrentmap.NewConcurrentMapTrait[int, int](),
-		stopChannel: make(chan struct{}),
+		ls:            controllerCtx.Ls,
+		deploymentMap: concurrentmap.NewConcurrentMapTrait[string, versionedDeployment](),
+		replicasetMap: concurrentmap.NewConcurrentMapTrait[string, versionedReplicaset](),
+		stopChannel:   make(chan struct{}),
 	}
 	return dc
 }
 
 func (dc *DeploymentController) Run(ctx context.Context) {
 	klog.Debugf("[DeploymentController] running...\n")
-
+	// TODO
 	<-ctx.Done()
 	close(dc.stopChannel)
 }
 
 func (dc *DeploymentController) register() {
-	go func() {
+	registerAddDeployment := func() {
 		for {
-			err := dc.ls.Watch("/registry/deployment", dc.addDeployment, dc.stopChannel)
+			err := dc.ls.Watch("/registry/deployment", dc.putDeployment, dc.stopChannel)
 			if err != nil {
 				klog.Errorf("Error watching /registry/deployment\n")
 			}
 			time.Sleep(5 * time.Second)
 		}
-	}()
+	}
+	registerDeleteDeployment := func() {
+		for {
+			err := dc.ls.Watch("/registry/deployment", dc.deleteDeployment, dc.stopChannel)
+			if err != nil {
+				klog.Errorf("Error watching /registry/deployment\n")
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}
+	registerSyncLoop := func() {
+		//TODO handle the event when the list responses mismatch with local cache
+		for {
+			{
+				resList, err := dc.ls.List("/registry/rs/default")
+				if err != nil {
+					klog.Errorf("Error synchronizing!\n")
+					continue
+				}
+				newMap := make(map[string]versionedReplicaset)
+				for _, res := range resList {
+					versionedRS := versionedReplicaset{version: res.ResourceVersion}
+					_ = json.Unmarshal(res.ValueBytes, &versionedRS.replicaset)
+					newMap[res.Key] = versionedRS
+				}
+				dc.replicasetMap.ReplaceAll(newMap)
+			}
+			{
+				resList, err := dc.ls.List("/registry/deployment/default")
+				if err != nil {
+					klog.Errorf("Error synchronizing!\n")
+					continue
+				}
+				newMap := make(map[string]versionedDeployment)
+				for _, res := range resList {
+					versionedDM := versionedDeployment{version: res.ResourceVersion}
+					_ = json.Unmarshal(res.ValueBytes, &versionedDM.deployment)
+					newMap[res.Key] = versionedDM
+				}
+				dc.deploymentMap.ReplaceAll(newMap)
+			}
+			time.Sleep(dc.resyncInterval)
+		}
+	}
+
+	go registerSyncLoop()
+	go registerAddDeployment()
+	go registerDeleteDeployment()
 }
 
-func (dc *DeploymentController) addDeployment(res etcdstore.WatchRes) {
+func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
+	key := res.Key
+	// TODO 根据deployment的name确定replicaset的name
+	var name string
+	_, err := fmt.Sscanf(key, "/registry/deployment/default/%s", &name)
+	if err != nil {
+		klog.Errorf("Error parsing deployment key %s\n", key)
+		return
+	}
+	deployment := object.Deployment{}
+	err = json.Unmarshal(res.ValueBytes, &deployment)
+	if err != nil {
+		klog.Errorf("Error unmarshalling deployment json data\n")
+		return
+	}
+	var rs object.ReplicaSet
+	if res.IsCreate {
+		// TODO : create a new replicaset
+		rs = object.ReplicaSet{
+			ObjectMeta: deployment.Metadata,
+			Spec: object.ReplicaSetSpec{
+				Replicas: deployment.Spec.Replicas,
+				Template: deployment.Spec.Template,
+			},
+			Status: object.ReplicaSetStatus{Replicas: 0},
+		}
+	} else if res.IsModify {
+		// TODO : modify the old replicaset
+		versionedRS, ok := dc.replicasetMap.Get("/registry/rs/default/" + name)
+		if !ok {
+			klog.Errorf("Local cache outdated!\n")
+			return
+		}
 
+	}
 }
 
 func (dc *DeploymentController) deleteDeployment(res etcdstore.WatchRes) {
 
 }
 
-func (dc *DeploymentController) deletePod(res etcdstore.WatchRes) {
+func (dc *DeploymentController) deltaDeployment(res etcdstore.WatchRes) {
+	switch res.ResType {
+	case etcdstore.PUT:
+		dc.putDeployment(res)
+	case etcdstore.DELETE:
+		dc.deleteDeployment(res)
+	default:
+		klog.Fatalf("Internal error!\n")
+	}
 
 }
