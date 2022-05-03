@@ -24,12 +24,13 @@ type Kubelet struct {
 	ls          *listerwatcher.ListerWatcher
 	stopChannel <-chan struct{}
 	Client      client.RESTClient
+	Err         error
 }
 
 func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kubelet {
 	kubelet := &Kubelet{}
 	kubelet.podManager = podManager.NewPodManager()
-	kubelet.kubeproxy = kubeproxy.NewKubeproxy()
+	kubelet.kubeproxy, kubelet.Err = kubeproxy.NewKubeproxy(lsConfig, clientConfig)
 
 	restClient := client.RESTClient{
 		Base: "http://" + clientConfig.Host,
@@ -49,31 +50,8 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 	return kubelet
 }
 
-func (kl *Kubelet) register() {
-	err := kl.ls.Watch("/registry/pod/default", kl.watchPod, kl.stopChannel)
-	if err != nil {
-		fmt.Printf("[Kubelet] ListWatch init fail...")
-	}
-}
-
-// Register TODO: node register to apiserver config
-func (kl *Kubelet) registerNode() {
-	meta := object.ObjectMeta{
-		Name: "node1",
-	}
-	node := object.Node{
-		ObjectMeta: meta,
-	}
-	err := kl.Client.RegisterNode(&node)
-	if err != nil {
-		fmt.Printf("[Kubelet] Register Node fail...")
-	}
-}
-
 func (kl *Kubelet) Run() {
-	kl.registerNode()
-	go kl.register()
-
+	kl.kubeproxy.StartKubeProxy()
 	updates := kl.PodConfig.GetUpdates()
 	kl.syncLoop(updates, kl)
 }

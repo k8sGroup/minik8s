@@ -218,3 +218,40 @@ func (r RESTClient) WatchRegister(resource string, name string, withPrefix bool)
 	}
 	return &attachURL, &result.Ticket, nil
 }
+
+/***********************************put****************************************/
+func (r RESTClient) PutWrap(attachUrl string, requestBody any) error {
+	if requestBody == nil {
+		req, err2 := http.NewRequest("PUT", r.Base+attachUrl, nil)
+		if err2 != nil {
+			return err2
+		}
+		resp, err3 := http.DefaultClient.Do(req)
+		if err3 != nil {
+			return err3
+		}
+		if resp.StatusCode != 200 {
+			s := fmt.Sprintf("http request error, attachUrl = %s, StatusCode = %d", attachUrl, resp.StatusCode)
+			return errors.New(s)
+		}
+	} else {
+		body, err := json.Marshal(requestBody)
+		if err != nil {
+			return err
+		}
+		reqBody := bytes.NewBuffer(body)
+		req, err2 := http.NewRequest("PUT", r.Base+attachUrl, reqBody)
+		if err2 != nil {
+			return err2
+		}
+		resp, err3 := http.DefaultClient.Do(req)
+		if err3 != nil {
+			return err3
+		}
+		if resp.StatusCode != 200 {
+			s := fmt.Sprintf("http request error, attachUrl = %s, StatusCode = %d", attachUrl, resp.StatusCode)
+			return errors.New(s)
+		}
+	}
+	return nil
+}
