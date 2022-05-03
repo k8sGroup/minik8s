@@ -12,7 +12,7 @@ func main() {
 	//res, err := ipManager.GetRouteInfo()
 	//fmt.Println(res)
 	//fmt.Println(err)
-	fmt.Println(netConfigStore.GetNodeIpAndMask())
-	fmt.Println(netConfigStore.GetNodeIpAndMask())
-	fmt.Println(netConfigStore.GetNodeIpAndMask())
+	fmt.Println(netConfigStore.GetNodeNameWithIpAndMask())
+	fmt.Println(netConfigStore.GetNodeNameWithIpAndMask())
+	fmt.Println(netConfigStore.GetNodeNameWithIpAndMask())
 }

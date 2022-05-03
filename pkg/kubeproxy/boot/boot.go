@@ -99,11 +99,24 @@ func modifyDocker0IpAndMask(ipAndMask string) error {
 //参数为本机docker0网段地址以及大网段地址(针对所有node)
 //保证大网段涵盖所有node的docker网段
 //例：172.17.43.1/24   172.17.0.0/16
-func BootNetWork(Docker0IpAndMask string, BasicIpAndMask string) {
-	changeDocker0IpAndMask(Docker0IpAndMask)
-	preDownload()
-	createBr0()
-	bootBasic(BasicIpAndMask)
+func BootNetWork(Docker0IpAndMask string, BasicIpAndMask string) error {
+	err := changeDocker0IpAndMask(Docker0IpAndMask)
+	if err != nil {
+		return err
+	}
+	err = preDownload()
+	if err != nil {
+		return err
+	}
+	err = createBr0()
+	if err != nil {
+		return err
+	}
+	err = bootBasic(BasicIpAndMask)
+	if err != nil {
+		return err
+	}
+	return nil
 	//注意这时候还没有gre端口加入
 }
 func changeDocker0IpAndMask(ipAndMask string) error {
@@ -180,7 +193,7 @@ func bootBasic(BasicIpAndMask string) error {
 }
 
 //设置gre端口
-func setGrePortInBr0(grePort string, remoteIp string) error {
+func SetGrePortInBr0(grePort string, remoteIp string) error {
 	//先判断grePort是否已经存在
 	command := "list-ports " + netconfig.OVS_BRIDGE_NAME
 	res, err := execOvsVsctlCmdWithOutput(command)

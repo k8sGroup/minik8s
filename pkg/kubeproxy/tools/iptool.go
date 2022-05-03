@@ -1,6 +1,9 @@
 package tools
 
-import "net"
+import (
+	"net"
+	"strings"
+)
 
 //获取内网ip
 func LocalIPv4s() ([]string, error) {
@@ -40,4 +43,12 @@ func GetIPv4ByInterface(name string) ([]string, error) {
 	}
 
 	return ips, nil
+}
+func GetBasicIpAndMask(ipAndMask string) string {
+	index := strings.Index(ipAndMask, ".")
+	a := ipAndMask[:index]
+	ipAndMask = ipAndMask[index+1:]
+	index = strings.Index(ipAndMask, ".")
+	b := ipAndMask[:index]
+	return a + "." + b + ".0.0/16"
 }
