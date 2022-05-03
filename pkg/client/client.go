@@ -1,6 +1,8 @@
 package client
 
 import (
+	"github.com/google/uuid"
+
 	"bytes"
 	"context"
 	"encoding/json"
@@ -23,11 +25,16 @@ type RESTClient struct {
 
 /******************************Pod*******************************/
 
-func (r RESTClient) CreatePods(ctx context.Context, template *object.PodTemplateSpec) error {
-	pod, _ := GetPodFromTemplate(template)
+func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) error {
+	id := uuid.New()
+
+	podName := rs.Spec.Template.Name + id.String()
+	attachURL := "/registry/pod/default/" + podName
+
+	pod, _ := GetPodFromRS(rs)
+	pod.Name = podName
 	podRaw, _ := json.Marshal(pod)
 	reqBody := bytes.NewBuffer(podRaw)
-	attachURL := "/registry/pod/default"
 
 	req, _ := http.NewRequest("PUT", r.Base+attachURL, reqBody)
 	resp, _ := http.DefaultClient.Do(req)
@@ -64,7 +71,7 @@ func (r RESTClient) UpdatePods(ctx context.Context, pod *object.Pod) error {
 }
 
 func (r RESTClient) DeletePod(ctx context.Context, podName string) error {
-	attachURL := "/registry/pod/default" + podName
+	attachURL := "/registry/pod/default/" + podName
 	req, _ := http.NewRequest("DELETE", r.Base+attachURL, nil)
 	resp, _ := http.DefaultClient.Do(req)
 
@@ -77,9 +84,16 @@ func (r RESTClient) DeletePod(ctx context.Context, podName string) error {
 }
 
 // GetPodFromTemplate TODO: type conversion
-func GetPodFromTemplate(template *object.PodTemplateSpec) (*object.Pod, error) {
+func GetPodFromRS(rs *object.ReplicaSet) (*object.Pod, error) {
 	pod := &object.Pod{}
-	pod.Spec = object.PodSpec{}
+	pod.Spec = rs.Spec.Template.Spec
+	// add ownership
+	owner := object.OwnerReference{
+		Kind:       object.ReplicaSetKind,
+		Name:       rs.Name,
+		Controller: true,
+	}
+	pod.OwnerReferences = append(pod.OwnerReferences, owner)
 	return pod, nil
 }
 
@@ -106,26 +120,38 @@ func (r RESTClient) GetRS(name string) (*object.ReplicaSet, error) {
 	return result, nil
 }
 
-func (r RESTClient) GetRSPods(name string) ([]*object.Pod, error) {
-	attachURL := "/pod/" + name
+func GetRSPods(ls *listerwatcher.ListerWatcher, name string) ([]*object.Pod, error) {
+	raw, err := ls.List("/registry/pod/default")
 
-	req, _ := http.NewRequest("GET", r.Base+attachURL, nil)
-	resp, _ := http.DefaultClient.Do(req)
+	var pods []*object.Pod
 
-	if resp.StatusCode != object.SUCCESS {
-		return nil, errors.New("get rs pod fail")
+	if len(raw) == 0 {
+		return pods, nil
 	}
 
-	var result []*object.Pod
-	body, _ := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	// unmarshal and filter by ownership
+	for _, rawPod := range raw {
+		pod := &object.Pod{}
+		err = json.Unmarshal(rawPod.ValueBytes, &pod)
+		if ownBy(pod.OwnerReferences, name) {
+			pods = append(pods, pod)
+		}
+	}
 
-	err := json.Unmarshal(body, &result)
 	if err != nil {
-		klog.Infof("[GetRSPods] Body Pods Unmarshal fail\n")
+		fmt.Printf("[GetRSPods] unmarshal fail\n")
 	}
 
-	return result, nil
+	return pods, nil
+}
+
+func ownBy(ownerReferences []object.OwnerReference, owner string) bool {
+	for _, ref := range ownerReferences {
+		if ref.Name == owner {
+			return true
+		}
+	}
+	return false
 }
 
 func (r RESTClient) UpdateRSStatus(ctx context.Context, replicaSet *object.ReplicaSet) (*object.ReplicaSet, error) {

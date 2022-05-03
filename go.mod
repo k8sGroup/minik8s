@@ -8,6 +8,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/gin-gonic/gin v1.7.7
 	github.com/go-yaml/yaml v2.1.0+incompatible
+	github.com/google/uuid v1.2.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/pquerna/ffjson v0.0.0-20190930134022-aa0246cd15f7

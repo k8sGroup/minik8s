@@ -8,13 +8,13 @@ build:
 	go build -o ${BINARY_NAME}/controller.exe ${KUBE_CONTROLLER_MANAGER}
 	go build -o ${BINARY_NAME}/apiserver.exe ${API_SERVER}
 	go build -o ${BINARY_NAME}/scheduler.exe ${SCHEDULER}
-	go build -o ${BINARY_NAME}/kubelet.exe ${KUBELET}
+#go build -o ${BINARY_NAME}/kubelet.exe ${KUBELET}
 
 run:
 	${BINARY_NAME}/apiserver.exe
 	${BINARY_NAME}/scheduler.exe
 	${BINARY_NAME}/controller.exe
-	${BINARY_NAME}/kubelet.exe
+	#${BINARY_NAME}/kubelet.exe
 
 
 
