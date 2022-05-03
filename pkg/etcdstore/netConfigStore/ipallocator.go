@@ -11,17 +11,19 @@ const BASIC_IP_AND_MASK = "172.17.0.0/16"
 const BASIC_MASK = "/16"
 const NODE_MASK = "/24"
 const NODE_LAST_FIELD = "1"
+const NODE_NAME_PREFIX = "node"
 
 var count = 1
 var lock sync.Mutex
 
-func GetNodeIpAndMask() string {
+func GetNodeNameWithIpAndMask() (string, string) {
 	lock.Lock()
 	defer lock.Unlock()
 	a, b, _, _ := getFourField(BASIC_IP_AND_MASK)
 	res := a + "." + b + "." + fmt.Sprintf("%d", count) + "." + NODE_LAST_FIELD + "" + NODE_MASK
+	nodeName := NODE_NAME_PREFIX + fmt.Sprintf("%d", count)
 	count++
-	return res
+	return res, nodeName
 }
 
 //----------------------tools begin-----------------------------//

@@ -35,11 +35,16 @@ const Path = "/registry/:resource/:namespace/:resourceName"
 const PrefixPath = "/registry/:resource/:namespace"
 const ParamResource = "resource"
 const ParamResourceName = "resourceName"
+const ParamClusterIp = "clusterIp"
+const ParamType = "type"
+const NODE_NAME = "name"
 
 // path for kube client
 const (
-	RS  = "/rs/:resourceName"
-	POD = "/pod/:resourceName"
+	RS          = "/rs/:resourceName"
+	POD         = "/pod/:resourceName"
+	NODE        = "/node/register/:clusterIp"
+	NODE_PREFIX = "/node/register"
 )
 
 type ServerConfig struct {
