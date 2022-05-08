@@ -57,7 +57,7 @@ func (s *Server) deleteRS(ctx *gin.Context) {
 	}
 
 	// set spec replicas to zero
-	*rs.Spec.Replicas = 0
+	rs.Spec.Replicas = 0
 	raw, _ := json.Marshal(rs)
 	err = s.store.Put(key, raw)
 	if err != nil {

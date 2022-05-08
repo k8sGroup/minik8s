@@ -10,30 +10,45 @@ const (
 	// SUCCESS http status code
 	SUCCESS int = 200
 	FAILED  int = 400
+
+	// kind
+	PodKind        string = "Pod"
+	ReplicaSetKind string = "RS"
 )
 
 type ObjectMeta struct {
 	Name   string            `json:"name" yaml:"name"`
 	Labels map[string]string `json:"labels" yaml:"labels"`
+
+	OwnerReferences []OwnerReference `json:"ownerReferences" yaml:"ownerReferences"`
+}
+
+// OwnerReference ownership for objects, e.g. replicaset and pods
+type OwnerReference struct {
+	Kind string `json:"kind" yaml:"kind"`
+	Name string `json:"name" yaml:"name"`
+	UID  string `json:"uid" yaml:"uid"`
+	// If true, this reference points to the managing controller.
+	Controller bool `json:"controller" yaml:"controller"`
 }
 
 /*******************ReplicaSet*************************/
 
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 type ReplicaSet struct {
-	ObjectMeta
-	Spec   ReplicaSetSpec
-	Status ReplicaSetStatus
+	ObjectMeta `json:"metadata" yaml:"metadata"`
+	Spec       ReplicaSetSpec   `json:"spec" yaml:"spec"`
+	Status     ReplicaSetStatus `json:"status" yaml:"status"`
 }
 
 type ReplicaSetSpec struct {
-	Replicas *int32
-	Template PodTemplateSpec
+	Replicas int32           `json:"replicas" yaml:"replicas"`
+	Template PodTemplateSpec `json:"template" yaml:"template"`
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 type ReplicaSetStatus struct {
-	Replicas int32
+	Replicas int32 `json:"replicas" yaml:"replicas"`
 }
 
 type LabelSelector struct {
@@ -62,7 +77,8 @@ type PodStatus struct {
 }
 
 type PodTemplateSpec struct {
-	Spec PodSpec
+	ObjectMeta `json:"metadata" yaml:"metadata"`
+	Spec       PodSpec
 }
 
 // PodList is a list of Pods.
