@@ -39,7 +39,7 @@ func NewDeploymentController(ctx context.Context, controllerCtx util.ControllerC
 		deploymentMap: concurrentmap.NewConcurrentMapTrait[string, versionedDeployment](),
 		replicasetMap: concurrentmap.NewConcurrentMapTrait[string, versionedReplicaset](),
 		stopChannel:   make(chan struct{}),
-		apiServerBase: controllerCtx.APIServerBase,
+		apiServerBase: "http://" + controllerCtx.MasterIP + ":" + controllerCtx.HttpServerPort,
 	}
 	if dc.apiServerBase == "" {
 		klog.Fatalf("uninitialized apiserver base!\n")

@@ -60,8 +60,9 @@ func CreateControllerContext() (*util.ControllerContext, error) {
 		return nil, err
 	}
 	controllerContext := &util.ControllerContext{
-		Ls:       ls,
-		MasterIP: "127.0.0.1:8080",
+		Ls:             ls,
+		MasterIP:       "127.0.0.1",
+		HttpServerPort: "8080",
 	}
 	return controllerContext, nil
 }

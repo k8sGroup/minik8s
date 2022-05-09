@@ -29,7 +29,7 @@ type ReplicaSetController struct {
 
 func NewReplicaSetController(ctx context.Context, controllerCtx util.ControllerContext) *ReplicaSetController {
 	restClient := client.RESTClient{
-		Base: "http://" + controllerCtx.MasterIP,
+		Base: "http://" + controllerCtx.MasterIP + ":" + controllerCtx.HttpServerPort,
 	}
 
 	cp := concurrent_map.NewConcurrentMap()

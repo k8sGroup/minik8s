@@ -42,8 +42,8 @@ type ReplicaSet struct {
 }
 
 type ReplicaSetSpec struct {
-	Replicas int32           `json:"replicas" yaml:"replicas"`
-	Template PodTemplateSpec `json:"template" yaml:"template"`
+	Replicas int32       `json:"replicas" yaml:"replicas"`
+	Template PodTemplate `json:"template" yaml:"template"`
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
@@ -76,7 +76,7 @@ type PodStatus struct {
 	PodIP string `json:"podIP" yaml:"podIP"`
 }
 
-type PodTemplateSpec struct {
+type PodTemplate struct {
 	ObjectMeta `json:"metadata" yaml:"metadata"`
 	Spec       PodSpec
 }
