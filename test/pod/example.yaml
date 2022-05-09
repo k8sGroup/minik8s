@@ -2,7 +2,7 @@ kind: Pod #kind资源 Pod
 metadata:
   name: example
   labels:
-    key1: test
+    key: test
 spec: #详细
   volumes:
     - name: nginxConfig
