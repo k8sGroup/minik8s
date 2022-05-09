@@ -8,6 +8,7 @@ import (
 	"minik8s/object"
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
+	"minik8s/pkg/kubectl"
 	"minik8s/pkg/listerwatcher"
 	concurrentmap "minik8s/util/map"
 	"time"
@@ -29,6 +30,7 @@ type DeploymentController struct {
 	replicasetMap  *concurrentmap.ConcurrentMapTrait[string, versionedReplicaset]
 	resyncInterval time.Duration
 	stopChannel    chan struct{}
+	apiServerBase  string
 }
 
 func NewDeploymentController(ctx context.Context, controllerCtx util.ControllerContext) *DeploymentController {
@@ -37,6 +39,10 @@ func NewDeploymentController(ctx context.Context, controllerCtx util.ControllerC
 		deploymentMap: concurrentmap.NewConcurrentMapTrait[string, versionedDeployment](),
 		replicasetMap: concurrentmap.NewConcurrentMapTrait[string, versionedReplicaset](),
 		stopChannel:   make(chan struct{}),
+		apiServerBase: controllerCtx.APIServerBase,
+	}
+	if dc.apiServerBase == "" {
+		klog.Fatalf("uninitialized apiserver base!\n")
 	}
 	return dc
 }
@@ -122,24 +128,23 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 		klog.Errorf("Error unmarshalling deployment json data\n")
 		return
 	}
-	var rs object.ReplicaSet
+	rsKey := "/registry/rs/default/" + name
+	rs := object.ReplicaSet{
+		ObjectMeta: deployment.Metadata,
+		Spec: object.ReplicaSetSpec{
+			Replicas: deployment.Spec.Replicas,
+			Template: deployment.Spec.Template,
+		},
+		Status: object.ReplicaSetStatus{Replicas: 0},
+	}
 	if res.IsCreate {
-		// TODO : create a new replicaset
-		rs = object.ReplicaSet{
-			ObjectMeta: deployment.Metadata,
-			Spec: object.ReplicaSetSpec{
-				Replicas: deployment.Spec.Replicas,
-				Template: deployment.Spec.Template,
-			},
-			Status: object.ReplicaSetStatus{Replicas: 0},
+		// TODO : create a new replicaset and send it to etcd
+		err = kubectl.Put(dc.apiServerBase+rsKey, rs)
+		if err != nil {
+			klog.Errorf("Error send new rs to etcd\n")
 		}
 	} else if res.IsModify {
-		// TODO : modify the old replicaset
-		versionedRS, ok := dc.replicasetMap.Get("/registry/rs/default/" + name)
-		if !ok {
-			klog.Errorf("Local cache outdated!\n")
-			return
-		}
+		// TODO : check if it should scale up or update
 
 	}
 }
@@ -157,5 +162,4 @@ func (dc *DeploymentController) deltaDeployment(res etcdstore.WatchRes) {
 	default:
 		klog.Fatalf("Internal error!\n")
 	}
-
 }
