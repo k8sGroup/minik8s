@@ -29,7 +29,7 @@ type Kubelet struct {
 func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kubelet {
 	kubelet := &Kubelet{}
 	kubelet.podManager = podManager.NewPodManager(clientConfig)
-	kubelet.kubeproxy, kubelet.Err = kubeproxy.NewKubeproxy(lsConfig, clientConfig)
+	//kubelet.kubeproxy, kubelet.Err = kubeproxy.NewKubeproxy(lsConfig, clientConfig)
 
 	restClient := client.RESTClient{
 		Base: "http://" + clientConfig.Host,
@@ -50,10 +50,10 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 }
 
 func (kl *Kubelet) Run() {
-	kl.kubeproxy.StartKubeProxy()
+	//kl.kubeproxy.StartKubeProxy()
 	kl.podManager.StartPodManager()
 	updates := kl.PodConfig.GetUpdates()
-	kl.syncLoop(updates, kl)
+	go kl.syncLoop(updates, kl)
 }
 
 func (kl *Kubelet) syncLoop(updates <-chan types.PodUpdate, handler SyncHandler) {

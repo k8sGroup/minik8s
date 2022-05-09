@@ -50,7 +50,7 @@ type Pod struct {
 }
 
 type PodSpec struct {
-	Volumes    []Volume    `json:"volume" yaml:"volume"`
+	Volumes    []Volume    `json:"volumes" yaml:"volumes"`
 	Containers []Container `json:"containers" yaml:"containers"`
 	NodeName   string      `json:"nodeName" yaml:"nodeName"`
 }

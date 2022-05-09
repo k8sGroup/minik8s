@@ -113,8 +113,13 @@ func NewPodfromConfig(config *object.Pod) *Pod {
 		config.Spec.Containers[index].Name = realName
 	}
 	newPod.containers[0].RealName = pauseRealName
-	newPod.AddVolumes(config.Spec.Volumes)
-	newPod.status = POD_PENDING_STATUS //此时还未部署,设置状态为Pending
+	err := newPod.AddVolumes(config.Spec.Volumes)
+	if err != nil {
+		newPod.err = err
+		newPod.status = POD_FAILED_STATUS
+	} else {
+		newPod.status = POD_PENDING_STATUS //此时还未部署,设置状态为Pending
+	}
 	//生成snapShoot
 	errMsg := ""
 	if newPod.err != nil {
@@ -135,6 +140,9 @@ func NewPodfromConfig(config *object.Pod) *Pod {
 	}
 	//启动pod
 	newPod.StartPod()
+	if newPod.err != nil {
+		return newPod
+	}
 	//生成command
 	commandWithConfig := &message.CommandWithConfig{}
 	commandWithConfig.CommandType = message.COMMAND_BUILD_CONTAINERS_OF_POD

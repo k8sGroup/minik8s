@@ -1,17 +1,44 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	"github.com/go-yaml/yaml"
+	"io/ioutil"
+	"minik8s/object"
 	"minik8s/pkg/client"
-	"minik8s/pkg/kubelet"
-	"minik8s/pkg/listerwatcher"
 )
 
 func main() {
 	// host is the address of master node
 	clientConfig := client.Config{Host: "127.0.0.1:8080"}
-	kube := kubelet.NewKubelet(listerwatcher.DefaultConfig(), clientConfig)
-	kube.Run()
-
+	//kube := kubelet.NewKubelet(listerwatcher.DefaultConfig(), clientConfig)
+	//kube.Run()
+	restClient := client.RESTClient{
+		Base: "http://" + clientConfig.Host,
+	}
+	data, err := ioutil.ReadFile("./test/pod/example.yaml")
+	if err != nil {
+		fmt.Println(err)
+	}
+	pod := &object.Pod{}
+	err = yaml.Unmarshal([]byte(data), &pod)
+	//err = kube.AddPod(pod)
+	if err != nil {
+		fmt.Println(err)
+	}
+	restClient.UpdatePods(context.TODO(), pod)
+	res, err2 := restClient.GetPod(pod.Name)
+	if err2 != nil {
+		fmt.Println(err2)
+	} else {
+		fmt.Println(res)
+	}
+	var m int
+	for {
+		fmt.Scanln(m)
+		m++
+	}
 }
 
 //

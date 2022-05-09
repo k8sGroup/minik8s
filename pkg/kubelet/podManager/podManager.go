@@ -120,8 +120,6 @@ func (p *PodManager) GetPodSnapShoot(podName string) (*pod.PodSnapShoot, error) 
 }
 
 func (p *PodManager) CheckIfPodExist(podName string) bool {
-	p.rwLock.RLock()
-	defer p.rwLock.RUnlock()
 	_, ok := p.name2uuid[podName]
 	return ok
 }
@@ -161,16 +159,16 @@ func (p *PodManager) AddPod(config *object.Pod) error {
 	p.uid2podSnapshoot[newPodShoot.Uid] = newPodShoot
 	p.name2uuid[newPodShoot.Name] = newPodShoot.Uid
 	//把新的pod信息更新到etcd
-	oldPod, err := p.client.GetPod(newPodShoot.Name)
-	if err != nil {
-		return err
-	}
-	oldPod.Status.Phase = newPodShoot.Status
-	oldPod.Status.PodIP = newPodShoot.PodNetWork.Ipaddress
-	oldPod.ObjectMeta.Ctime = newPodShoot.Ctime
-	oldPod.Status.Err = newPodShoot.Err
+	//oldPod, err := p.client.GetPod(newPodShoot.Name)
+	//if err != nil {
+	//	return err
+	//}
+	config.Status.Phase = newPodShoot.Status
+	config.Status.PodIP = newPodShoot.PodNetWork.Ipaddress
+	config.ObjectMeta.Ctime = newPodShoot.Ctime
+	config.Status.Err = newPodShoot.Err
 	//把新的pod信息上传
-	err = p.client.UpdatePods(context.TODO(), oldPod)
+	err := p.client.UpdatePods(context.TODO(), config)
 	return err
 }
 
