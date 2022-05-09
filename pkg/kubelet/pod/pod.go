@@ -135,6 +135,39 @@ func NewPodfromConfig(config *object.Pod) *Pod {
 	}
 	//启动pod
 	newPod.StartPod()
+	//生成command
+	commandWithConfig := &message.CommandWithConfig{}
+	commandWithConfig.CommandType = message.COMMAND_BUILD_CONTAINERS_OF_POD
+	commandWithConfig.Group = config.Spec.Containers
+	//把config中的container里的volumeMounts MountPath 换成实际路径
+	for _, value := range commandWithConfig.Group {
+		if value.VolumeMounts != nil {
+			for index, it := range value.VolumeMounts {
+				path, ok := newPod.tmpDirMap[it.Name]
+				if ok {
+					value.VolumeMounts[index].Name = path
+					continue
+				}
+				path, ok = newPod.hostDirMap[it.Name]
+				if ok {
+					value.VolumeMounts[index].Name = path
+					continue
+				}
+				path, ok = newPod.hostFileMap[it.Name]
+				if ok {
+					value.VolumeMounts[index].Name = path
+					continue
+				}
+				klog.Errorf("container Mount path didn't exist")
+			}
+		}
+	}
+	podCommand := message.PodCommand{
+		ContainerCommand: &(commandWithConfig.Command),
+		PodUid:           newPod.uid,
+		PodCommandType:   message.ADD_POD,
+	}
+	newPod.commandChan <- podCommand
 	return newPod
 }
 

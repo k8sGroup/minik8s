@@ -1,7 +1,6 @@
 package kubelet
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"minik8s/object"
@@ -29,7 +28,7 @@ type Kubelet struct {
 
 func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kubelet {
 	kubelet := &Kubelet{}
-	kubelet.podManager = podManager.NewPodManager()
+	kubelet.podManager = podManager.NewPodManager(clientConfig)
 	kubelet.kubeproxy, kubelet.Err = kubeproxy.NewKubeproxy(lsConfig, clientConfig)
 
 	restClient := client.RESTClient{
@@ -52,6 +51,7 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 
 func (kl *Kubelet) Run() {
 	kl.kubeproxy.StartKubeProxy()
+	kl.podManager.StartPodManager()
 	updates := kl.PodConfig.GetUpdates()
 	kl.syncLoop(updates, kl)
 }
@@ -165,15 +165,8 @@ func (kl *Kubelet) HandlePodAdditions(pods []*object.Pod) {
 	for _, pod := range pods {
 		fmt.Printf("[Kubelet] Prepare add pod:%s\n", pod.Name)
 		err := kl.podManager.AddPod(pod)
-
 		if err != nil {
-			fmt.Printf("[Kubelet] Add pod fail...,err:%v\n", err)
-		} else {
-			// update pod status
-			p, _ := kl.podManager.GetPodSnapShoot(pod.Name)
-			//p.Status = object.PodRunning
-			pod.Status.Phase = p.Status
-			kl.Client.UpdatePods(context.TODO(), pod)
+			kl.Err = err
 		}
 	}
 }

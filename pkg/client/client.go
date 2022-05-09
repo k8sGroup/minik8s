@@ -64,7 +64,7 @@ func (r RESTClient) UpdatePods(ctx context.Context, pod *object.Pod) error {
 }
 
 func (r RESTClient) DeletePod(ctx context.Context, podName string) error {
-	attachURL := "/registry/pod/default" + podName
+	attachURL := "/registry/pod/default/" + podName
 	req, _ := http.NewRequest("DELETE", r.Base+attachURL, nil)
 	resp, _ := http.DefaultClient.Do(req)
 
@@ -81,6 +81,24 @@ func GetPodFromTemplate(template *object.PodTemplateSpec) (*object.Pod, error) {
 	pod := &object.Pod{}
 	pod.Spec = object.PodSpec{}
 	return pod, nil
+}
+
+func (r RESTClient) GetPod(name string) (*object.Pod, error) {
+	attachUrl := "/register/pod/default/" + name
+	req, _ := http.NewRequest("GET", r.Base+attachUrl, nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	result := &object.Pod{}
+	body, _ := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+
+	err = json.Unmarshal(body, result)
+	if err != nil {
+		return nil, err
+	}
+	return result, err
 }
 
 /********************************RS*****************************/

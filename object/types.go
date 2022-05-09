@@ -15,6 +15,8 @@ const (
 type ObjectMeta struct {
 	Name   string            `json:"name" yaml:"name"`
 	Labels map[string]string `json:"labels" yaml:"labels"`
+	//time to create
+	Ctime string
 }
 
 /*******************ReplicaSet*************************/
@@ -59,6 +61,8 @@ type PodStatus struct {
 	HostIP string `json:"hostIP" yaml:"hostIP"`
 	// IP address allocated to the pod. Routable at least within the cluster
 	PodIP string `json:"podIP" yaml:"podIP"`
+	//error message
+	Err string
 }
 
 type PodTemplateSpec struct {
