@@ -20,11 +20,15 @@ const (
 type WatchRes struct {
 	ResType         WatchResType
 	ResourceVersion int64
+	IsCreate        bool // true when ResType == PUT and the key is new
+	IsModify        bool // true when ResType == PUT and the key is old
+	Key             string
 	ValueBytes      []byte
 }
 
 type ListRes struct {
 	ResourceVersion int64
+	Key             string
 	ValueBytes      []byte
 }
 
@@ -54,7 +58,11 @@ func (s *Store) Get(key string) ([]ListRes, error) {
 	if len(response.Kvs) == 0 {
 		return []ListRes{}, nil
 	} else {
-		listRes := ListRes{ResourceVersion: response.Kvs[0].ModRevision, ValueBytes: response.Kvs[0].Value}
+		listRes := ListRes{
+			ResourceVersion: response.Kvs[0].ModRevision,
+			Key:             string(response.Kvs[0].Key),
+			ValueBytes:      response.Kvs[0].Value,
+		}
 		return []ListRes{listRes}, nil
 	}
 }
@@ -83,11 +91,17 @@ func (s *Store) Watch(key string) (context.CancelFunc, <-chan WatchRes) {
 				case etcd.EventTypePut:
 					res.ResType = PUT
 					res.ResourceVersion = event.Kv.ModRevision
+					res.IsCreate = event.IsCreate()
+					res.IsModify = event.IsModify()
+					res.Key = string(event.Kv.Key)
 					res.ValueBytes = event.Kv.Value
 					break
 				case etcd.EventTypeDelete:
 					res.ResType = DELETE
 					res.ResourceVersion = event.Kv.ModRevision
+					res.IsCreate = event.IsCreate()
+					res.IsModify = event.IsModify()
+					res.Key = string(event.Kv.Key)
 					break
 				}
 				c <- res
@@ -113,11 +127,17 @@ func (s *Store) PrefixWatch(key string) (context.CancelFunc, <-chan WatchRes) {
 				case etcd.EventTypePut:
 					res.ResType = PUT
 					res.ResourceVersion = event.Kv.ModRevision
+					res.IsCreate = event.IsCreate()
+					res.IsModify = event.IsModify()
+					res.Key = string(event.Kv.Key)
 					res.ValueBytes = event.Kv.Value
 					break
 				case etcd.EventTypeDelete:
 					res.ResType = DELETE
 					res.ResourceVersion = event.Kv.ModRevision
+					res.IsCreate = event.IsCreate()
+					res.IsModify = event.IsModify()
+					res.Key = string(event.Kv.Key)
 					break
 				}
 				c <- res
@@ -140,6 +160,7 @@ func (s *Store) PrefixGet(key string) ([]ListRes, error) {
 	for _, kv := range response.Kvs {
 		res := ListRes{
 			ResourceVersion: kv.ModRevision,
+			Key:             string(kv.Key),
 			ValueBytes:      kv.Value,
 		}
 		ret = append(ret, res)

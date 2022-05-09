@@ -61,7 +61,7 @@ func (ls *ListerWatcher) List(key string) ([]etcdstore.ListRes, error) {
 	return resList, nil
 }
 
-// Watch should never return if the stopChannel until the channel is closed
+// Watch should never return until stopChannel is closed
 func (ls *ListerWatcher) Watch(key string, handler WatchHandler, stopChannel <-chan struct{}) error {
 	// request the server to publish
 	resourceURL := ls.rootURL + key

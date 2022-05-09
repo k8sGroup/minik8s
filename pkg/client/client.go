@@ -83,7 +83,7 @@ func (r RESTClient) DeletePod(ctx context.Context, podName string) error {
 	return nil
 }
 
-// GetPodFromTemplate TODO: type conversion
+// GetPodFromRS TODO: type conversion
 func GetPodFromRS(rs *object.ReplicaSet) (*object.Pod, error) {
 	pod := &object.Pod{}
 	pod.Spec = rs.Spec.Template.Spec

@@ -22,6 +22,7 @@ func Get(url string) ([]etcdstore.ListRes, error) {
 		return nil, errors.New("StatusCode not 200")
 	}
 	reader := response.Body
+	defer reader.Close()
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
