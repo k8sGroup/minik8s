@@ -9,14 +9,14 @@ import (
 )
 
 func (s *Server) addNode(ctx *gin.Context) {
-	clusterIp := ctx.Param(config.ParamClusterIp)
-	pair, err := s.netConfigStore.AddNewNode(clusterIp)
+	physicalIp := ctx.Param(config.ParamphysicalIp)
+	pair, err := s.netConfigStore.AddNewNode(physicalIp)
 	if err != nil {
 		fmt.Println(err)
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	key := "/node/register/" + clusterIp
+	key := "/node/register/" + physicalIp
 	raw, _ := json.Marshal(pair)
 	err = s.store.Put(key, raw)
 	if err != nil {
