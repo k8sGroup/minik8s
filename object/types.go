@@ -21,6 +21,7 @@ type ObjectMeta struct {
 	Labels map[string]string `json:"labels" yaml:"labels"`
 
 	OwnerReferences []OwnerReference `json:"ownerReferences" yaml:"ownerReferences"`
+	Ctime           string
 }
 
 // OwnerReference ownership for objects, e.g. replicaset and pods
@@ -63,7 +64,7 @@ type Pod struct {
 }
 
 type PodSpec struct {
-	Volumes    []Volume    `json:"volume" yaml:"volume"`
+	Volumes    []Volume    `json:"volumes" yaml:"volumes"`
 	Containers []Container `json:"containers" yaml:"containers"`
 	NodeName   string      `json:"nodeName" yaml:"nodeName"`
 }
@@ -74,6 +75,8 @@ type PodStatus struct {
 	HostIP string `json:"hostIP" yaml:"hostIP"`
 	// IP address allocated to the pod. Routable at least within the cluster
 	PodIP string `json:"podIP" yaml:"podIP"`
+	//error message
+	Err string
 }
 
 type PodTemplate struct {
