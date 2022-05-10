@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"minik8s/cmd/kube-controller-manager/util"
 	"minik8s/object"
+	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
-	"minik8s/pkg/kubectl"
 	"minik8s/pkg/listerwatcher"
 	concurrentmap "minik8s/util/map"
 	"time"
@@ -19,9 +19,25 @@ type versionedDeployment struct {
 	deployment object.Deployment
 }
 
+func selectNewerDeployment(d1 versionedDeployment, d2 versionedDeployment) versionedDeployment {
+	if d1.version > d2.version {
+		return d1
+	} else {
+		return d2
+	}
+}
+
 type versionedReplicaset struct {
 	version    int64
 	replicaset object.ReplicaSet
+}
+
+func selectNewerReplicaset(rs1 versionedReplicaset, rs2 versionedReplicaset) versionedReplicaset {
+	if rs1.version > rs2.version {
+		return rs1
+	} else {
+		return rs2
+	}
 }
 
 type DeploymentController struct {
@@ -73,7 +89,8 @@ func (dc *DeploymentController) register() {
 			time.Sleep(5 * time.Second)
 		}
 	}
-	registerSyncLoop := func() {
+
+	registerDeploymentResyncLoop := func() {
 		//TODO handle the event when the list responses mismatch with local cache
 		for {
 			{
@@ -88,7 +105,7 @@ func (dc *DeploymentController) register() {
 					_ = json.Unmarshal(res.ValueBytes, &versionedRS.replicaset)
 					newMap[res.Key] = versionedRS
 				}
-				dc.replicasetMap.ReplaceAll(newMap)
+				dc.replicasetMap.UpdateAll(newMap, selectNewerReplicaset)
 			}
 			{
 				resList, err := dc.ls.List("/registry/deployment/default")
@@ -108,7 +125,7 @@ func (dc *DeploymentController) register() {
 		}
 	}
 
-	go registerSyncLoop()
+	go registerDeploymentResyncLoop()
 	go registerAddDeployment()
 	go registerDeleteDeployment()
 }
@@ -128,23 +145,23 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 		klog.Errorf("Error unmarshalling deployment json data\n")
 		return
 	}
-	rsKey := "/registry/rs/default/" + name
-	rs := object.ReplicaSet{
-		ObjectMeta: deployment.Metadata,
-		Spec: object.ReplicaSetSpec{
-			Replicas: deployment.Spec.Replicas,
-			Template: deployment.Spec.Template,
-		},
-		Status: object.ReplicaSetStatus{Replicas: 0},
-	}
 	if res.IsCreate {
 		// TODO : create a new replicaset and send it to etcd
-		err = kubectl.Put(dc.apiServerBase+rsKey, rs)
+		rsKey := "/registry/rs/default/" + name
+		rs := object.ReplicaSet{
+			ObjectMeta: deployment.Metadata,
+			Spec: object.ReplicaSetSpec{
+				Replicas: deployment.Spec.Replicas,
+				Template: deployment.Spec.Template,
+			},
+			Status: object.ReplicaSetStatus{Replicas: 0},
+		}
+		err = client.Put(dc.apiServerBase+rsKey, rs)
 		if err != nil {
 			klog.Errorf("Error send new rs to etcd\n")
 		}
 	} else if res.IsModify {
-		// TODO : check if it should scale up or update
+		// TODO : update deployment
 
 	}
 }
@@ -162,4 +179,8 @@ func (dc *DeploymentController) deltaDeployment(res etcdstore.WatchRes) {
 	default:
 		klog.Fatalf("Internal error!\n")
 	}
+}
+
+func (dc *DeploymentController) syncReplicaset(res etcdstore.WatchRes) {
+
 }
