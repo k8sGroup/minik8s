@@ -1,4 +1,4 @@
-package kubectl
+package client
 
 import (
 	"bytes"
@@ -22,6 +22,7 @@ func Get(url string) ([]etcdstore.ListRes, error) {
 		return nil, errors.New("StatusCode not 200")
 	}
 	reader := response.Body
+	defer reader.Close()
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
@@ -49,8 +50,8 @@ func Del(url string) error {
 	return nil
 }
 
-func Put(url string, v any) error {
-	payload, err := json.Marshal(v)
+func Put(url string, obj any) error {
+	payload, err := json.Marshal(obj)
 	if err != nil {
 		return err
 	}

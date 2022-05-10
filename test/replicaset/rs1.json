@@ -1,0 +1,44 @@
+{
+  "kind": "ReplicaSet",
+  "metadata": {
+    "name": "rs1",
+    "labels": {
+      "key": "test"
+    }
+  },
+  "spec": {
+    "replicas": 3,
+    "template": {
+      "spec": {
+        "volumes": [
+          {
+            "name": "nginxConfig",
+            "type": "hostFile",
+            "path": "./cmd/kubelet/nginx.conf"
+          }
+        ],
+        "containers": [
+          {
+            "name": "nginx",
+            "image": "nginx",
+            "ports": [
+              {
+                "containerPort": 80,
+                "volumeMounts": [
+                  {
+                    "name": "nginxConfig",
+                    "mountPath": "/etc/nginx/nginx.conf"
+                  }
+                ]
+              },
+              {
+                "name": "ghost",
+                "image": "ghost"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

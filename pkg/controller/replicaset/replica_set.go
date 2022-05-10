@@ -29,7 +29,7 @@ type ReplicaSetController struct {
 
 func NewReplicaSetController(ctx context.Context, controllerCtx util.ControllerContext) *ReplicaSetController {
 	restClient := client.RESTClient{
-		Base: "http://" + controllerCtx.MasterIP,
+		Base: "http://" + controllerCtx.MasterIP + ":" + controllerCtx.HttpServerPort,
 	}
 
 	cp := concurrent_map.NewConcurrentMap()
@@ -51,17 +51,25 @@ func (rsc *ReplicaSetController) Run(ctx context.Context) {
 }
 
 func (rsc *ReplicaSetController) register() {
-	err := rsc.ls.Watch("/registry/rs/default", rsc.addRS, rsc.stopChannel)
-	if err != nil {
-		fmt.Printf("[Scheduler] ListWatch init fail...")
+	watchAdd := func(rsc *ReplicaSetController) {
+		err := rsc.ls.Watch("/registry/rs/default", rsc.addRS, rsc.stopChannel)
+		if err != nil {
+			fmt.Printf("[Scheduler] ListWatch init fail...")
+		}
 	}
 
-	err = rsc.ls.Watch("/registry/rs/default", rsc.deleteRS, rsc.stopChannel)
-	if err != nil {
-		fmt.Printf("[Scheduler] ListWatch init fail...")
+	watchDelete := func(rsc *ReplicaSetController) {
+		err := rsc.ls.Watch("/registry/rs/default", rsc.deleteRS, rsc.stopChannel)
+		if err != nil {
+			fmt.Printf("[Scheduler] ListWatch init fail...")
+		}
 	}
 
 	klog.Debugf("success register\n")
+
+	go watchAdd(rsc)
+	go watchDelete(rsc)
+
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
@@ -83,13 +91,15 @@ func (rsc *ReplicaSetController) addRS(res etcdstore.WatchRes) {
 		return
 	}
 
-	fmt.Printf("[addRS] message receive...")
-
 	rs := &object.ReplicaSet{}
 	err := json.Unmarshal(res.ValueBytes, rs)
 	if err != nil {
-		klog.Warnf("addRS bad message\n")
+		fmt.Printf("addRS bad message\n")
+		return
 	}
+
+	fmt.Printf("[addRS] message receive...\n")
+
 	// encode object to key
 	key := getKey(rs)
 	rsc.cp.Put(key, rs)
@@ -102,18 +112,19 @@ func (rsc *ReplicaSetController) deleteRS(res etcdstore.WatchRes) {
 	rs := &object.ReplicaSet{}
 	err := json.Unmarshal(res.ValueBytes, rs)
 	if err != nil {
-		klog.Warnf("bad message\n")
-	}
-
-	// check whether the message is deletion
-	if *rs.Spec.Replicas != 0 {
+		fmt.Printf("bad message\n")
 		return
 	}
 
-	fmt.Printf("[deleteRS] message receive...")
+	// check whether the message is deletion
+	if rs.Spec.Replicas != 0 {
+		return
+	}
+
+	fmt.Printf("[deleteRS] message receive...\n")
 
 	// reset replicas to zero
-	*rs.Spec.Replicas = 0
+	rs.Spec.Replicas = 0
 
 	// encode object to key
 	key := getKey(rs)
@@ -129,7 +140,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	// get expected replica set
 	rs, _ := rsc.cp.Get(key).(*object.ReplicaSet)
 	// get all actual pods of the rs
-	allPods, _ := rsc.Client.GetRSPods(name)
+	allPods, _ := client.GetRSPods(rsc.ls, name)
 	// filter all inactive pods
 	activePods := controller.FilterActivePods(allPods)
 	// manage pods
@@ -143,14 +154,14 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 
 func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPods []*object.Pod, rs *object.ReplicaSet) error {
 	// make diff for current pods and expected number
-	diff := len(filteredPods) - int(*(rs.Spec.Replicas))
+	diff := len(filteredPods) - int(rs.Spec.Replicas)
 	//key := getKey(rs)
 
 	if diff < 0 {
 		diff *= -1
 		// create pods
 		for i := 0; i < diff; i++ {
-			err := rsc.Client.CreatePods(ctx, &rs.Spec.Template)
+			err := rsc.Client.CreateRSPod(ctx, rs)
 			if err != nil {
 				klog.Errorf("create pod fail\n")
 			}
