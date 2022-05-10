@@ -1,4 +1,4 @@
-package kubectl
+package client
 
 import (
 	"bytes"
@@ -50,8 +50,8 @@ func Del(url string) error {
 	return nil
 }
 
-func Put(url string, v any) error {
-	payload, err := json.Marshal(v)
+func Put(url string, obj any) error {
+	payload, err := json.Marshal(obj)
 	if err != nil {
 		return err
 	}

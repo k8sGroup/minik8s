@@ -3,7 +3,7 @@ package app
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	"minik8s/pkg/kubectl"
+	"minik8s/pkg/client"
 )
 
 var (
@@ -21,7 +21,7 @@ var (
 			} else {
 				url = baseUrl + fmt.Sprintf("/registry/%s/%s/%s", resource, flagsGet.namespace, flagsGet.name)
 			}
-			bytes, err := kubectl.Get(url)
+			bytes, err := client.Get(url)
 			if err != nil {
 				fmt.Println(err.Error())
 				return

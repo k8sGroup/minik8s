@@ -3,7 +3,7 @@ package app
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	"minik8s/pkg/kubectl"
+	"minik8s/pkg/client"
 )
 
 type flags struct {
@@ -21,7 +21,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			resource := args[0]
 			url := baseUrl + fmt.Sprintf("/registry/%s/%s/%s", resource, flagsDel.namespace, flagsDel.name)
-			err := kubectl.Del(url)
+			err := client.Del(url)
 			if err != nil {
 				fmt.Println(err.Error())
 				return
