@@ -20,6 +20,7 @@ const (
 type WatchRes struct {
 	ResType         WatchResType
 	ResourceVersion int64
+	CreateVersion   int64
 	IsCreate        bool // true when ResType == PUT and the key is new
 	IsModify        bool // true when ResType == PUT and the key is old
 	Key             string
@@ -28,6 +29,7 @@ type WatchRes struct {
 
 type ListRes struct {
 	ResourceVersion int64
+	CreateVersion   int64
 	Key             string
 	ValueBytes      []byte
 }
@@ -60,6 +62,7 @@ func (s *Store) Get(key string) ([]ListRes, error) {
 	} else {
 		listRes := ListRes{
 			ResourceVersion: response.Kvs[0].ModRevision,
+			CreateVersion:   response.Kvs[0].CreateRevision,
 			Key:             string(response.Kvs[0].Key),
 			ValueBytes:      response.Kvs[0].Value,
 		}
@@ -91,6 +94,7 @@ func (s *Store) Watch(key string) (context.CancelFunc, <-chan WatchRes) {
 				case etcd.EventTypePut:
 					res.ResType = PUT
 					res.ResourceVersion = event.Kv.ModRevision
+					res.CreateVersion = event.Kv.CreateRevision
 					res.IsCreate = event.IsCreate()
 					res.IsModify = event.IsModify()
 					res.Key = string(event.Kv.Key)
@@ -99,6 +103,7 @@ func (s *Store) Watch(key string) (context.CancelFunc, <-chan WatchRes) {
 				case etcd.EventTypeDelete:
 					res.ResType = DELETE
 					res.ResourceVersion = event.Kv.ModRevision
+					res.CreateVersion = event.Kv.CreateRevision
 					res.IsCreate = event.IsCreate()
 					res.IsModify = event.IsModify()
 					res.Key = string(event.Kv.Key)
@@ -127,6 +132,7 @@ func (s *Store) PrefixWatch(key string) (context.CancelFunc, <-chan WatchRes) {
 				case etcd.EventTypePut:
 					res.ResType = PUT
 					res.ResourceVersion = event.Kv.ModRevision
+					res.CreateVersion = event.Kv.CreateRevision
 					res.IsCreate = event.IsCreate()
 					res.IsModify = event.IsModify()
 					res.Key = string(event.Kv.Key)
@@ -135,6 +141,7 @@ func (s *Store) PrefixWatch(key string) (context.CancelFunc, <-chan WatchRes) {
 				case etcd.EventTypeDelete:
 					res.ResType = DELETE
 					res.ResourceVersion = event.Kv.ModRevision
+					res.CreateVersion = event.Kv.CreateRevision
 					res.IsCreate = event.IsCreate()
 					res.IsModify = event.IsModify()
 					res.Key = string(event.Kv.Key)
@@ -160,6 +167,7 @@ func (s *Store) PrefixGet(key string) ([]ListRes, error) {
 	for _, kv := range response.Kvs {
 		res := ListRes{
 			ResourceVersion: kv.ModRevision,
+			CreateVersion:   kv.CreateRevision,
 			Key:             string(kv.Key),
 			ValueBytes:      kv.Value,
 		}

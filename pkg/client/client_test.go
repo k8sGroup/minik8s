@@ -1,4 +1,4 @@
-package kubectl
+package client
 
 import (
 	"encoding/json"

@@ -33,12 +33,12 @@ func (cp *ConcurrentMap) Contains(key interface{}) bool {
 	return ok
 }
 
-type ConcurrentMapTrait[KEY, VALUE] struct {
+type ConcurrentMapTrait[KEY comparable, VALUE any] struct {
 	innerMap map[KEY]VALUE
 	mtx      sync.RWMutex
 }
 
-func NewConcurrentMapTrait[KEY, VALUE]() *ConcurrentMapTrait[KEY, VALUE] {
+func NewConcurrentMapTrait[KEY comparable, VALUE any]() *ConcurrentMapTrait[KEY, VALUE] {
 	return &ConcurrentMapTrait[KEY, VALUE]{
 		innerMap: make(map[KEY]VALUE),
 	}
@@ -77,8 +77,23 @@ func (c *ConcurrentMapTrait[KEY, VALUE]) ReplaceAll(newMap map[KEY]VALUE) {
 }
 
 func (c *ConcurrentMapTrait[KEY, VALUE]) SnapShot() map[KEY]VALUE {
-	c.mtx.RUnlock()
+	c.mtx.RLock()
 	defer c.mtx.RUnlock()
 	m2 := c.innerMap
 	return m2
+}
+
+func (c *ConcurrentMapTrait[KEY, VALUE]) UpdateAll(newMap map[KEY]VALUE, selectFunc func(v1 VALUE, v2 VALUE) VALUE) {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+	ret := make(map[KEY]VALUE)
+	for key, newVal := range newMap {
+		oldVal, ok := c.innerMap[key]
+		if ok {
+			ret[key] = selectFunc(newVal, oldVal)
+		} else {
+			ret[key] = newVal
+		}
+	}
+	c.innerMap = ret
 }
