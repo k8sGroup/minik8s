@@ -54,33 +54,40 @@ func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) erro
 	return err
 }
 
-func (r RESTClient) UpdatePods(ctx context.Context, pod *object.Pod) error {
-	podRaw, _ := json.Marshal(pod)
-	reqBody := bytes.NewBuffer(podRaw)
+func (r RESTClient) UpdatePods(pod *object.Pod) error {
 	attachURL := "/registry/pod/default/" + pod.Name
-
-	req, _ := http.NewRequest("PUT", r.Base+attachURL, reqBody)
-	resp, _ := http.DefaultClient.Do(req)
-
-	if resp.StatusCode != object.SUCCESS {
-		return errors.New("create pod fail")
+	err := Put(r.Base+attachURL, pod)
+	if err != nil {
+		return err
 	}
-	defer resp.Body.Close()
+	//podRaw, _ := json.Marshal(pod)
+	//reqBody := bytes.NewBuffer(podRaw)
+	//attachURL := "/registry/pod/default/" + pod.Name
+	//
+	//req, _ := http.NewRequest("PUT", r.Base+attachURL, reqBody)
+	//resp, _ := http.DefaultClient.Do(req)
+	//
+	//if resp.StatusCode != object.SUCCESS {
+	//	return errors.New("create pod fail")
+	//}
+	//defer resp.Body.Close()
 
 	return nil
 }
 
-func (r RESTClient) DeletePod(ctx context.Context, podName string) error {
+func (r RESTClient) DeletePod(podName string) error {
 	attachURL := "/registry/pod/default/" + podName
-	req, _ := http.NewRequest("DELETE", r.Base+attachURL, nil)
-	resp, _ := http.DefaultClient.Do(req)
+	err := Del(r.Base + attachURL)
+	return err
+	//req, _ := http.NewRequest("DELETE", r.Base+attachURL, nil)
+	//resp, _ := http.DefaultClient.Do(req)
+	//
+	//if resp.StatusCode != object.SUCCESS {
+	//	return errors.New("delete pod fail")
+	//}
+	//defer resp.Body.Close()
 
-	if resp.StatusCode != object.SUCCESS {
-		return errors.New("delete pod fail")
-	}
-	defer resp.Body.Close()
-
-	return nil
+	//return nil
 }
 
 // GetPodFromRS TODO: type conversion
@@ -98,20 +105,13 @@ func GetPodFromRS(rs *object.ReplicaSet) (*object.Pod, error) {
 }
 
 func (r RESTClient) GetPod(name string) (*object.Pod, error) {
-	attachUrl := "/register/pod/default/" + name
-	req, _ := http.NewRequest("GET", r.Base+attachUrl, nil)
-	resp, err := http.DefaultClient.Do(req)
+	attachUrl := "/registry/pod/default/" + name
+	resp, err := Get(r.Base + attachUrl)
 	if err != nil {
 		return nil, err
 	}
 	result := &object.Pod{}
-	body, _ := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
-
-	err = json.Unmarshal(body, result)
-	if err != nil {
-		return nil, err
-	}
+	err = json.Unmarshal(resp[0].ValueBytes, result)
 	return result, err
 }
 

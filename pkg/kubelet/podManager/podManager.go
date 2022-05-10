@@ -1,7 +1,6 @@
 package podManager
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"github.com/pquerna/ffjson/ffjson"
@@ -75,8 +74,9 @@ func (p *PodManager) startTimer() {
 						}
 						//暂时只用更新这两
 						oldPod.Status.Phase = newPodSnapShoot.Status
+						oldPod.Status.PodIP = newPodSnapShoot.PodNetWork.Ipaddress
 						oldPod.Status.Err = newPodSnapShoot.Err
-						err = p.client.UpdatePods(context.TODO(), oldPod)
+						err = p.client.UpdatePods(oldPod)
 						if err != nil {
 							p.Err = err
 							continue
@@ -139,7 +139,7 @@ func (p *PodManager) DeletePod(podName string) error {
 	delete(p.uid2podSnapshoot, uid)
 	delete(p.uid2pod, uid)
 	//提交delete pod的请求
-	err := p.client.DeletePod(context.TODO(), podName)
+	err := p.client.DeletePod(podName)
 	if err != nil {
 		return err
 	}
@@ -168,7 +168,7 @@ func (p *PodManager) AddPod(config *object.Pod) error {
 	config.ObjectMeta.Ctime = newPodShoot.Ctime
 	config.Status.Err = newPodShoot.Err
 	//把新的pod信息上传
-	err := p.client.UpdatePods(context.TODO(), config)
+	err := p.client.UpdatePods(config)
 	return err
 }
 

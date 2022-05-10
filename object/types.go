@@ -21,6 +21,7 @@ type ObjectMeta struct {
 	Labels map[string]string `json:"labels" yaml:"labels"`
 
 	OwnerReferences []OwnerReference `json:"ownerReferences" yaml:"ownerReferences"`
+	Ctime           string
 }
 
 // OwnerReference ownership for objects, e.g. replicaset and pods
