@@ -31,7 +31,7 @@ const MASK = "need allocate port"
 type Kubeproxy struct {
 	portMappings []iptablesManager.PortMapping
 	rwLock       sync.RWMutex
-	//存一份map,由clusterIp映射到管道名, 同时这个与etcd中的数据做对比可以得到要增加或者删除的gre端口
+	//存一份map,由physicalIp映射到管道名, 同时这个与etcd中的数据做对比可以得到要增加或者删除的gre端口
 	ipPipeMap map[string]string
 	//存一份snapshoop
 	kubeproxySnapShoot     KubeproxySnapShoot
@@ -42,7 +42,7 @@ type Kubeproxy struct {
 	NetCommandResponseChan chan NetCommandResponse
 	commandWorker          *CommandWorker
 	//自己所在节点的ip
-	myClusterIp string
+	myphysicalIp string
 	//自己分配的网段
 	myIpAndMask string
 	bootStatus  int
@@ -61,12 +61,12 @@ func (worker *CommandWorker) SyncLoop(commands <-chan NetCommand, responses chan
 			switch command.Op {
 			case OP_ADD_GRE:
 				portName := netconfig.FormGrePort()
-				err := boot.SetGrePortInBr0(portName, command.ClusterIp)
+				err := boot.SetGrePortInBr0(portName, command.physicalIp)
 				response := NetCommandResponse{
-					Op:        command.Op,
-					ClusterIp: command.ClusterIp,
-					GrePort:   portName,
-					Err:       err,
+					Op:         command.Op,
+					physicalIp: command.physicalIp,
+					GrePort:    portName,
+					Err:        err,
 				}
 				responses <- response
 			case OP_BOOT_NET:
@@ -83,16 +83,16 @@ func (worker *CommandWorker) SyncLoop(commands <-chan NetCommand, responses chan
 
 type NetCommand struct {
 	//操作类型
-	Op        int
-	ClusterIp string
+	Op         int
+	physicalIp string
 	//这些只有boot的时候需要, 即分配给自己机子的网段，同时通过这个可以得到大网段
 	IpAndMask string
 }
 type NetCommandResponse struct {
 	//操作类型
-	Op        int
-	ClusterIp string
-	GrePort   string
+	Op         int
+	physicalIp string
+	GrePort    string
 	//Err 为nil代表command正确执行
 	Err error
 }
@@ -100,7 +100,7 @@ type KubeproxySnapShoot struct {
 	PortMappings []iptablesManager.PortMapping
 	IpPipeMap    map[string]string
 	IpPairs      []netConfigStore.IpPair
-	MyClusterIp  string
+	MyphysicalIp string
 	MyIpAndMask  string
 	Error        string
 	BootStatus   int
@@ -129,12 +129,12 @@ func NewKubeproxy(lsConfig *listerwatcher.Config, clientConfig client.Config) (*
 	if err != nil {
 		newKubeproxy.err = err
 	} else {
-		newKubeproxy.myClusterIp = ips[0]
+		newKubeproxy.myphysicalIp = ips[0]
 	}
 	newKubeproxy.kubeproxySnapShoot = KubeproxySnapShoot{
 		PortMappings: newKubeproxy.portMappings,
 		IpPipeMap:    newKubeproxy.ipPipeMap,
-		MyClusterIp:  newKubeproxy.myClusterIp,
+		MyphysicalIp: newKubeproxy.myphysicalIp,
 		MyIpAndMask:  newKubeproxy.myIpAndMask,
 		Error:        newKubeproxy.err.Error(),
 		BootStatus:   newKubeproxy.bootStatus,
@@ -159,10 +159,10 @@ func (k *Kubeproxy) registerNode() error {
 	}
 	//设置map， 暂时不生成command，用MASK占位
 	for _, value := range res {
-		k.ipPipeMap[value.ClusterIp] = MASK
+		k.ipPipeMap[value.PhysicalIp] = MASK
 	}
 	//发起注册的http请求
-	attachURL := "/node/register/" + k.myClusterIp
+	attachURL := "/node/register/" + k.myphysicalIp
 	err = k.Client.PutWrap(attachURL, nil)
 	if err != nil {
 		return err
@@ -260,38 +260,38 @@ func (k *Kubeproxy) watchAndHandleInner(ipPair *netConfigStore.IpPair) {
 	switch k.bootStatus {
 	case NOT_BOOT:
 		//根据是否是自己的ip区别对待
-		if ipPair.ClusterIp == k.myClusterIp {
+		if ipPair.PhysicalIp == k.myphysicalIp {
 			command := NetCommand{
-				Op:        OP_BOOT_NET,
-				ClusterIp: ipPair.ClusterIp,
-				IpAndMask: ipPair.NodeIpAndMask,
+				Op:         OP_BOOT_NET,
+				physicalIp: ipPair.PhysicalIp,
+				IpAndMask:  ipPair.NodeIpAndMask,
 			}
 			k.myIpAndMask = ipPair.NodeIpAndMask
 			k.bootStatus = IS_BOOTING
 			k.netCommandChan <- command
 		} else {
-			k.ipPipeMap[ipPair.ClusterIp] = MASK
+			k.ipPipeMap[ipPair.PhysicalIp] = MASK
 		}
 		return
 	case BOOT_FAILED:
 		//上次boot失败，尝试再次boot
-		k.ipPipeMap[ipPair.ClusterIp] = MASK
+		k.ipPipeMap[ipPair.PhysicalIp] = MASK
 		command := NetCommand{
-			Op:        OP_BOOT_NET,
-			ClusterIp: k.myClusterIp,
-			IpAndMask: k.myIpAndMask,
+			Op:         OP_BOOT_NET,
+			physicalIp: k.myphysicalIp,
+			IpAndMask:  k.myIpAndMask,
 		}
 		k.netCommandChan <- command
 		return
 	case IS_BOOTING:
 		//同样不需要生成实际的command
-		k.ipPipeMap[ipPair.ClusterIp] = MASK
+		k.ipPipeMap[ipPair.PhysicalIp] = MASK
 		return
 	case BOOT_SUCCEED:
 		//生成command
 		command := NetCommand{
-			Op:        OP_ADD_GRE,
-			ClusterIp: ipPair.ClusterIp,
+			Op:         OP_ADD_GRE,
+			physicalIp: ipPair.PhysicalIp,
 		}
 		k.netCommandChan <- command
 		return
@@ -310,7 +310,7 @@ func (k *Kubeproxy) listeningResponse() {
 				k.rwLock.Lock()
 				if response.Err == nil {
 					//success
-					k.ipPipeMap[response.ClusterIp] = response.GrePort
+					k.ipPipeMap[response.physicalIp] = response.GrePort
 				} else {
 					k.err = response.Err
 					//直接设置error, 同时不选择重试，因为这时候基本重试也会寄
@@ -324,8 +324,8 @@ func (k *Kubeproxy) listeningResponse() {
 					for key, v := range k.ipPipeMap {
 						if v == MASK {
 							command := NetCommand{
-								Op:        OP_ADD_GRE,
-								ClusterIp: key,
+								Op:         OP_ADD_GRE,
+								physicalIp: key,
 							}
 							k.netCommandChan <- command
 						}

@@ -35,7 +35,7 @@ const Path = "/registry/:resource/:namespace/:resourceName"
 const PrefixPath = "/registry/:resource/:namespace"
 const ParamResource = "resource"
 const ParamResourceName = "resourceName"
-const ParamClusterIp = "clusterIp"
+const ParamphysicalIp = "physicalIp"
 const ParamType = "type"
 const NODE_NAME = "name"
 
@@ -43,8 +43,8 @@ const NODE_NAME = "name"
 const (
 	RS          = "/rs/:resourceName"
 	POD         = "/pod/:resourceName"
-	NODE        = "/node/register/:clusterIp"
-	NODE_PREFIX = "/node/register"
+	NODE        = "/registry/node/default/:resourceName"
+	NODE_PREFIX = "/register/node/default"
 )
 
 type ServerConfig struct {
