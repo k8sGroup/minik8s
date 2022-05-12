@@ -5,12 +5,13 @@ services:
     container_name: rabbitmq
     restart: always
     hostname: rabbitmq_host
+    privileged: true
     ports:
       - "15672:15672"   # web UI 管理接口
       - "5672:5672"    # 生产者和消费者连接使用的接口
     volumes:
       - ./docker/rabbit/log:/var/log/rabbitmq #挂载 RabbitMQ日志
-      - ./docker/rabbit/data:/var/lib/rabbitmq #挂载 RabbitMQ数据
+      - ./docker/rabbit/data:/var/lib/rabbitmq/mnesia #挂载 RabbitMQ数据
     environment:
       - RABBITMQ_DEFAULT_USER=root
       - RABBITMQ_DEFAULT_PASS=123456
