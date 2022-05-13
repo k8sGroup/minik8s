@@ -58,17 +58,17 @@ func (rsc *ReplicaSetController) register() {
 		}
 	}
 
-	//watchDelete := func(rsc *ReplicaSetController) {
-	//	err := rsc.ls.Watch("/registry/rs/default", rsc.deleteRS, rsc.stopChannel)
-	//	if err != nil {
-	//		fmt.Printf("[Scheduler] ListWatch init fail...")
-	//	}
-	//}
+	watchPod := func(rsc *ReplicaSetController) {
+		err := rsc.ls.Watch("/registry/pod/default", rsc.podOperation, rsc.stopChannel)
+		if err != nil {
+			fmt.Printf("[Scheduler] ListWatch init fail...")
+		}
+	}
 
 	klog.Debugf("success register\n")
 
 	go watchAdd(rsc)
-	//go watchDelete(rsc)
+	go watchPod(rsc)
 
 }
 
@@ -87,7 +87,10 @@ func (rsc *ReplicaSetController) worker(ctx context.Context) {
 }
 
 func (rsc *ReplicaSetController) addRS(res etcdstore.WatchRes) {
-
+	// do not react to delete, delete is mocked by put
+	if res.ResType == etcdstore.DELETE {
+		return
+	}
 	rs := &object.ReplicaSet{}
 	err := json.Unmarshal(res.ValueBytes, rs)
 	if err != nil {
@@ -132,17 +135,23 @@ func (rsc *ReplicaSetController) addRS(res etcdstore.WatchRes) {
 //}
 
 func (rsc *ReplicaSetController) podOperation(res etcdstore.WatchRes) {
-	// check ownership
-	pod := &object.Pod{}
-	err := json.Unmarshal(res.ValueBytes, pod)
-	if err != nil {
-		fmt.Printf("bad message,unmarshal fail\n")
+	if res.ResType == etcdstore.DELETE {
 		return
 	}
+	// check ownership
+	pod := &object.Pod{}
+	fmt.Printf("[podOperation] messgae:%v\n", len(res.ValueBytes))
+	err := json.Unmarshal(res.ValueBytes, pod)
+	if err != nil {
+		fmt.Printf("[podOperation] bad message,unmarshal fail\n")
+		return
+	}
+
 	isOwned, name := client.OwnByRs(pod)
 	if isOwned {
-		rs, err := rsc.Client.GetRS(name)
-		if err != nil {
+		rs, err := client.GetRS(rsc.ls, name)
+		fmt.Printf("[podOperation] rs:%v owns:%v\n", rs.Name, pod.Name)
+		if err == nil {
 			// encode object to key
 			key := getKey(rs)
 			rsc.cp.Put(key, rs)
@@ -161,6 +170,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	allPods, _ := client.GetRSPods(rsc.ls, name)
 	// filter all inactive pods
 	activePods := controller.FilterActivePods(allPods)
+	fmt.Printf("[syncReplicaSet] active pods of rs %v:%v\n", rs.Name, len(activePods))
 	if len(activePods) == int(rs.Spec.Replicas) {
 		return nil
 	}
@@ -176,12 +186,13 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPods []*object.Pod, rs *object.ReplicaSet) error {
 	// make diff for current pods and expected number
 	diff := len(filteredPods) - int(rs.Spec.Replicas)
-	fmt.Printf("[manageReplicas] diff:%v", diff)
+	fmt.Printf("[manageReplicas] diff:%v\n", diff)
 
 	if diff < 0 {
 		diff *= -1
 		// create pods
 		for i := 0; i < diff; i++ {
+			fmt.Printf("[manageReplicas] create pod\n")
 			err := rsc.Client.CreateRSPod(ctx, rs)
 			if err != nil {
 				klog.Errorf("create pod fail\n")
@@ -191,7 +202,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 	} else if diff > 0 {
 		// delete pods
 		podsToDelete := getPodsToDelete(filteredPods, diff)
-		fmt.Printf("[manageReplicas] del pods number:%v", len(podsToDelete))
+		fmt.Printf("[manageReplicas] del pods number:%v\n", len(podsToDelete))
 
 		for _, pod := range podsToDelete {
 			err := rsc.Client.DeletePod(pod.Name)
@@ -210,10 +221,10 @@ func calculateStatus(rs *object.ReplicaSet, filteredPods []*object.Pod) object.R
 }
 
 // ge related pods to replicaset
-func (rsc *ReplicaSetController) getRelatedPods(rs *object.ReplicaSet) ([]*object.Pod, error) {
-	var relatedPods []*object.Pod
-	return relatedPods, nil
-}
+//func (rsc *ReplicaSetController) getRelatedPods(rs *object.ReplicaSet) ([]*object.Pod, error) {
+//	var relatedPods []*object.Pod
+//	return relatedPods, nil
+//}
 
 // choose pods to be deleted
 // simple policy

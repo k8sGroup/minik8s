@@ -44,6 +44,8 @@ const (
 	POD         = "/registry/pod/default/:resourceName"
 	NODE        = "/registry/node/default/:resourceName"
 	NODE_PREFIX = "/registry/node/default"
+
+	POD_TEST = "/pod/test/:resourceName"
 )
 
 type ServerConfig struct {

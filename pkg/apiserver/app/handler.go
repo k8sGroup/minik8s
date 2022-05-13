@@ -9,34 +9,40 @@ import (
 	"net/http"
 )
 
-//
-//// do not delete pod in etcd directly, just modify the status
-//// TODO: real deletion by kubelet !
-//func (s *Server) deletePod(ctx *gin.Context) {
-//	name := ctx.Param(config.ParamResourceName)
-//	key := "/registry/pod/default/" + name
-//	resList, err := s.store.Get(key)
-//	if err != nil || len(resList) == 0 {
-//		fmt.Printf("[deletePod] pod not exist:%s\n", name)
-//		ctx.AbortWithStatus(http.StatusBadRequest)
-//		return
-//	}
-//	pod := object.Pod{}
-//	err = json.Unmarshal(resList[0].ValueBytes, &pod)
-//	if err != nil {
-//		fmt.Printf("[deletePod] pod unmarshal fail\n")
-//		ctx.AbortWithStatus(http.StatusBadRequest)
-//		return
-//	}
-//	// update pod phases to failed
-//	pod.Status.Phase = object.PodFailed
-//	raw, _ := json.Marshal(pod)
-//	err = s.store.Put(key, raw)
-//	if err != nil {
-//		ctx.AbortWithStatus(http.StatusBadRequest)
-//	}
-//	ctx.Status(http.StatusOK)
-//}
+// do not delete pod in etcd directly, just modify the status
+// TODO: real deletion by kubelet !
+func (s *Server) deletePod(ctx *gin.Context) {
+	name := ctx.Param(config.ParamResourceName)
+	key := "/registry/pod/default/" + name
+	resList, err := s.store.Get(key)
+	if err != nil || len(resList) == 0 {
+		fmt.Printf("[deletePod] pod not exist:%s\n", name)
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	pod := object.Pod{}
+	err = json.Unmarshal(resList[0].ValueBytes, &pod)
+	if err != nil {
+		fmt.Printf("[deletePod] pod unmarshal fail\n")
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	// if already zero just delete
+	if pod.Status.Phase == object.PodFailed {
+		err = s.store.Del(key)
+		ctx.Status(http.StatusOK)
+		return
+	}
+
+	// update pod phases to failed
+	pod.Status.Phase = object.PodFailed
+	raw, _ := json.Marshal(pod)
+	err = s.store.Put(key, raw)
+	if err != nil {
+		ctx.AbortWithStatus(http.StatusBadRequest)
+	}
+	ctx.Status(http.StatusOK)
+}
 
 // do not delete rs in etcd directly, just modify the number of replicas
 // TODO: real deletion by replica set controller !
@@ -54,6 +60,13 @@ func (s *Server) deleteRS(ctx *gin.Context) {
 	if err != nil {
 		fmt.Printf("[deleteRS] pod unmarshal fail\n")
 		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	// if already zero just delete
+	if rs.Spec.Replicas == 0 {
+		err = s.store.Del(key)
+		ctx.Status(http.StatusOK)
 		return
 	}
 
