@@ -39,6 +39,7 @@ type Server struct {
 	watcherChan    chan watchOpt
 	ticketSeller   *atomic.Uint64
 	netConfigStore *netConfigStore.NetConfigStore
+	//kubeNetSupport *kubeNetSupport.KubeNetSupport
 }
 
 type watcher struct {
@@ -57,6 +58,10 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 		return nil, err
 	}
 	watcherChan := make(chan watchOpt)
+	//kubeNetSupport, err2 := kubeNetSupport.NewKubeNetSupport(listerwatcher.DefaultConfig(), client.DefaultClientConfig())
+	//if err2 != nil {
+	//	return nil, err2
+	//}
 	s := &Server{
 		engine:         engine,
 		port:           c.HttpPort,
@@ -67,6 +72,7 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 		watcherChan:    watcherChan,
 		ticketSeller:   atomic.NewUint64(0),
 		netConfigStore: netConfigStore.NewNetConfigStore(),
+		//kubeNetSupport: kubeNetSupport,
 	}
 
 	{
@@ -85,14 +91,14 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 		engine.DELETE(config.POD, s.deletePod)
 	}
 	{
-		engine.PUT(config.NODE, s.validate, s.addNode)
-		engine.GET(config.NODE, s.validate, s.get)
-		engine.POST(config.NODE, s.validate, s.watch)
-		engine.DELETE(config.NODE, s.validate, s.del)
+		engine.PUT(config.NODE, s.addNode)
+		engine.GET(config.NODE, s.get)
+		engine.POST(config.NODE, s.watch)
+		engine.DELETE(config.NODE, s.del)
 	}
 	{
-		engine.GET(config.NODE_PREFIX, s.validate, s.prefixGet)
-		engine.POST(config.NODE_PREFIX, s.validate, s.prefixWatch)
+		engine.GET(config.NODE_PREFIX, s.prefixGet)
+		engine.POST(config.NODE_PREFIX, s.prefixWatch)
 	}
 
 	go s.daemon(watcherChan)
@@ -106,7 +112,8 @@ func (s *Server) Run() error {
 	if err != nil {
 		return err
 	}
-	return nil
+	//err = s.kubeNetSupport.StartKubeNetSupport()
+	return err
 }
 
 func (s *Server) validate(c *gin.Context) {

@@ -23,6 +23,12 @@ type RESTClient struct {
 	Base string // url = base+resource+name
 }
 
+func DefaultClientConfig() Config {
+	return Config{
+		Host: "127.0.0.1:8080",
+	}
+}
+
 /******************************Pod*******************************/
 
 func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) error {

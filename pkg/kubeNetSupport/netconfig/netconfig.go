@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-const ETH_NAME = "ens33"
+const ETH_NAME = "ens3"
 const OVS_BRIDGE_NAME = "br0"
 const GRE_PORT_NAME = "gre"
 const DOCKER_NETCARD = "docker0"

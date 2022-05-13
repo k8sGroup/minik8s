@@ -7,18 +7,18 @@ import (
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
+	"minik8s/pkg/kubeNetSupport"
+	"minik8s/pkg/kubeNetSupport/iptablesManager"
 	"minik8s/pkg/kubelet/config"
 	"minik8s/pkg/kubelet/podManager"
 	"minik8s/pkg/kubelet/types"
-	"minik8s/pkg/kubeproxy"
-	"minik8s/pkg/kubeproxy/iptablesManager"
 	"minik8s/pkg/listerwatcher"
 )
 
 type Kubelet struct {
-	podManager *podManager.PodManager
-	kubeproxy  *kubeproxy.Kubeproxy
-	PodConfig  *config.PodConfig
+	podManager     *podManager.PodManager
+	kubeNetSupport *kubeNetSupport.KubeNetSupport
+	PodConfig      *config.PodConfig
 
 	ls          *listerwatcher.ListerWatcher
 	stopChannel <-chan struct{}
@@ -29,7 +29,7 @@ type Kubelet struct {
 func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kubelet {
 	kubelet := &Kubelet{}
 	kubelet.podManager = podManager.NewPodManager(clientConfig)
-	//kubelet.kubeproxy, kubelet.Err = kubeproxy.NewKubeproxy(lsConfig, clientConfig)
+	kubelet.kubeNetSupport, kubelet.Err = kubeNetSupport.NewKubeNetSupport(lsConfig, clientConfig, false)
 
 	restClient := client.RESTClient{
 		Base: "http://" + clientConfig.Host,
@@ -50,7 +50,7 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 }
 
 func (kl *Kubelet) Run() {
-	//kl.kubeproxy.StartKubeProxy()
+	kl.kubeNetSupport.StartKubeNetSupport()
 	kl.podManager.StartPodManager()
 	updates := kl.PodConfig.GetUpdates()
 	go kl.syncLoop(updates, kl)
@@ -76,17 +76,17 @@ func (k *Kubelet) AddPodPortMapping(podName string, podPort string, hostPort str
 	if err != nil {
 		return iptablesManager.PortMapping{}, err
 	}
-	return k.kubeproxy.AddPortMapping(p, podPort, hostPort)
+	return k.kubeNetSupport.AddPortMapping(p, podPort, hostPort)
 }
 func (k *Kubelet) RemovePortMapping(podName string, podPort string, hostPort string) error {
 	p, err := k.podManager.GetPodSnapShoot(podName)
 	if err != nil {
 		return err
 	}
-	return k.kubeproxy.RemovePortMapping(p, podPort, hostPort)
+	return k.kubeNetSupport.RemovePortMapping(p, podPort, hostPort)
 }
 func (k *Kubelet) GetPodMappingInfo() []iptablesManager.PortMapping {
-	return k.kubeproxy.GetKubeproxySnapShoot().PortMappings
+	return k.kubeNetSupport.GetKubeproxySnapShoot().PortMappings
 }
 
 type SyncHandler interface {

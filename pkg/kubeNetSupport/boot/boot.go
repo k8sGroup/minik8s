@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"io"
+	"minik8s/pkg/kubeNetSupport/bridgeManager"
+	"minik8s/pkg/kubeNetSupport/ipManager"
+	"minik8s/pkg/kubeNetSupport/netconfig"
 	"minik8s/pkg/kubelet/dockerClient"
-	"minik8s/pkg/kubeproxy/bridgeManager"
-	"minik8s/pkg/kubeproxy/ipManager"
-	"minik8s/pkg/kubeproxy/netconfig"
 	"os"
 	"os/exec"
 	"strings"
@@ -37,89 +37,92 @@ func stopAllContainers() error {
 	return nil
 }
 
-//修改配置文件
+//修改配置文件, 采取直接重写的方式，如果采用修改字段的方式太容易出错了
 func modifyDocker0IpAndMask(ipAndMask string) error {
-	_, err := os.Stat(DOCKER_CONFIG_PATH)
-	if err != nil {
-		//配置文件不存在
-		f, err2 := os.Create(DOCKER_CONFIG_PATH)
-		if err2 != nil {
-			return err2
-		}
-		content := fmt.Sprintf("{\n \"bip\":\"%s\"\n}", ipAndMask)
-		_, err2 = f.Write([]byte(content))
-		if err2 != nil {
-			return err2
-		}
-		f.Close()
-	} else {
-		//文件存在，更改bip项
-		file, err2 := os.OpenFile(DOCKER_CONFIG_PATH, os.O_RDWR, 0666)
-		if err2 != nil {
-			return err2
-		}
-		reader := bufio.NewReader(file)
-		pos := int64(0)
-		flag := "\"bip\""
-		for {
-			line, err3 := reader.ReadString('\n')
-			if err3 != nil {
-				if err3 == io.EOF {
-					//说明此时不存在bip字段
-					break
-				} else {
-					file.Close()
-					return err3
-				}
-			}
-			if strings.Contains(line, flag) {
-				content := fmt.Sprintf(" \"bip\":\"%s\"    ", ipAndMask)
-				bytes := []byte(content)
-				file.WriteAt(bytes, pos)
-				file.Close()
-				return nil
-			}
-			pos += int64(len(line))
-		}
-		//这种情况文件存在但是没有bip字段,直接覆盖
-		f, err2 := os.Create(DOCKER_CONFIG_PATH)
-		if err2 != nil {
-			return err2
-		}
-		content := fmt.Sprintf("{\n \"bip\":\"%s\"\n}", ipAndMask)
-		_, err2 = f.Write([]byte(content))
-		if err2 != nil {
-			return err2
-		}
-		f.Close()
+	//_, err := os.Stat(DOCKER_CONFIG_PATH)
+	//if err != nil {
+	//配置文件不存在
+	f, err2 := os.Create(DOCKER_CONFIG_PATH)
+	if err2 != nil {
+		return err2
 	}
+	content := fmt.Sprintf("{\n \"bip\":\"%s\"\n}", ipAndMask)
+	_, err2 = f.Write([]byte(content))
+	if err2 != nil {
+		return err2
+	}
+	f.Close()
+	//} else {
+	//	//文件存在，更改bip项
+	//	file, err2 := os.OpenFile(DOCKER_CONFIG_PATH, os.O_RDWR, 0666)
+	//	if err2 != nil {
+	//		return err2
+	//	}
+	//	reader := bufio.NewReader(file)
+	//	pos := int64(0)
+	//	flag := "\"bip\""
+	//	for {
+	//		line, err3 := reader.ReadString('\n')
+	//		if err3 != nil {
+	//			if err3 == io.EOF {
+	//				//说明此时不存在bip字段
+	//				break
+	//			} else {
+	//				file.Close()
+	//				return err3
+	//			}
+	//		}
+	//		if strings.Contains(line, flag) {
+	//			content := fmt.Sprintf(" \"bip\":\"%s\"    ", ipAndMask)
+	//			bytes := []byte(content)
+	//			file.WriteAt(bytes, pos)
+	//			file.Close()
+	//			return nil
+	//		}
+	//		pos += int64(len(line))
+	//	}
+	//	//这种情况文件存在但是没有bip字段,直接覆盖
+	//	f, err2 := os.Create(DOCKER_CONFIG_PATH)
+	//	if err2 != nil {
+	//		return err2
+	//	}
+	//	content := fmt.Sprintf("{\n \"bip\":\"%s\"\n}", ipAndMask)
+	//	_, err2 = f.Write([]byte(content))
+	//	if err2 != nil {
+	//		return err2
+	//	}
+	//	f.Close()
+	//}
 	return nil
 }
 
 //参数为本机docker0网段地址以及大网段地址(针对所有node)
 //保证大网段涵盖所有node的docker网段
 //例：172.17.43.1/24   172.17.0.0/16
-func BootNetWork(Docker0IpAndMask string, BasicIpAndMask string) error {
-	err := changeDocker0IpAndMask(Docker0IpAndMask)
+func BootNetWork(Docker0IpAndMask string, BasicIpAndMask string, isMaster bool) error {
+	var err error
+	if !isMaster {
+		err = ChangeDocker0IpAndMask(Docker0IpAndMask)
+		if err != nil {
+			return err
+		}
+	}
+	err = PreDownload()
 	if err != nil {
 		return err
 	}
-	err = preDownload()
+	err = CreateBr0()
 	if err != nil {
 		return err
 	}
-	err = createBr0()
-	if err != nil {
-		return err
-	}
-	err = bootBasic(BasicIpAndMask)
+	err = BootBasic(BasicIpAndMask)
 	if err != nil {
 		return err
 	}
 	return nil
 	//注意这时候还没有gre端口加入
 }
-func changeDocker0IpAndMask(ipAndMask string) error {
+func ChangeDocker0IpAndMask(ipAndMask string) error {
 	//先停止所有的容器
 	err := stopAllContainers()
 	if err != nil {
@@ -142,12 +145,22 @@ func changeDocker0IpAndMask(ipAndMask string) error {
 
 //建立基于ovs + gre的大二层通信
 //先下载必要的软件
-func preDownload() error {
-	cmd := exec.Command("./pkg/kubeproxy/boot.sh")
+func PreDownload() error {
+	cmd := exec.Command("apt-get", strings.Split("update", " ")...)
 	_, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+	cmd = exec.Command("apt-get", strings.Split("install -y openvswitch-switch", " ")...)
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	cmd = exec.Command("apt-get", strings.Split("install bridge-utils", " ")...)
+	_, err = cmd.Output()
 	return err
 }
-func createBr0() error {
+func CreateBr0() error {
 	//创建br0网桥
 	res, err := execOvsVsctlCmdWithOutput("list-br")
 	if err != nil {
@@ -170,12 +183,23 @@ func createBr0() error {
 }
 
 ////创建的基本配置启动
-func bootBasic(BasicIpAndMask string) error {
-	//将br0网桥加入到docker0网桥
-	command := fmt.Sprintf("addif %s %s", netconfig.DOCKER_NETCARD, netconfig.OVS_BRIDGE_NAME)
-	err := bridgeManager.ExecBrctlCmd(command)
+func BootBasic(BasicIpAndMask string) error {
+	//先判断docker0中是否已经存在br0
+	command := fmt.Sprintf("show %s", netconfig.DOCKER_NETCARD)
+	res, err := bridgeManager.ExecBrctlCmdWithOutput(command)
+	flag := false
 	if err != nil {
 		return err
+	} else {
+		flag = strings.Contains(res[1], netconfig.OVS_BRIDGE_NAME)
+	}
+	//将br0网桥加入到docker0网桥
+	if !flag {
+		command = fmt.Sprintf("addif %s %s", netconfig.DOCKER_NETCARD, netconfig.OVS_BRIDGE_NAME)
+		err = bridgeManager.ExecBrctlCmd(command)
+		if err != nil {
+			return err
+		}
 	}
 	err = ipManager.SetDev(netconfig.OVS_BRIDGE_NAME)
 	if err != nil {
@@ -185,9 +209,19 @@ func bootBasic(BasicIpAndMask string) error {
 	if err != nil {
 		return err
 	}
-	err = ipManager.AddRoute(BasicIpAndMask, netconfig.DOCKER_NETCARD)
-	if err != nil {
-		return err
+	//同样的需要在有路由的情况下才能够去add
+	res, err = ipManager.GetRouteInfo()
+	flag = false
+	for _, value := range res {
+		if strings.Contains(value, BasicIpAndMask+" dev "+netconfig.DOCKER_NETCARD) {
+			flag = true
+		}
+	}
+	if !flag {
+		err = ipManager.AddRoute(BasicIpAndMask, netconfig.DOCKER_NETCARD)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
