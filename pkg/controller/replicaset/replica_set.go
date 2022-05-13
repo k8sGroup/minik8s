@@ -172,7 +172,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		relatedPods, _ := rsc.getRelatedPods(rs)
 		podsToDelete := getPodsToDelete(filteredPods, relatedPods, diff)
 		for _, pod := range podsToDelete {
-			err := rsc.Client.DeletePod(ctx, pod.Name)
+			err := rsc.Client.DeletePod(pod.Name)
 			if err != nil {
 				klog.Errorf("delete pod fail\n")
 			}
