@@ -99,10 +99,13 @@ func modifyDocker0IpAndMask(ipAndMask string) error {
 //参数为本机docker0网段地址以及大网段地址(针对所有node)
 //保证大网段涵盖所有node的docker网段
 //例：172.17.43.1/24   172.17.0.0/16
-func BootNetWork(Docker0IpAndMask string, BasicIpAndMask string) error {
-	err := ChangeDocker0IpAndMask(Docker0IpAndMask)
-	if err != nil {
-		return err
+func BootNetWork(Docker0IpAndMask string, BasicIpAndMask string, isMaster bool) error {
+	var err error
+	if !isMaster {
+		err = ChangeDocker0IpAndMask(Docker0IpAndMask)
+		if err != nil {
+			return err
+		}
 	}
 	err = PreDownload()
 	if err != nil {

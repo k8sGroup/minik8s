@@ -13,9 +13,10 @@ const NODE_MASK = "/24"
 const NODE_LAST_FIELD = "1"
 const NODE_NAME_PREFIX = "node"
 
-var count = 1
+var count = 0
 var lock sync.Mutex
 
+//第一个分配的就是docker0的初始地址，也就是说master不需要重启docker0
 func GetNodeNameWithIpAndMask() (string, string) {
 	lock.Lock()
 	defer lock.Unlock()
@@ -23,7 +24,7 @@ func GetNodeNameWithIpAndMask() (string, string) {
 	res := a + "." + b + "." + fmt.Sprintf("%d", count) + "." + NODE_LAST_FIELD + "" + NODE_MASK
 	nodeName := NODE_NAME_PREFIX + fmt.Sprintf("%d", count)
 	count++
-	return res, nodeName
+	return nodeName, res
 }
 
 //----------------------tools begin-----------------------------//

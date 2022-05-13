@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	kubeNetSupport, err := kubeNetSupport.NewKubeNetSupport(listerwatcher.DefaultConfig(), client.DefaultClientConfig())
+	kubeNetSupport, err := kubeNetSupport.NewKubeNetSupport(listerwatcher.DefaultConfig(), client.DefaultClientConfig(), true)
 	if err != nil {
 		fmt.Println(err)
 	}

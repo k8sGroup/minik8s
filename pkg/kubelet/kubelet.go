@@ -29,7 +29,7 @@ type Kubelet struct {
 func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kubelet {
 	kubelet := &Kubelet{}
 	kubelet.podManager = podManager.NewPodManager(clientConfig)
-	kubelet.kubeNetSupport, kubelet.Err = kubeNetSupport.NewKubeNetSupport(lsConfig, clientConfig)
+	kubelet.kubeNetSupport, kubelet.Err = kubeNetSupport.NewKubeNetSupport(lsConfig, clientConfig, false)
 
 	restClient := client.RESTClient{
 		Base: "http://" + clientConfig.Host,

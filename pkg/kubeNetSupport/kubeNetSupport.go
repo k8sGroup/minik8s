@@ -50,6 +50,7 @@ type KubeNetSupport struct {
 	err         error
 }
 type CommandWorker struct {
+	isMaster bool
 }
 
 func (worker *CommandWorker) SyncLoop(commands <-chan NetCommand, responses chan<- NetCommandResponse) {
@@ -71,7 +72,7 @@ func (worker *CommandWorker) SyncLoop(commands <-chan NetCommand, responses chan
 				}
 				responses <- response
 			case OP_BOOT_NET:
-				err := boot.BootNetWork(command.IpAndMask, tools.GetBasicIpAndMask(command.IpAndMask))
+				err := boot.BootNetWork(command.IpAndMask, tools.GetBasicIpAndMask(command.IpAndMask), worker.isMaster)
 				response := NetCommandResponse{
 					Op:  command.Op,
 					Err: err,
@@ -107,7 +108,7 @@ type KubeNetSupportSnapShoot struct {
 	BootStatus   int
 }
 
-func NewKubeNetSupport(lsConfig *listerwatcher.Config, clientConfig client.Config) (*KubeNetSupport, error) {
+func NewKubeNetSupport(lsConfig *listerwatcher.Config, clientConfig client.Config, isMaster bool) (*KubeNetSupport, error) {
 	newKubeNetSupport := &KubeNetSupport{}
 	var rwLock sync.RWMutex
 	newKubeNetSupport.rwLock = rwLock
@@ -116,7 +117,9 @@ func NewKubeNetSupport(lsConfig *listerwatcher.Config, clientConfig client.Confi
 	newKubeNetSupport.netCommandChan = make(chan NetCommand, 100)
 	newKubeNetSupport.NetCommandResponseChan = make(chan NetCommandResponse, 100)
 	newKubeNetSupport.bootStatus = NOT_BOOT
-	newKubeNetSupport.commandWorker = &CommandWorker{}
+	newKubeNetSupport.commandWorker = &CommandWorker{
+		isMaster: isMaster,
+	}
 	ls, err2 := listerwatcher.NewListerWatcher(lsConfig)
 	if err2 != nil {
 		return nil, err2
@@ -132,12 +135,16 @@ func NewKubeNetSupport(lsConfig *listerwatcher.Config, clientConfig client.Confi
 	} else {
 		newKubeNetSupport.myphysicalIp = ips[0]
 	}
+	sErr := ""
+	if newKubeNetSupport.err != nil {
+		sErr = newKubeNetSupport.err.Error()
+	}
 	newKubeNetSupport.kubeproxySnapShoot = KubeNetSupportSnapShoot{
 		PortMappings: newKubeNetSupport.portMappings,
 		IpPipeMap:    newKubeNetSupport.ipPipeMap,
 		MyphysicalIp: newKubeNetSupport.myphysicalIp,
 		MyIpAndMask:  newKubeNetSupport.myIpAndMask,
-		Error:        newKubeNetSupport.err.Error(),
+		Error:        sErr,
 		BootStatus:   newKubeNetSupport.bootStatus,
 	}
 	return newKubeNetSupport, nil
@@ -165,7 +172,7 @@ func (k *KubeNetSupport) registerNode() error {
 		k.ipPipeMap[value.PhysicalIp] = MASK
 	}
 	//发起注册的http请求
-	attachURL := "/node/register/" + k.myphysicalIp
+	attachURL := config.NODE_PREFIX + "/" + k.myphysicalIp
 	err = k.Client.PutWrap(attachURL, nil)
 	if err != nil {
 		return err

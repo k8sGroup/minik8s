@@ -91,14 +91,14 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 		engine.DELETE(config.POD, s.deletePod)
 	}
 	{
-		engine.PUT(config.NODE, s.validate, s.addNode)
-		engine.GET(config.NODE, s.validate, s.get)
-		engine.POST(config.NODE, s.validate, s.watch)
-		engine.DELETE(config.NODE, s.validate, s.del)
+		engine.PUT(config.NODE, s.addNode)
+		engine.GET(config.NODE, s.get)
+		engine.POST(config.NODE, s.watch)
+		engine.DELETE(config.NODE, s.del)
 	}
 	{
-		engine.GET(config.NODE_PREFIX, s.validate, s.prefixGet)
-		engine.POST(config.NODE_PREFIX, s.validate, s.prefixWatch)
+		engine.GET(config.NODE_PREFIX, s.prefixGet)
+		engine.POST(config.NODE_PREFIX, s.prefixWatch)
 	}
 
 	go s.daemon(watcherChan)
