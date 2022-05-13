@@ -96,24 +96,26 @@ func (r RESTClient) GetPod(name string) (*object.Pod, error) {
 
 /********************************RS*****************************/
 
-func (r RESTClient) GetRS(name string) (*object.ReplicaSet, error) {
+func GetRS(ls *listerwatcher.ListerWatcher, name string) (*object.ReplicaSet, error) {
 	attachURL := "/registry/rs/default/" + name
 
-	req, _ := http.NewRequest("GET", r.Base+attachURL, nil)
-	resp, _ := http.DefaultClient.Do(req)
+	raw, err := ls.List(attachURL)
+	if err != nil {
+		fmt.Printf("[GetNodes] fail to get nodes\n")
+	}
 
-	if resp.StatusCode != object.SUCCESS {
-		return nil, errors.New("delete pod fail")
+	if len(raw) == 0 {
+		return nil, errors.New("not find")
 	}
 
 	result := &object.ReplicaSet{}
-	body, _ := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
 
-	err := json.Unmarshal(body, result)
+	err = json.Unmarshal(raw[0].ValueBytes, result)
+
 	if err != nil {
-		klog.Infof("[GetRS] Body Pods Unmarshal fail\n")
+		fmt.Printf("[GetNodes] unmarshal fail\n")
 	}
+	fmt.Printf("[GetNodes] rs:%+v\n", result)
 	return result, nil
 }
 
@@ -140,10 +142,12 @@ func GetRSPods(ls *listerwatcher.ListerWatcher, name string) ([]*object.Pod, err
 	}
 
 	return pods, nil
+
 }
 
 func (r RESTClient) DeleteRS(rsName string) error {
 	attachURL := "/registry/rs/default/" + rsName
+	fmt.Printf("delete rs:" + attachURL + "\n")
 	err := Del(r.Base + attachURL)
 	return err
 }
@@ -166,6 +170,7 @@ func OwnByRs(pod *object.Pod) (bool, string) {
 	// unmarshal and filter by ownership
 	for _, owner := range ownerReferences {
 		if owner.Kind == object.ReplicaSetKind {
+			fmt.Printf("[OwnByRs] owner:%v\n", owner.Name)
 			return true, owner.Name
 		}
 	}
