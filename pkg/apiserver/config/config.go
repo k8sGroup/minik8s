@@ -41,8 +41,8 @@ const NODE_NAME = "name"
 
 // path for kube client
 const (
-	RS          = "/rs/:resourceName"
-	POD         = "/pod/:resourceName"
+	RS          = "/registry/rs/default/:resourceName"
+	POD         = "/registry/pod/default/:resourceName"
 	NODE        = "/registry/node/default/:resourceName"
 	NODE_PREFIX = "/register/node/default"
 )
