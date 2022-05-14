@@ -58,17 +58,17 @@ func (rsc *ReplicaSetController) register() {
 		}
 	}
 
-	watchDelete := func(rsc *ReplicaSetController) {
-		err := rsc.ls.Watch("/registry/rs/default", rsc.deleteRS, rsc.stopChannel)
-		if err != nil {
-			fmt.Printf("[Scheduler] ListWatch init fail...")
-		}
-	}
+	//watchDelete := func(rsc *ReplicaSetController) {
+	//	err := rsc.ls.Watch("/registry/rs/default", rsc.deleteRS, rsc.stopChannel)
+	//	if err != nil {
+	//		fmt.Printf("[Scheduler] ListWatch init fail...")
+	//	}
+	//}
 
 	klog.Debugf("success register\n")
 
 	go watchAdd(rsc)
-	go watchDelete(rsc)
+	//go watchDelete(rsc)
 
 }
 
@@ -87,9 +87,6 @@ func (rsc *ReplicaSetController) worker(ctx context.Context) {
 }
 
 func (rsc *ReplicaSetController) addRS(res etcdstore.WatchRes) {
-	if res.ResType != etcdstore.PUT {
-		return
-	}
 
 	rs := &object.ReplicaSet{}
 	err := json.Unmarshal(res.ValueBytes, rs)
@@ -107,31 +104,52 @@ func (rsc *ReplicaSetController) addRS(res etcdstore.WatchRes) {
 	rsc.queue.Enqueue(key)
 }
 
-func (rsc *ReplicaSetController) deleteRS(res etcdstore.WatchRes) {
+//
+//func (rsc *ReplicaSetController) deleteRS(res etcdstore.WatchRes) {
+//	if res.ResType != etcdstore.DELETE {
+//		return
+//	}
+//
+//	fmt.Printf("delete msg:" + string(res.ValueBytes))
+//
+//	rs := &object.ReplicaSet{}
+//	err := json.Unmarshal(res.ValueBytes, rs)
+//	if err != nil {
+//		fmt.Printf("del bad message\n")
+//		return
+//	}
+//
+//	fmt.Printf("[deleteRS] message receive...\n")
+//
+//	// reset replicas to zero
+//	rs.Spec.Replicas = 0
+//
+//	// encode object to key
+//	key := getKey(rs)
+//	rsc.cp.Put(key, rs)
+//	// enqueue key
+//	rsc.queue.Enqueue(key)
+//}
 
-	rs := &object.ReplicaSet{}
-	err := json.Unmarshal(res.ValueBytes, rs)
+func (rsc *ReplicaSetController) podOperation(res etcdstore.WatchRes) {
+	// check ownership
+	pod := &object.Pod{}
+	err := json.Unmarshal(res.ValueBytes, pod)
 	if err != nil {
-		fmt.Printf("bad message\n")
+		fmt.Printf("bad message,unmarshal fail\n")
 		return
 	}
-
-	// check whether the message is deletion
-	if rs.Spec.Replicas != 0 {
-		return
+	isOwned, name := client.OwnByRs(pod)
+	if isOwned {
+		rs, err := rsc.Client.GetRS(name)
+		if err != nil {
+			// encode object to key
+			key := getKey(rs)
+			rsc.cp.Put(key, rs)
+			// enqueue key
+			rsc.queue.Enqueue(key)
+		}
 	}
-
-	fmt.Printf("[deleteRS] message receive...\n")
-
-	// reset replicas to zero
-	rs.Spec.Replicas = 0
-
-	// encode object to key
-	key := getKey(rs)
-	rsc.cp.Put(key, rs)
-	// enqueue key
-	rsc.queue.Enqueue(key)
-
 }
 
 func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
@@ -143,19 +161,22 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	allPods, _ := client.GetRSPods(rsc.ls, name)
 	// filter all inactive pods
 	activePods := controller.FilterActivePods(allPods)
+	if len(activePods) == int(rs.Spec.Replicas) {
+		return nil
+	}
 	// manage pods
-	rsc.manageReplicas(ctx, activePods, rs)
+	err := rsc.manageReplicas(ctx, activePods, rs)
 	// calculate new status
 	newStatus := calculateStatus(rs, activePods)
 	// update status
-	updateReplicaSetStatus(ctx, &rsc.Client, rs, newStatus)
-	return nil
+	err = putReplicaSet(ctx, &rsc.Client, rs, newStatus)
+	return err
 }
 
 func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPods []*object.Pod, rs *object.ReplicaSet) error {
 	// make diff for current pods and expected number
 	diff := len(filteredPods) - int(rs.Spec.Replicas)
-	//key := getKey(rs)
+	fmt.Printf("[manageReplicas] diff:%v", diff)
 
 	if diff < 0 {
 		diff *= -1
@@ -169,8 +190,9 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 
 	} else if diff > 0 {
 		// delete pods
-		relatedPods, _ := rsc.getRelatedPods(rs)
-		podsToDelete := getPodsToDelete(filteredPods, relatedPods, diff)
+		podsToDelete := getPodsToDelete(filteredPods, diff)
+		fmt.Printf("[manageReplicas] del pods number:%v", len(podsToDelete))
+
 		for _, pod := range podsToDelete {
 			err := rsc.Client.DeletePod(pod.Name)
 			if err != nil {
@@ -195,7 +217,7 @@ func (rsc *ReplicaSetController) getRelatedPods(rs *object.ReplicaSet) ([]*objec
 
 // choose pods to be deleted
 // simple policy
-func getPodsToDelete(filteredPods, relatedPods []*object.Pod, diff int) []*object.Pod {
+func getPodsToDelete(filteredPods []*object.Pod, diff int) []*object.Pod {
 	return filteredPods[:diff]
 }
 
@@ -203,8 +225,16 @@ func getKey(rs *object.ReplicaSet) string {
 	return rs.Name
 }
 
-func updateReplicaSetStatus(ctx context.Context, c *client.RESTClient, rs *object.ReplicaSet, newStatus object.ReplicaSetStatus) (*object.ReplicaSet, error) {
-	var updatedRS *object.ReplicaSet
-	updatedRS, _ = c.UpdateRSStatus(ctx, rs)
-	return updatedRS, nil
+func putReplicaSet(ctx context.Context, c *client.RESTClient, rs *object.ReplicaSet, newStatus object.ReplicaSetStatus) error {
+	rs.Status = newStatus
+	var err error
+
+	if rs.Spec.Replicas == 0 {
+		// do real deletion
+		err = c.DeleteRS(rs.Name)
+	} else {
+		err = c.PutWrap("/registry/rs/default/"+rs.Name, rs)
+	}
+
+	return err
 }
