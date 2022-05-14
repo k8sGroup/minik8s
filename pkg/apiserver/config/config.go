@@ -47,6 +47,8 @@ const (
 	NODE_PREFIX = "/node/register"
 )
 
+var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "hpa"}
+
 type ServerConfig struct {
 	HttpPort       int
 	ValidResources []string // 合法的resource
@@ -58,7 +60,7 @@ type ServerConfig struct {
 func DefaultServerConfig() *ServerConfig {
 	return &ServerConfig{
 		HttpPort:       8080,
-		ValidResources: []string{"pod", "rs", "node", "test"},
+		ValidResources: defaultValidResources,
 		EtcdEndpoints:  []string{"localhost:2379"},
 		EtcdTimeout:    5 * time.Second,
 		QueueConfig:    messaging.DefaultQConfig(),

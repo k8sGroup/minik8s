@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"minik8s/cmd/kube-controller-manager/util"
 	"minik8s/object"
 	"minik8s/pkg/client"
@@ -14,36 +15,11 @@ import (
 	"time"
 )
 
-type versionedDeployment struct {
-	version    int64
-	deployment object.Deployment
-}
-
-func selectNewerDeployment(d1 versionedDeployment, d2 versionedDeployment) versionedDeployment {
-	if d1.version > d2.version {
-		return d1
-	} else {
-		return d2
-	}
-}
-
-type versionedReplicaset struct {
-	version    int64
-	replicaset object.ReplicaSet
-}
-
-func selectNewerReplicaset(rs1 versionedReplicaset, rs2 versionedReplicaset) versionedReplicaset {
-	if rs1.version > rs2.version {
-		return rs1
-	} else {
-		return rs2
-	}
-}
-
 type DeploymentController struct {
 	ls             *listerwatcher.ListerWatcher
-	deploymentMap  *concurrentmap.ConcurrentMapTrait[string, versionedDeployment]
-	replicasetMap  *concurrentmap.ConcurrentMapTrait[string, versionedReplicaset]
+	deploymentMap  *concurrentmap.ConcurrentMapTrait[string, object.VersionedDeployment]
+	replicasetMap  *concurrentmap.ConcurrentMapTrait[string, object.VersionedReplicaset]
+	dm2rs          *concurrentmap.ConcurrentMapTrait[string, string] // dm2rs mapping from Deployment key in etcdstore to Replicaset key in etcdstore
 	resyncInterval time.Duration
 	stopChannel    chan struct{}
 	apiServerBase  string
@@ -51,11 +27,13 @@ type DeploymentController struct {
 
 func NewDeploymentController(ctx context.Context, controllerCtx util.ControllerContext) *DeploymentController {
 	dc := &DeploymentController{
-		ls:            controllerCtx.Ls,
-		deploymentMap: concurrentmap.NewConcurrentMapTrait[string, versionedDeployment](),
-		replicasetMap: concurrentmap.NewConcurrentMapTrait[string, versionedReplicaset](),
-		stopChannel:   make(chan struct{}),
-		apiServerBase: "http://" + controllerCtx.MasterIP + ":" + controllerCtx.HttpServerPort,
+		ls:             controllerCtx.Ls,
+		deploymentMap:  concurrentmap.NewConcurrentMapTrait[string, object.VersionedDeployment](),
+		replicasetMap:  concurrentmap.NewConcurrentMapTrait[string, object.VersionedReplicaset](),
+		dm2rs:          concurrentmap.NewConcurrentMapTrait[string, string](),
+		stopChannel:    make(chan struct{}),
+		resyncInterval: time.Duration(controllerCtx.Config.ResyncIntervals) * time.Second,
+		apiServerBase:  "http://" + controllerCtx.MasterIP + ":" + controllerCtx.HttpServerPort,
 	}
 	if dc.apiServerBase == "" {
 		klog.Fatalf("uninitialized apiserver base!\n")
@@ -65,122 +43,214 @@ func NewDeploymentController(ctx context.Context, controllerCtx util.ControllerC
 
 func (dc *DeploymentController) Run(ctx context.Context) {
 	klog.Debugf("[DeploymentController] running...\n")
-	// TODO
+	dc.register()
 	<-ctx.Done()
 	close(dc.stopChannel)
 }
 
 func (dc *DeploymentController) register() {
-	registerAddDeployment := func() {
+	registerWatchReplicaset := func() {
 		for {
-			err := dc.ls.Watch("/registry/deployment", dc.putDeployment, dc.stopChannel)
+			err := dc.ls.Watch("/registry/rs/default", dc.watchReplicaset, dc.stopChannel)
 			if err != nil {
-				klog.Errorf("Error watching /registry/deployment\n")
-			}
-			time.Sleep(5 * time.Second)
-		}
-	}
-	registerDeleteDeployment := func() {
-		for {
-			err := dc.ls.Watch("/registry/deployment", dc.deleteDeployment, dc.stopChannel)
-			if err != nil {
-				klog.Errorf("Error watching /registry/deployment\n")
+				klog.Errorf("Error watching /registry/rs\n")
 			}
 			time.Sleep(5 * time.Second)
 		}
 	}
 
-	registerDeploymentResyncLoop := func() {
-		//TODO handle the event when the list responses mismatch with local cache
+	registerAddDeployment := func() {
+		for {
+			err := dc.ls.Watch("/registry/deployment/default", dc.putDeployment, dc.stopChannel)
+			if err != nil {
+				klog.Errorf("Error watching /registry/deployment : %s\n", err.Error())
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}
+
+	registerDeleteDeployment := func() {
+		for {
+			err := dc.ls.Watch("/registry/deployment/default", dc.deleteDeployment, dc.stopChannel)
+			if err != nil {
+				klog.Errorf("Error watching /registry/deployment : %s\n", err.Error())
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}
+
+	registerResyncLoop := func() {
 		for {
 			{
 				resList, err := dc.ls.List("/registry/rs/default")
 				if err != nil {
 					klog.Errorf("Error synchronizing!\n")
-					continue
+					goto failed
 				}
-				newMap := make(map[string]versionedReplicaset)
+				newMap := make(map[string]object.VersionedReplicaset)
 				for _, res := range resList {
-					versionedRS := versionedReplicaset{version: res.ResourceVersion}
-					_ = json.Unmarshal(res.ValueBytes, &versionedRS.replicaset)
+					versionedRS := object.VersionedReplicaset{Version: res.ResourceVersion}
+					_ = json.Unmarshal(res.ValueBytes, &versionedRS.Replicaset)
 					newMap[res.Key] = versionedRS
 				}
-				dc.replicasetMap.UpdateAll(newMap, selectNewerReplicaset)
+				dc.replicasetMap.UpdateAll(newMap, object.SelectNewerReplicaset)
 			}
 			{
 				resList, err := dc.ls.List("/registry/deployment/default")
 				if err != nil {
 					klog.Errorf("Error synchronizing!\n")
-					continue
+					goto failed
 				}
-				newMap := make(map[string]versionedDeployment)
+				newMap := make(map[string]object.VersionedDeployment)
 				for _, res := range resList {
-					versionedDM := versionedDeployment{version: res.ResourceVersion}
-					_ = json.Unmarshal(res.ValueBytes, &versionedDM.deployment)
+					versionedDM := object.VersionedDeployment{Version: res.ResourceVersion}
+					_ = json.Unmarshal(res.ValueBytes, &versionedDM.Deployment)
 					newMap[res.Key] = versionedDM
 				}
-				dc.deploymentMap.ReplaceAll(newMap)
+				dc.deploymentMap.UpdateAll(newMap, object.SelectNewerDeployment)
 			}
+		failed:
 			time.Sleep(dc.resyncInterval)
 		}
 	}
 
-	go registerDeploymentResyncLoop()
+	go registerResyncLoop()
 	go registerAddDeployment()
 	go registerDeleteDeployment()
+	go registerWatchReplicaset()
 }
 
 func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
-	key := res.Key
-	// TODO 根据deployment的name确定replicaset的name
-	var name string
-	_, err := fmt.Sscanf(key, "/registry/deployment/default/%s", &name)
-	if err != nil {
-		klog.Errorf("Error parsing deployment key %s\n", key)
+	if res.ResType != etcdstore.PUT {
 		return
 	}
 	deployment := object.Deployment{}
-	err = json.Unmarshal(res.ValueBytes, &deployment)
+	err := json.Unmarshal(res.ValueBytes, &deployment)
 	if err != nil {
-		klog.Errorf("Error unmarshalling deployment json data\n")
+		klog.Errorf("%s\n", err.Error())
 		return
 	}
 	if res.IsCreate {
-		// TODO : create a new replicaset and send it to etcd
-		rsKey := "/registry/rs/default/" + name
+		rsKeyNew := "/registry/rs/default/" + deployment.Metadata.Name + uuid.New().String()
 		rs := object.ReplicaSet{
-			ObjectMeta: deployment.Metadata,
+			ObjectMeta: object.ObjectMeta{
+				Name:   deployment.Metadata.Name,
+				Labels: deployment.Metadata.Labels,
+				OwnerReferences: []object.OwnerReference{{
+					Kind:       "Deployment",
+					Name:       deployment.Metadata.Name,
+					UID:        "",
+					Controller: false,
+				}},
+			},
 			Spec: object.ReplicaSetSpec{
 				Replicas: deployment.Spec.Replicas,
 				Template: deployment.Spec.Template,
 			},
 			Status: object.ReplicaSetStatus{Replicas: 0},
 		}
-		err = client.Put(dc.apiServerBase+rsKey, rs)
+		dc.dm2rs.Put(res.Key, rsKeyNew)
+		err = client.Put(dc.apiServerBase+rsKeyNew, rs)
 		if err != nil {
 			klog.Errorf("Error send new rs to etcd\n")
 		}
 	} else if res.IsModify {
-		// TODO : update deployment
+		update := func() {
+			rsKeyNew := "/registry/rs/default/" + deployment.Metadata.Name + uuid.New().String()
+			rsKeyOld, _ := dc.dm2rs.Get(res.Key)
+			fmt.Println(deployment)
+			surge := *deployment.Spec.Strategy.RollingUpdate.MaxSurge
+			replicas := deployment.Spec.Replicas
+			vs, ok := dc.replicasetMap.Get(rsKeyOld)
+			var done bool
+			var rsOld object.ReplicaSet
+			if !ok {
+				done = true
+			} else {
+				rsOld = vs.Replicaset
+				done = rsOld.Spec.Replicas <= 0
+			}
+			rsNew := object.ReplicaSet{
+				ObjectMeta: object.ObjectMeta{
+					Name:   deployment.Metadata.Name,
+					Labels: deployment.Metadata.Labels,
+					OwnerReferences: []object.OwnerReference{{
+						Kind:       "Deployment",
+						Name:       deployment.Metadata.Name,
+						UID:        "",
+						Controller: false,
+					}},
+				},
+				Spec: object.ReplicaSetSpec{
+					Replicas: surge,
+					Template: deployment.Spec.Template,
+				},
+				Status: object.ReplicaSetStatus{Replicas: 0},
+			}
+			for ; surge <= replicas; surge++ {
+				rsNew.Spec.Replicas = surge
+				err = client.Put(dc.apiServerBase+rsKeyNew, rsNew)
+				if err != nil {
+					klog.Errorf("%s\n", err.Error())
+				}
+				if !done {
+					rsOld.Spec.Replicas -= 1
+					if rsOld.Spec.Replicas > 0 {
+						err = client.Put(dc.apiServerBase+rsKeyOld, rsOld)
+						if err != nil {
+							klog.Errorf("%s\n", err.Error())
+						}
+					} else {
+						err = client.Del(dc.apiServerBase + rsKeyOld)
+						done = true
+						if err != nil {
+							klog.Errorf("%s\n", err.Error())
+						}
+					}
+				}
+				time.Sleep(15 * time.Second)
+			}
+			dc.dm2rs.Put(res.Key, rsKeyNew)
+		}
+		go update()
+	}
+}
 
+func (dc *DeploymentController) watchReplicaset(res etcdstore.WatchRes) {
+	switch res.ResType {
+	case etcdstore.PUT:
+		rs := object.ReplicaSet{}
+		err := json.Unmarshal(res.ValueBytes, &rs)
+		if err != nil {
+			klog.Errorf("%s\n", err.Error())
+			return
+		}
+		if rs.Spec.Replicas == 0 {
+			dc.replicasetMap.Del(res.Key)
+		} else {
+			vrs := object.VersionedReplicaset{
+				Version:    res.ResourceVersion,
+				Replicaset: rs,
+			}
+			dc.replicasetMap.Put(res.Key, vrs)
+		}
+		break
+	case etcdstore.DELETE:
+		dc.replicasetMap.Del(res.Key)
+		break
 	}
 }
 
 func (dc *DeploymentController) deleteDeployment(res etcdstore.WatchRes) {
-
-}
-
-func (dc *DeploymentController) deltaDeployment(res etcdstore.WatchRes) {
-	switch res.ResType {
-	case etcdstore.PUT:
-		dc.putDeployment(res)
-	case etcdstore.DELETE:
-		dc.deleteDeployment(res)
-	default:
-		klog.Fatalf("Internal error!\n")
+	if res.ResType != etcdstore.DELETE {
+		return
 	}
-}
-
-func (dc *DeploymentController) syncReplicaset(res etcdstore.WatchRes) {
-
+	rsKey, _ := dc.dm2rs.Get(res.Key)
+	dc.deploymentMap.Del(res.Key)
+	dc.dm2rs.Del(res.Key)
+	err := client.Del(dc.apiServerBase + rsKey)
+	if err != nil {
+		klog.Errorf("Error del rs %s. Err : %s\n", dc.apiServerBase+rsKey, err.Error())
+		return
+	}
 }
