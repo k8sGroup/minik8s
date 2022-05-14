@@ -180,6 +180,17 @@ func (p *PodManager) PullImages(images []string) error {
 	return response.Err
 }
 
+// CopyUid2pod only copy the pointers in map, check before actual use
+func (p *PodManager) CopyUid2pod() map[string]*pod.Pod {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	uuidMap := make(map[string]*pod.Pod)
+	for key, val := range p.uid2pod {
+		uuidMap[key] = val
+	}
+	return uuidMap
+}
+
 func compareSame(p1 pod.PodSnapShoot, p2 pod.PodSnapShoot) bool {
 	//只需要比较会发生变化的
 	if p1.Ctime != p2.Ctime {
