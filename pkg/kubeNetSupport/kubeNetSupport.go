@@ -34,7 +34,7 @@ type KubeNetSupport struct {
 	rwLock       sync.RWMutex
 	//存一份map,由physicalIp映射到管道名, 同时这个与etcd中的数据做对比可以得到要增加或者删除的gre端口
 	ipPipeMap map[string]string
-	//存一份snapshoop
+	//存一份snapshoop2
 	kubeproxySnapShoot     KubeNetSupportSnapShoot
 	ls                     *listerwatcher.ListerWatcher
 	Client                 client.RESTClient
@@ -154,6 +154,7 @@ func (k *KubeNetSupport) StartKubeNetSupport() error {
 	go k.commandWorker.SyncLoop(k.netCommandChan, k.NetCommandResponseChan)
 	go k.listeningResponse()
 	//注册
+	fmt.Println("start register")
 	return k.registerNode()
 }
 func (k *KubeNetSupport) registerNode() error {
@@ -235,8 +236,17 @@ func (kubeproxy *KubeNetSupport) AddPortMapping(pod *pod.PodSnapShoot, dockerPor
 }
 func (kubeproxy *KubeNetSupport) GetKubeproxySnapShoot() KubeNetSupportSnapShoot {
 	if kubeproxy.rwLock.TryRLock() {
+		sErr := ""
+		if kubeproxy.err != nil {
+			sErr = kubeproxy.err.Error()
+		}
 		kubeproxy.kubeproxySnapShoot = KubeNetSupportSnapShoot{
 			PortMappings: kubeproxy.portMappings,
+			IpPipeMap:    kubeproxy.ipPipeMap,
+			MyphysicalIp: kubeproxy.myphysicalIp,
+			MyIpAndMask:  kubeproxy.myIpAndMask,
+			Error:        sErr,
+			BootStatus:   kubeproxy.bootStatus,
 		}
 		kubeproxy.rwLock.RUnlock()
 		return kubeproxy.kubeproxySnapShoot
@@ -267,6 +277,7 @@ func (kp *KubeNetSupport) watchRegister(res etcdstore.WatchRes) {
 func (k *KubeNetSupport) watchAndHandleInner(ipPair *netConfigStore.IpPair) {
 	k.rwLock.Lock()
 	defer k.rwLock.Unlock()
+	fmt.Println("watchAndHandle receive command\n")
 	switch k.bootStatus {
 	case NOT_BOOT:
 		//根据是否是自己的ip区别对待
