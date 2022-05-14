@@ -18,7 +18,8 @@ type Scheduler struct {
 	ls          *listerwatcher.ListerWatcher
 	stopChannel <-chan struct{}
 	queue       queue.ConcurrentQueue
-	Client      client.RESTClient
+
+	Client client.RESTClient
 }
 
 func NewScheduler(lsConfig *listerwatcher.Config, clientConfig client.Config) *Scheduler {
