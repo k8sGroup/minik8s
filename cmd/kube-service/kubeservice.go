@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"minik8s/pkg/kubeNetSupport/boot"
+	"minik8s/pkg/client"
 	"os"
 	"path"
 	"path/filepath"
@@ -16,15 +16,17 @@ func GetProjectAbsPath() (projectAbsPath string) {
 	return projectAbsPath
 }
 func main() {
-	//err := boot.PreDownload()
-	//path, err1 := tools.GetBootShFilePath()
-	//if err1 != nil {
-	//	fmt.Println(err1)
-	//}
-	err := boot.BootBasic("172.17.0.0/16")
+	clientConfig := client.Config{Host: "192.168.1.7:8080"}
+	restClient := client.RESTClient{
+		Base: "http://" + clientConfig.Host,
+	}
+	ress, err := client.Get(restClient.Base + "/registry/node/default")
 	if err != nil {
 		fmt.Println(err)
 	} else {
-		fmt.Println("OK")
+		for _, res := range ress {
+			fmt.Println(string(res.ValueBytes), res.Key)
+		}
+
 	}
 }

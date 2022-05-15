@@ -227,7 +227,7 @@ func BootBasic(BasicIpAndMask string) error {
 }
 
 //设置gre端口
-func SetGrePortInBr0(grePort string, remoteIp string) error {
+func SetVxLanPortInBr0(vaLanPort string, remoteIp string) error {
 	//先判断grePort是否已经存在
 	command := "list-ports " + netconfig.OVS_BRIDGE_NAME
 	res, err := execOvsVsctlCmdWithOutput(command)
@@ -236,30 +236,30 @@ func SetGrePortInBr0(grePort string, remoteIp string) error {
 	}
 	isExist := false
 	for _, value := range res {
-		if strings.Contains(value, grePort) {
+		if strings.Contains(value, vaLanPort) {
 			isExist = true
 			break
 		}
 	}
 	if isExist {
 		//存在的情况下,先删除已存在的port
-		command = "del-port " + grePort
+		command = "del-port " + vaLanPort
 		err = execOvsVsctlCmd(command)
 		if err != nil {
 			return err
 		}
 	}
 	//创建gre Port
-	command = fmt.Sprintf("add-port %s %s -- set Interface %s type=gre option:remote_ip=%s",
-		netconfig.OVS_BRIDGE_NAME, grePort, grePort, remoteIp)
+	command = fmt.Sprintf("add-port %s %s -- set Interface %s type=vxlan option:remote_ip=%s",
+		netconfig.OVS_BRIDGE_NAME, vaLanPort, vaLanPort, remoteIp)
 	err = execOvsVsctlCmd(command)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func delGrePortInBr0(grePort string) error {
-	command := "del-port " + grePort
+func delVxLanPortInBr0(VxLanPort string) error {
+	command := "del-port " + VxLanPort
 	err := execOvsVsctlCmd(command)
 	return err
 }

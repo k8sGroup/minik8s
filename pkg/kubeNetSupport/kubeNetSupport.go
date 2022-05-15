@@ -16,10 +16,11 @@ import (
 	"minik8s/pkg/kubelet/pod"
 	"minik8s/pkg/listerwatcher"
 	"sync"
+	"time"
 )
 
 //--------------常量定义---------------------//
-const OP_ADD_GRE = 1
+const OP_ADD_VXLAN = 1
 const OP_DELETE_GRE = 2 //不需要考虑delete的情况
 const OP_BOOT_NET = 3
 const NOT_BOOT = 1
@@ -61,13 +62,13 @@ func (worker *CommandWorker) SyncLoop(commands <-chan NetCommand, responses chan
 				return
 			}
 			switch command.Op {
-			case OP_ADD_GRE:
-				portName := netconfig.FormGrePort()
-				err := boot.SetGrePortInBr0(portName, command.physicalIp)
+			case OP_ADD_VXLAN:
+				portName := netconfig.FormVxLanPort()
+				err := boot.SetVxLanPortInBr0(portName, command.physicalIp)
 				response := NetCommandResponse{
 					Op:         command.Op,
 					physicalIp: command.physicalIp,
-					GrePort:    portName,
+					VxLanPort:  portName,
 					Err:        err,
 				}
 				responses <- response
@@ -94,7 +95,7 @@ type NetCommandResponse struct {
 	//操作类型
 	Op         int
 	physicalIp string
-	GrePort    string
+	VxLanPort  string
 	//Err 为nil代表command正确执行
 	Err error
 }
@@ -160,7 +161,7 @@ func (k *KubeNetSupport) StartKubeNetSupport() error {
 func (k *KubeNetSupport) registerNode() error {
 	//先挂上watch
 	go k.ls.Watch(config.NODE_PREFIX, k.watchRegister, k.stopChannel)
-
+	time.Sleep(2 * time.Second)
 	//获取所有其他的节点
 	res, err := k.getIpPairs()
 	if err != nil {
@@ -311,7 +312,7 @@ func (k *KubeNetSupport) watchAndHandleInner(ipPair *netConfigStore.IpPair) {
 	case BOOT_SUCCEED:
 		//生成command
 		command := NetCommand{
-			Op:         OP_ADD_GRE,
+			Op:         OP_ADD_VXLAN,
 			physicalIp: ipPair.PhysicalIp,
 		}
 		k.netCommandChan <- command
@@ -327,11 +328,11 @@ func (k *KubeNetSupport) listeningResponse() {
 				return
 			}
 			switch response.Op {
-			case OP_ADD_GRE:
+			case OP_ADD_VXLAN:
 				k.rwLock.Lock()
 				if response.Err == nil {
 					//success
-					k.ipPipeMap[response.physicalIp] = response.GrePort
+					k.ipPipeMap[response.physicalIp] = response.VxLanPort
 				} else {
 					k.err = response.Err
 					//直接设置error, 同时不选择重试，因为这时候基本重试也会寄
@@ -345,7 +346,7 @@ func (k *KubeNetSupport) listeningResponse() {
 					for key, v := range k.ipPipeMap {
 						if v == MASK {
 							command := NetCommand{
-								Op:         OP_ADD_GRE,
+								Op:         OP_ADD_VXLAN,
 								physicalIp: key,
 							}
 							k.netCommandChan <- command
