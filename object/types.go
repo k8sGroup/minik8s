@@ -98,7 +98,7 @@ type Volume struct {
 }
 
 type Container struct {
-	Name         string        `json:"path" yaml:"name"`
+	Name         string        `json:"name" yaml:"name"`
 	Image        string        `json:"image" yaml:"image"`
 	Command      []string      `json:"command" yaml:"command"`
 	Args         []string      `json:"args" yaml:"args"`

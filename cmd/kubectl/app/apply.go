@@ -17,6 +17,7 @@ const (
 	Deployment              string = "Deployment"
 	Replicaset              string = "Replicaset"
 	HorizontalPodAutoscaler string = "HorizontalPodAutoscaler"
+	Test                    string = "Test"
 )
 
 var (
@@ -69,10 +70,11 @@ func analyzeFile(path string) {
 		deployment := object.Deployment{}
 		err = unmarshal(file, &deployment)
 		if err != nil {
-			fmt.Printf("Error unmarshaling file %s\n", path)
+			fmt.Printf("Error unmarshaling file %s, %s\n", path, err.Error())
 			return
 		}
 		deployment.Complete()
+		fmt.Printf("%+v\n", deployment)
 		err = client.Put(baseUrl+"/registry/deployment/default/"+deployment.Metadata.Name, deployment)
 		if err != nil {
 			fmt.Printf("Error applying `file %s`.\n%s\n", path, err.Error())
@@ -99,17 +101,23 @@ func analyzeFile(path string) {
 			fmt.Printf("Error unmarshaling file %s\n", path)
 			return
 		}
-		err = client.Put(baseUrl+"/registry/rs/default/"+hpa.Metadata.Name, hpa)
+		err = client.Put(baseUrl+"/registry/autoscaler/default/"+hpa.Metadata.Name, hpa)
 		if err != nil {
 			fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
 			return
 		}
 		break
+	case Test:
+		err = client.Put(baseUrl+"/registry/test/default/test1", "{test:\"test\"}")
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		break
 	case "":
-		fmt.Printf("kind is nspecified\n")
+		fmt.Printf("kind is unspecified\n")
 		return
 	default:
-		fmt.Printf("Unknown kind %s\n", kind)
+		fmt.Printf("Unsupported kind %s\n", kind)
 		return
 	}
 	fmt.Println("Applied!")

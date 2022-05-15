@@ -162,13 +162,14 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 			surge := *deployment.Spec.Strategy.RollingUpdate.MaxSurge
 			replicas := deployment.Spec.Replicas
 			vs, ok := dc.replicasetMap.Get(rsKeyOld)
-			var done bool
+			var decreaseOldDone, increaseNewDone bool
+			increaseNewDone = false
 			var rsOld object.ReplicaSet
 			if !ok {
-				done = true
+				decreaseOldDone = true
 			} else {
 				rsOld = vs.Replicaset
-				done = rsOld.Spec.Replicas <= 0
+				decreaseOldDone = rsOld.Spec.Replicas <= 0
 			}
 			rsNew := object.ReplicaSet{
 				ObjectMeta: object.ObjectMeta{
@@ -182,32 +183,63 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 					}},
 				},
 				Spec: object.ReplicaSetSpec{
-					Replicas: surge,
+					Replicas: func() int32 {
+						if surge < replicas {
+							return surge
+						} else {
+							return replicas
+						}
+					}(),
 					Template: deployment.Spec.Template,
 				},
 				Status: object.ReplicaSetStatus{Replicas: 0},
 			}
-			for ; surge <= replicas; surge++ {
-				rsNew.Spec.Replicas = surge
-				err = client.Put(dc.apiServerBase+rsKeyNew, rsNew)
-				if err != nil {
-					klog.Errorf("%s\n", err.Error())
+			err = client.Put(dc.apiServerBase+rsKeyNew, rsNew)
+			if err != nil {
+				klog.Errorf("%s\n", err.Error())
+			}
+			increaseNewDone = rsNew.Spec.Replicas == replicas
+			decreaseOldDone = rsOld.Spec.Replicas == 0
+
+			for true {
+				if !increaseNewDone {
+					stash := rsNew.Spec.Replicas
+					rsNew.Spec.Replicas += 1
+					if rsNew.Spec.Replicas > replicas {
+						increaseNewDone = true
+					} else {
+						err = client.Put(dc.apiServerBase+rsKeyNew, rsNew)
+						if err != nil {
+							rsNew.Spec.Replicas = stash
+							klog.Errorf("%s\n", err.Error())
+							goto LoopErr
+						}
+					}
 				}
-				if !done {
+				if !decreaseOldDone {
+					stash := rsOld.Spec.Replicas
 					rsOld.Spec.Replicas -= 1
 					if rsOld.Spec.Replicas > 0 {
 						err = client.Put(dc.apiServerBase+rsKeyOld, rsOld)
 						if err != nil {
 							klog.Errorf("%s\n", err.Error())
+							rsOld.Spec.Replicas = stash
+							goto LoopErr
 						}
 					} else {
 						err = client.Del(dc.apiServerBase + rsKeyOld)
-						done = true
+						decreaseOldDone = true
 						if err != nil {
 							klog.Errorf("%s\n", err.Error())
+							rsOld.Spec.Replicas = stash
+							goto LoopErr
 						}
 					}
 				}
+				if decreaseOldDone && increaseNewDone {
+					break
+				}
+			LoopErr:
 				time.Sleep(15 * time.Second)
 			}
 			dc.dm2rs.Put(res.Key, rsKeyNew)
