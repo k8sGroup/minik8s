@@ -16,10 +16,11 @@ import (
 	"minik8s/pkg/kubelet/pod"
 	"minik8s/pkg/listerwatcher"
 	"sync"
+	"time"
 )
 
 //--------------常量定义---------------------//
-const OP_ADD_GRE = 1
+const OP_ADD_VXLAN = 1
 const OP_DELETE_GRE = 2 //不需要考虑delete的情况
 const OP_BOOT_NET = 3
 const NOT_BOOT = 1
@@ -34,7 +35,7 @@ type KubeNetSupport struct {
 	rwLock       sync.RWMutex
 	//存一份map,由physicalIp映射到管道名, 同时这个与etcd中的数据做对比可以得到要增加或者删除的gre端口
 	ipPipeMap map[string]string
-	//存一份snapshoop
+	//存一份snapshoop2
 	kubeproxySnapShoot     KubeNetSupportSnapShoot
 	ls                     *listerwatcher.ListerWatcher
 	Client                 client.RESTClient
@@ -61,13 +62,13 @@ func (worker *CommandWorker) SyncLoop(commands <-chan NetCommand, responses chan
 				return
 			}
 			switch command.Op {
-			case OP_ADD_GRE:
-				portName := netconfig.FormGrePort()
-				err := boot.SetGrePortInBr0(portName, command.physicalIp)
+			case OP_ADD_VXLAN:
+				portName := netconfig.FormVxLanPort()
+				err := boot.SetVxLanPortInBr0(portName, command.physicalIp)
 				response := NetCommandResponse{
 					Op:         command.Op,
 					physicalIp: command.physicalIp,
-					GrePort:    portName,
+					VxLanPort:  portName,
 					Err:        err,
 				}
 				responses <- response
@@ -94,7 +95,7 @@ type NetCommandResponse struct {
 	//操作类型
 	Op         int
 	physicalIp string
-	GrePort    string
+	VxLanPort  string
 	//Err 为nil代表command正确执行
 	Err error
 }
@@ -154,12 +155,13 @@ func (k *KubeNetSupport) StartKubeNetSupport() error {
 	go k.commandWorker.SyncLoop(k.netCommandChan, k.NetCommandResponseChan)
 	go k.listeningResponse()
 	//注册
+	fmt.Println("start register")
 	return k.registerNode()
 }
 func (k *KubeNetSupport) registerNode() error {
 	//先挂上watch
 	go k.ls.Watch(config.NODE_PREFIX, k.watchRegister, k.stopChannel)
-
+	time.Sleep(2 * time.Second)
 	//获取所有其他的节点
 	res, err := k.getIpPairs()
 	if err != nil {
@@ -235,8 +237,17 @@ func (kubeproxy *KubeNetSupport) AddPortMapping(pod *pod.PodSnapShoot, dockerPor
 }
 func (kubeproxy *KubeNetSupport) GetKubeproxySnapShoot() KubeNetSupportSnapShoot {
 	if kubeproxy.rwLock.TryRLock() {
+		sErr := ""
+		if kubeproxy.err != nil {
+			sErr = kubeproxy.err.Error()
+		}
 		kubeproxy.kubeproxySnapShoot = KubeNetSupportSnapShoot{
 			PortMappings: kubeproxy.portMappings,
+			IpPipeMap:    kubeproxy.ipPipeMap,
+			MyphysicalIp: kubeproxy.myphysicalIp,
+			MyIpAndMask:  kubeproxy.myIpAndMask,
+			Error:        sErr,
+			BootStatus:   kubeproxy.bootStatus,
 		}
 		kubeproxy.rwLock.RUnlock()
 		return kubeproxy.kubeproxySnapShoot
@@ -267,6 +278,7 @@ func (kp *KubeNetSupport) watchRegister(res etcdstore.WatchRes) {
 func (k *KubeNetSupport) watchAndHandleInner(ipPair *netConfigStore.IpPair) {
 	k.rwLock.Lock()
 	defer k.rwLock.Unlock()
+	fmt.Println("watchAndHandle receive command\n")
 	switch k.bootStatus {
 	case NOT_BOOT:
 		//根据是否是自己的ip区别对待
@@ -300,7 +312,7 @@ func (k *KubeNetSupport) watchAndHandleInner(ipPair *netConfigStore.IpPair) {
 	case BOOT_SUCCEED:
 		//生成command
 		command := NetCommand{
-			Op:         OP_ADD_GRE,
+			Op:         OP_ADD_VXLAN,
 			physicalIp: ipPair.PhysicalIp,
 		}
 		k.netCommandChan <- command
@@ -316,11 +328,11 @@ func (k *KubeNetSupport) listeningResponse() {
 				return
 			}
 			switch response.Op {
-			case OP_ADD_GRE:
+			case OP_ADD_VXLAN:
 				k.rwLock.Lock()
 				if response.Err == nil {
 					//success
-					k.ipPipeMap[response.physicalIp] = response.GrePort
+					k.ipPipeMap[response.physicalIp] = response.VxLanPort
 				} else {
 					k.err = response.Err
 					//直接设置error, 同时不选择重试，因为这时候基本重试也会寄
@@ -334,7 +346,7 @@ func (k *KubeNetSupport) listeningResponse() {
 					for key, v := range k.ipPipeMap {
 						if v == MASK {
 							command := NetCommand{
-								Op:         OP_ADD_GRE,
+								Op:         OP_ADD_VXLAN,
 								physicalIp: key,
 							}
 							k.netCommandChan <- command

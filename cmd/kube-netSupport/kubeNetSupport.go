@@ -16,5 +16,10 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	select {}
+	var m int
+	for {
+		fmt.Println("查看信息\n")
+		fmt.Scanln(&m)
+		fmt.Println(kubeNetSupport.GetKubeproxySnapShoot())
+	}
 }
