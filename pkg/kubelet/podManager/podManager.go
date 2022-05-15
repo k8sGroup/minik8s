@@ -3,7 +3,6 @@ package podManager
 import (
 	"errors"
 	"fmt"
-	"github.com/pquerna/ffjson/ffjson"
 	"minik8s/object"
 	"minik8s/pkg/client"
 	"minik8s/pkg/kubelet/dockerClient"
@@ -11,6 +10,8 @@ import (
 	"minik8s/pkg/kubelet/pod"
 	"sync"
 	"time"
+
+	"github.com/pquerna/ffjson/ffjson"
 )
 
 //定时更新间隔
@@ -68,7 +69,7 @@ func (p *PodManager) startTimer() {
 					if !compareSame(p.uid2podSnapshoot[v], newPodSnapShoot) {
 						//有区别产生，需要更新缓存以及etcd
 						oldPod, err := p.client.GetPod(k)
-						if err != nil {
+						if err != nil || oldPod == nil {
 							p.Err = err
 							continue
 						}

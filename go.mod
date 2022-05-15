@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/docker/docker v20.10.8+incompatible
+	github.com/docker/docker v20.10.16+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/gin-gonic/gin v1.7.7
 	github.com/go-yaml/yaml v2.1.0+incompatible

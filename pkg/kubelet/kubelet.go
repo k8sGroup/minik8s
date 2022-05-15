@@ -1,9 +1,9 @@
 package kubelet
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/net/context"
 	"minik8s/object"
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
@@ -19,10 +19,10 @@ import (
 )
 
 type Kubelet struct {
-	podManager *podManager.PodManager
-	kubeproxy  *kubeproxy.Kubeproxy
-	PodConfig  *config.PodConfig
-	podMonitor *monitor.DockerMonitor
+	podManager     *podManager.PodManager
+	kubeNetSupport *kubeNetSupport.KubeNetSupport
+	PodConfig      *config.PodConfig
+	podMonitor     *monitor.DockerMonitor
 
 	ls          *listerwatcher.ListerWatcher
 	stopChannel <-chan struct{}
@@ -50,7 +50,6 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 	// initialize pod config
 	kubelet.PodConfig = config.NewPodConfig()
 
-	// initialize pod monitor
 	kubelet.podMonitor = monitor.NewDockerMonitor()
 
 	return kubelet
@@ -60,8 +59,9 @@ func (kl *Kubelet) Run() {
 	kl.kubeNetSupport.StartKubeNetSupport()
 	kl.podManager.StartPodManager()
 	updates := kl.PodConfig.GetUpdates()
+	go kl.podMonitor.Listener()
 	go kl.syncLoop(updates, kl)
-	go kl.DoMonitor(context.TODO())
+	go kl.DoMonitor(context.Background())
 }
 
 func (kl *Kubelet) syncLoop(updates <-chan types.PodUpdate, handler SyncHandler) {

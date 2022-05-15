@@ -95,6 +95,9 @@ func (r RESTClient) GetPod(name string) (*object.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(resp) == 0 {
+		return nil, nil
+	}
 	result := &object.Pod{}
 	err = json.Unmarshal(resp[0].ValueBytes, result)
 	return result, err
