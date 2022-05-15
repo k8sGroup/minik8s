@@ -18,10 +18,14 @@ func AddRoute(ipAndMask string, dev string) error {
 	command := fmt.Sprintf("route add %s dev %s", ipAndMask, dev)
 	return execIpCmd(command)
 }
+func DelRoute(ipAndMask string, dev string) error {
+	command := fmt.Sprintf("route del %s dev %s", ipAndMask, dev)
+	return execIpCmd(command)
+}
 
 //启动设备
 func SetDev(dev string) error {
-	command := fmt.Sprintf("link set dev %s ip", dev)
+	command := fmt.Sprintf("link set dev %s up", dev)
 	return execIpCmd(command)
 }
 func execIpCmd(iptableCmd string) error {

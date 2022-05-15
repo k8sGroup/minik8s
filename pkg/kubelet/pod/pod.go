@@ -113,8 +113,13 @@ func NewPodfromConfig(config *object.Pod) *Pod {
 		config.Spec.Containers[index].Name = realName
 	}
 	newPod.containers[0].RealName = pauseRealName
-	newPod.AddVolumes(config.Spec.Volumes)
-	newPod.status = POD_PENDING_STATUS //此时还未部署,设置状态为Pending
+	err := newPod.AddVolumes(config.Spec.Volumes)
+	if err != nil {
+		newPod.err = err
+		newPod.status = POD_FAILED_STATUS
+	} else {
+		newPod.status = POD_PENDING_STATUS //此时还未部署,设置状态为Pending
+	}
 	//生成snapShoot
 	errMsg := ""
 	if newPod.err != nil {
@@ -135,6 +140,42 @@ func NewPodfromConfig(config *object.Pod) *Pod {
 	}
 	//启动pod
 	newPod.StartPod()
+	if newPod.err != nil {
+		return newPod
+	}
+	//生成command
+	commandWithConfig := &message.CommandWithConfig{}
+	commandWithConfig.CommandType = message.COMMAND_BUILD_CONTAINERS_OF_POD
+	commandWithConfig.Group = config.Spec.Containers
+	//把config中的container里的volumeMounts MountPath 换成实际路径
+	for _, value := range commandWithConfig.Group {
+		if value.VolumeMounts != nil {
+			for index, it := range value.VolumeMounts {
+				path, ok := newPod.tmpDirMap[it.Name]
+				if ok {
+					value.VolumeMounts[index].Name = path
+					continue
+				}
+				path, ok = newPod.hostDirMap[it.Name]
+				if ok {
+					value.VolumeMounts[index].Name = path
+					continue
+				}
+				path, ok = newPod.hostFileMap[it.Name]
+				if ok {
+					value.VolumeMounts[index].Name = path
+					continue
+				}
+				klog.Errorf("container Mount path didn't exist")
+			}
+		}
+	}
+	podCommand := message.PodCommand{
+		ContainerCommand: &(commandWithConfig.Command),
+		PodUid:           newPod.uid,
+		PodCommandType:   message.ADD_POD,
+	}
+	newPod.commandChan <- podCommand
 	return newPod
 }
 
@@ -288,6 +329,7 @@ func filterChars(input []string) []string {
 //-------------------------------------------------------//
 
 //-----------------读取pod信息，需要读锁------------------------//
+// TODO: why use try lock
 func (p *Pod) GetPodSnapShoot() PodSnapShoot {
 	//p.rwLock.TryRLock()
 	//defer p.rwLock.RUnlock()
@@ -388,3 +430,27 @@ func (p *Pod) releaseResource() {
 }
 
 //-----------------------------------------------------------//
+
+func (p *Pod) GetContainers() []object.ContainerMeta {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	deepContainers := p.containers
+	return deepContainers
+}
+
+func (p *Pod) GetName() string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	deepName := p.name
+	return deepName
+}
+
+func (p *Pod) GetLabels() map[string]string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	deepLabel := make(map[string]string)
+	for key, val := range p.Label {
+		deepLabel[key] = val
+	}
+	return deepLabel
+}

@@ -158,6 +158,7 @@ func (s *Store) PrefixWatch(key string) (context.CancelFunc, <-chan WatchRes) {
 					res.IsCreate = event.IsCreate()
 					res.IsModify = event.IsModify()
 					res.Key = string(event.Kv.Key)
+					res.ValueBytes = event.Kv.Value
 					break
 				}
 				c <- res

@@ -18,7 +18,8 @@ type Scheduler struct {
 	ls          *listerwatcher.ListerWatcher
 	stopChannel <-chan struct{}
 	queue       queue.ConcurrentQueue
-	Client      client.RESTClient
+
+	Client client.RESTClient
 }
 
 func NewScheduler(lsConfig *listerwatcher.Config, clientConfig client.Config) *Scheduler {
@@ -75,7 +76,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, pod *object.Pod) error 
 	// modify pod host
 	pod.Spec.NodeName = nodeName
 	// update pod to api server
-	err := sched.Client.UpdatePods(ctx, pod)
+	err := sched.Client.UpdatePods(pod)
 	return err
 }
 

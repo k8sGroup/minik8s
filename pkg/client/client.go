@@ -23,6 +23,12 @@ type RESTClient struct {
 	Base string // url = base+resource+name
 }
 
+func DefaultClientConfig() Config {
+	return Config{
+		Host: "127.0.0.1:8080",
+	}
+}
+
 /******************************Pod*******************************/
 
 func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) error {
@@ -54,33 +60,19 @@ func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) erro
 	return err
 }
 
-func (r RESTClient) UpdatePods(ctx context.Context, pod *object.Pod) error {
-	podRaw, _ := json.Marshal(pod)
-	reqBody := bytes.NewBuffer(podRaw)
+func (r RESTClient) UpdatePods(pod *object.Pod) error {
 	attachURL := "/registry/pod/default/" + pod.Name
-
-	req, _ := http.NewRequest("PUT", r.Base+attachURL, reqBody)
-	resp, _ := http.DefaultClient.Do(req)
-
-	if resp.StatusCode != object.SUCCESS {
-		return errors.New("create pod fail")
+	err := Put(r.Base+attachURL, pod)
+	if err != nil {
+		return err
 	}
-	defer resp.Body.Close()
-
 	return nil
 }
 
-func (r RESTClient) DeletePod(ctx context.Context, podName string) error {
+func (r RESTClient) DeletePod(podName string) error {
 	attachURL := "/registry/pod/default/" + podName
-	req, _ := http.NewRequest("DELETE", r.Base+attachURL, nil)
-	resp, _ := http.DefaultClient.Do(req)
-
-	if resp.StatusCode != object.SUCCESS {
-		return errors.New("delete pod fail")
-	}
-	defer resp.Body.Close()
-
-	return nil
+	err := Del(r.Base + attachURL)
+	return err
 }
 
 // GetPodFromRS TODO: type conversion
@@ -97,26 +89,42 @@ func GetPodFromRS(rs *object.ReplicaSet) (*object.Pod, error) {
 	return pod, nil
 }
 
+func (r RESTClient) GetPod(name string) (*object.Pod, error) {
+	attachUrl := "/registry/pod/default/" + name
+	resp, err := Get(r.Base + attachUrl)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp) == 0 {
+		return nil, nil
+	}
+	result := &object.Pod{}
+	err = json.Unmarshal(resp[0].ValueBytes, result)
+	return result, err
+}
+
 /********************************RS*****************************/
 
-func (r RESTClient) GetRS(name string) (*object.ReplicaSet, error) {
+func GetRS(ls *listerwatcher.ListerWatcher, name string) (*object.ReplicaSet, error) {
 	attachURL := "/registry/rs/default/" + name
 
-	req, _ := http.NewRequest("GET", r.Base+attachURL, nil)
-	resp, _ := http.DefaultClient.Do(req)
+	raw, err := ls.List(attachURL)
+	if err != nil {
+		fmt.Printf("[GetNodes] fail to get nodes\n")
+	}
 
-	if resp.StatusCode != object.SUCCESS {
-		return nil, errors.New("delete pod fail")
+	if len(raw) == 0 {
+		return nil, errors.New("not find")
 	}
 
 	result := &object.ReplicaSet{}
-	body, _ := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
 
-	err := json.Unmarshal(body, result)
+	err = json.Unmarshal(raw[0].ValueBytes, result)
+
 	if err != nil {
-		klog.Infof("[GetRS] Body Pods Unmarshal fail\n")
+		fmt.Printf("[GetNodes] unmarshal fail\n")
 	}
+	fmt.Printf("[GetNodes] rs:%+v\n", result)
 	return result, nil
 }
 
@@ -143,6 +151,14 @@ func GetRSPods(ls *listerwatcher.ListerWatcher, name string) ([]*object.Pod, err
 	}
 
 	return pods, nil
+
+}
+
+func (r RESTClient) DeleteRS(rsName string) error {
+	attachURL := "/registry/rs/default/" + rsName
+	fmt.Printf("delete rs:" + attachURL + "\n")
+	err := Del(r.Base + attachURL)
+	return err
 }
 
 func ownBy(ownerReferences []object.OwnerReference, owner string) bool {
@@ -154,27 +170,21 @@ func ownBy(ownerReferences []object.OwnerReference, owner string) bool {
 	return false
 }
 
-func (r RESTClient) UpdateRSStatus(ctx context.Context, replicaSet *object.ReplicaSet) (*object.ReplicaSet, error) {
-	body, _ := json.Marshal(replicaSet)
-	reqBody := bytes.NewBuffer(body)
-	attachURL := "/rs/" + replicaSet.Name + "/" + "status"
-
-	req, _ := http.NewRequest("PUT", r.Base+attachURL, reqBody)
-	resp, _ := http.DefaultClient.Do(req)
-
-	if resp.StatusCode != object.SUCCESS {
-		return nil, errors.New("update rs fail")
+func OwnByRs(pod *object.Pod) (bool, string) {
+	ownerReferences := pod.OwnerReferences
+	if len(ownerReferences) == 0 {
+		return false, ""
 	}
 
-	result := &object.ReplicaSet{}
-	body, _ = ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
-
-	err := json.Unmarshal(body, result)
-	if err != nil {
-		klog.Infof("[UpdateRSStatus] Body Pods Unmarshal fail\n")
+	// unmarshal and filter by ownership
+	for _, owner := range ownerReferences {
+		if owner.Kind == object.ReplicaSetKind {
+			fmt.Printf("[OwnByRs] owner:%v\n", owner.Name)
+			return true, owner.Name
+		}
 	}
-	return result, nil
+
+	return false, ""
 }
 
 /********************************Node*****************************/

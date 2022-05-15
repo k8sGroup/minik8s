@@ -1,24 +1,26 @@
-package kubeproxy
+package kubeNetSupport
 
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/etcdstore/netConfigStore"
 	"minik8s/pkg/klog"
+	"minik8s/pkg/kubeNetSupport/boot"
+	"minik8s/pkg/kubeNetSupport/iptablesManager"
+	"minik8s/pkg/kubeNetSupport/netconfig"
+	"minik8s/pkg/kubeNetSupport/tools"
 	"minik8s/pkg/kubelet/pod"
-	"minik8s/pkg/kubeproxy/boot"
-	"minik8s/pkg/kubeproxy/iptablesManager"
-	"minik8s/pkg/kubeproxy/netconfig"
-	"minik8s/pkg/kubeproxy/tools"
 	"minik8s/pkg/listerwatcher"
 	"sync"
+	"time"
 )
 
 //--------------常量定义---------------------//
-const OP_ADD_GRE = 1
+const OP_ADD_VXLAN = 1
 const OP_DELETE_GRE = 2 //不需要考虑delete的情况
 const OP_BOOT_NET = 3
 const NOT_BOOT = 1
@@ -28,13 +30,13 @@ const BOOT_SUCCEED = 4
 const MASK = "need allocate port"
 
 //------------------------------------------//
-type Kubeproxy struct {
+type KubeNetSupport struct {
 	portMappings []iptablesManager.PortMapping
 	rwLock       sync.RWMutex
-	//存一份map,由clusterIp映射到管道名, 同时这个与etcd中的数据做对比可以得到要增加或者删除的gre端口
+	//存一份map,由physicalIp映射到管道名, 同时这个与etcd中的数据做对比可以得到要增加或者删除的gre端口
 	ipPipeMap map[string]string
-	//存一份snapshoop
-	kubeproxySnapShoot     KubeproxySnapShoot
+	//存一份snapshoop2
+	kubeproxySnapShoot     KubeNetSupportSnapShoot
 	ls                     *listerwatcher.ListerWatcher
 	Client                 client.RESTClient
 	stopChannel            <-chan struct{}
@@ -42,13 +44,14 @@ type Kubeproxy struct {
 	NetCommandResponseChan chan NetCommandResponse
 	commandWorker          *CommandWorker
 	//自己所在节点的ip
-	myClusterIp string
+	myphysicalIp string
 	//自己分配的网段
 	myIpAndMask string
 	bootStatus  int
 	err         error
 }
 type CommandWorker struct {
+	isMaster bool
 }
 
 func (worker *CommandWorker) SyncLoop(commands <-chan NetCommand, responses chan<- NetCommandResponse) {
@@ -59,18 +62,18 @@ func (worker *CommandWorker) SyncLoop(commands <-chan NetCommand, responses chan
 				return
 			}
 			switch command.Op {
-			case OP_ADD_GRE:
-				portName := netconfig.FormGrePort()
-				err := boot.SetGrePortInBr0(portName, command.ClusterIp)
+			case OP_ADD_VXLAN:
+				portName := netconfig.FormVxLanPort()
+				err := boot.SetVxLanPortInBr0(portName, command.physicalIp)
 				response := NetCommandResponse{
-					Op:        command.Op,
-					ClusterIp: command.ClusterIp,
-					GrePort:   portName,
-					Err:       err,
+					Op:         command.Op,
+					physicalIp: command.physicalIp,
+					VxLanPort:  portName,
+					Err:        err,
 				}
 				responses <- response
 			case OP_BOOT_NET:
-				err := boot.BootNetWork(command.IpAndMask, tools.GetBasicIpAndMask(command.IpAndMask))
+				err := boot.BootNetWork(command.IpAndMask, tools.GetBasicIpAndMask(command.IpAndMask), worker.isMaster)
 				response := NetCommandResponse{
 					Op:  command.Op,
 					Err: err,
@@ -83,93 +86,102 @@ func (worker *CommandWorker) SyncLoop(commands <-chan NetCommand, responses chan
 
 type NetCommand struct {
 	//操作类型
-	Op        int
-	ClusterIp string
+	Op         int
+	physicalIp string
 	//这些只有boot的时候需要, 即分配给自己机子的网段，同时通过这个可以得到大网段
 	IpAndMask string
 }
 type NetCommandResponse struct {
 	//操作类型
-	Op        int
-	ClusterIp string
-	GrePort   string
+	Op         int
+	physicalIp string
+	VxLanPort  string
 	//Err 为nil代表command正确执行
 	Err error
 }
-type KubeproxySnapShoot struct {
+type KubeNetSupportSnapShoot struct {
 	PortMappings []iptablesManager.PortMapping
 	IpPipeMap    map[string]string
 	IpPairs      []netConfigStore.IpPair
-	MyClusterIp  string
+	MyphysicalIp string
 	MyIpAndMask  string
 	Error        string
 	BootStatus   int
 }
 
-func NewKubeproxy(lsConfig *listerwatcher.Config, clientConfig client.Config) (*Kubeproxy, error) {
-	newKubeproxy := &Kubeproxy{}
+func NewKubeNetSupport(lsConfig *listerwatcher.Config, clientConfig client.Config, isMaster bool) (*KubeNetSupport, error) {
+	newKubeNetSupport := &KubeNetSupport{}
 	var rwLock sync.RWMutex
-	newKubeproxy.rwLock = rwLock
-	newKubeproxy.ipPipeMap = make(map[string]string)
-	newKubeproxy.stopChannel = make(chan struct{}, 10)
-	newKubeproxy.netCommandChan = make(chan NetCommand, 100)
-	newKubeproxy.NetCommandResponseChan = make(chan NetCommandResponse, 100)
-	newKubeproxy.bootStatus = NOT_BOOT
-	newKubeproxy.commandWorker = &CommandWorker{}
+	newKubeNetSupport.rwLock = rwLock
+	newKubeNetSupport.ipPipeMap = make(map[string]string)
+	newKubeNetSupport.stopChannel = make(chan struct{}, 10)
+	newKubeNetSupport.netCommandChan = make(chan NetCommand, 100)
+	newKubeNetSupport.NetCommandResponseChan = make(chan NetCommandResponse, 100)
+	newKubeNetSupport.bootStatus = NOT_BOOT
+	newKubeNetSupport.commandWorker = &CommandWorker{
+		isMaster: isMaster,
+	}
 	ls, err2 := listerwatcher.NewListerWatcher(lsConfig)
 	if err2 != nil {
 		return nil, err2
 	}
-	newKubeproxy.ls = ls
+	newKubeNetSupport.ls = ls
 	restClient := client.RESTClient{
 		Base: "http://" + clientConfig.Host,
 	}
-	newKubeproxy.Client = restClient
+	newKubeNetSupport.Client = restClient
 	ips, err := tools.GetIPv4ByInterface(netconfig.ETH_NAME)
 	if err != nil {
-		newKubeproxy.err = err
+		newKubeNetSupport.err = err
 	} else {
-		newKubeproxy.myClusterIp = ips[0]
+		newKubeNetSupport.myphysicalIp = ips[0]
 	}
-	newKubeproxy.kubeproxySnapShoot = KubeproxySnapShoot{
-		PortMappings: newKubeproxy.portMappings,
-		IpPipeMap:    newKubeproxy.ipPipeMap,
-		MyClusterIp:  newKubeproxy.myClusterIp,
-		MyIpAndMask:  newKubeproxy.myIpAndMask,
-		Error:        newKubeproxy.err.Error(),
-		BootStatus:   newKubeproxy.bootStatus,
+	sErr := ""
+	if newKubeNetSupport.err != nil {
+		sErr = newKubeNetSupport.err.Error()
 	}
-	return newKubeproxy, nil
+	newKubeNetSupport.kubeproxySnapShoot = KubeNetSupportSnapShoot{
+		PortMappings: newKubeNetSupport.portMappings,
+		IpPipeMap:    newKubeNetSupport.ipPipeMap,
+		MyphysicalIp: newKubeNetSupport.myphysicalIp,
+		MyIpAndMask:  newKubeNetSupport.myIpAndMask,
+		Error:        sErr,
+		BootStatus:   newKubeNetSupport.bootStatus,
+	}
+	return newKubeNetSupport, nil
 }
-func (k *Kubeproxy) StartKubeProxy() {
+func (k *KubeNetSupport) StartKubeNetSupport() error {
 	//先启动线程
 	go k.commandWorker.SyncLoop(k.netCommandChan, k.NetCommandResponseChan)
 	go k.listeningResponse()
 	//注册
-	k.registerNode()
+	fmt.Println("start register")
+	return k.registerNode()
 }
-func (k *Kubeproxy) registerNode() error {
+func (k *KubeNetSupport) registerNode() error {
 	//先挂上watch
 	go k.ls.Watch(config.NODE_PREFIX, k.watchRegister, k.stopChannel)
-
+	time.Sleep(2 * time.Second)
 	//获取所有其他的节点
 	res, err := k.getIpPairs()
 	if err != nil {
 		return err
 	}
+	fmt.Println("ipPairs get is\n")
+	fmt.Println(res)
 	//设置map， 暂时不生成command，用MASK占位
 	for _, value := range res {
-		k.ipPipeMap[value.ClusterIp] = MASK
+		k.ipPipeMap[value.PhysicalIp] = MASK
 	}
 	//发起注册的http请求
-	attachURL := "/node/register/" + k.myClusterIp
+	attachURL := config.NODE_PREFIX + "/" + k.myphysicalIp
 	err = k.Client.PutWrap(attachURL, nil)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (k *Kubeproxy) getIpPairs() ([]netConfigStore.IpPair, error) {
+func (k *KubeNetSupport) getIpPairs() ([]netConfigStore.IpPair, error) {
 	raw, err := k.ls.List(config.NODE_PREFIX)
 	if err != nil {
 		return nil, err
@@ -185,7 +197,7 @@ func (k *Kubeproxy) getIpPairs() ([]netConfigStore.IpPair, error) {
 	}
 	return res, nil
 }
-func (k *Kubeproxy) RemovePortMapping(pod *pod.PodSnapShoot, dockerPort string, hostPort string) error {
+func (k *KubeNetSupport) RemovePortMapping(pod *pod.PodSnapShoot, dockerPort string, hostPort string) error {
 	//先检查是否存在该规则
 	k.rwLock.Lock()
 	defer k.rwLock.Unlock()
@@ -201,7 +213,7 @@ func (k *Kubeproxy) RemovePortMapping(pod *pod.PodSnapShoot, dockerPort string, 
 	}
 	return errors.New("想要删除的规则不存在")
 }
-func (kubeproxy *Kubeproxy) AddPortMapping(pod *pod.PodSnapShoot, dockerPort string, hostPort string) (iptablesManager.PortMapping, error) {
+func (kubeproxy *KubeNetSupport) AddPortMapping(pod *pod.PodSnapShoot, dockerPort string, hostPort string) (iptablesManager.PortMapping, error) {
 	//要检查pod中是否存在该dockerPort
 	kubeproxy.rwLock.Lock()
 	defer kubeproxy.rwLock.Unlock()
@@ -223,10 +235,19 @@ func (kubeproxy *Kubeproxy) AddPortMapping(pod *pod.PodSnapShoot, dockerPort str
 	kubeproxy.portMappings = append(kubeproxy.portMappings, res)
 	return res, nil
 }
-func (kubeproxy *Kubeproxy) GetKubeproxySnapShoot() KubeproxySnapShoot {
+func (kubeproxy *KubeNetSupport) GetKubeproxySnapShoot() KubeNetSupportSnapShoot {
 	if kubeproxy.rwLock.TryRLock() {
-		kubeproxy.kubeproxySnapShoot = KubeproxySnapShoot{
+		sErr := ""
+		if kubeproxy.err != nil {
+			sErr = kubeproxy.err.Error()
+		}
+		kubeproxy.kubeproxySnapShoot = KubeNetSupportSnapShoot{
 			PortMappings: kubeproxy.portMappings,
+			IpPipeMap:    kubeproxy.ipPipeMap,
+			MyphysicalIp: kubeproxy.myphysicalIp,
+			MyIpAndMask:  kubeproxy.myIpAndMask,
+			Error:        sErr,
+			BootStatus:   kubeproxy.bootStatus,
 		}
 		kubeproxy.rwLock.RUnlock()
 		return kubeproxy.kubeproxySnapShoot
@@ -236,7 +257,7 @@ func (kubeproxy *Kubeproxy) GetKubeproxySnapShoot() KubeproxySnapShoot {
 }
 
 //-------------------------------注册相关----------------------------------------//
-func (kp *Kubeproxy) watchRegister(res etcdstore.WatchRes) {
+func (kp *KubeNetSupport) watchRegister(res etcdstore.WatchRes) {
 	//只管增加不管删除
 	if res.ResType == etcdstore.DELETE {
 		//不需要管其他节点删除的情况
@@ -254,51 +275,52 @@ func (kp *Kubeproxy) watchRegister(res etcdstore.WatchRes) {
 //所以如果没有boot同时有一大堆gre端口等着创建，可以先在map中生成空映射，等到收到boot成功的response再去生成command
 //此外不需要考虑gre端口的销毁，因为每个gre端口是唯一生成的，不会重复，另外就算其他节点没注册但是连接着,网段的唯一性也可以保证不会出错
 
-func (k *Kubeproxy) watchAndHandleInner(ipPair *netConfigStore.IpPair) {
+func (k *KubeNetSupport) watchAndHandleInner(ipPair *netConfigStore.IpPair) {
 	k.rwLock.Lock()
 	defer k.rwLock.Unlock()
+	fmt.Println("watchAndHandle receive command\n")
 	switch k.bootStatus {
 	case NOT_BOOT:
 		//根据是否是自己的ip区别对待
-		if ipPair.ClusterIp == k.myClusterIp {
+		if ipPair.PhysicalIp == k.myphysicalIp {
 			command := NetCommand{
-				Op:        OP_BOOT_NET,
-				ClusterIp: ipPair.ClusterIp,
-				IpAndMask: ipPair.NodeIpAndMask,
+				Op:         OP_BOOT_NET,
+				physicalIp: ipPair.PhysicalIp,
+				IpAndMask:  ipPair.NodeIpAndMask,
 			}
 			k.myIpAndMask = ipPair.NodeIpAndMask
 			k.bootStatus = IS_BOOTING
 			k.netCommandChan <- command
 		} else {
-			k.ipPipeMap[ipPair.ClusterIp] = MASK
+			k.ipPipeMap[ipPair.PhysicalIp] = MASK
 		}
 		return
 	case BOOT_FAILED:
 		//上次boot失败，尝试再次boot
-		k.ipPipeMap[ipPair.ClusterIp] = MASK
+		k.ipPipeMap[ipPair.PhysicalIp] = MASK
 		command := NetCommand{
-			Op:        OP_BOOT_NET,
-			ClusterIp: k.myClusterIp,
-			IpAndMask: k.myIpAndMask,
+			Op:         OP_BOOT_NET,
+			physicalIp: k.myphysicalIp,
+			IpAndMask:  k.myIpAndMask,
 		}
 		k.netCommandChan <- command
 		return
 	case IS_BOOTING:
 		//同样不需要生成实际的command
-		k.ipPipeMap[ipPair.ClusterIp] = MASK
+		k.ipPipeMap[ipPair.PhysicalIp] = MASK
 		return
 	case BOOT_SUCCEED:
 		//生成command
 		command := NetCommand{
-			Op:        OP_ADD_GRE,
-			ClusterIp: ipPair.ClusterIp,
+			Op:         OP_ADD_VXLAN,
+			physicalIp: ipPair.PhysicalIp,
 		}
 		k.netCommandChan <- command
 		return
 	}
 }
 
-func (k *Kubeproxy) listeningResponse() {
+func (k *KubeNetSupport) listeningResponse() {
 	for {
 		select {
 		case response, ok := <-k.NetCommandResponseChan:
@@ -306,11 +328,11 @@ func (k *Kubeproxy) listeningResponse() {
 				return
 			}
 			switch response.Op {
-			case OP_ADD_GRE:
+			case OP_ADD_VXLAN:
 				k.rwLock.Lock()
 				if response.Err == nil {
 					//success
-					k.ipPipeMap[response.ClusterIp] = response.GrePort
+					k.ipPipeMap[response.physicalIp] = response.VxLanPort
 				} else {
 					k.err = response.Err
 					//直接设置error, 同时不选择重试，因为这时候基本重试也会寄
@@ -324,8 +346,8 @@ func (k *Kubeproxy) listeningResponse() {
 					for key, v := range k.ipPipeMap {
 						if v == MASK {
 							command := NetCommand{
-								Op:        OP_ADD_GRE,
-								ClusterIp: key,
+								Op:         OP_ADD_VXLAN,
+								physicalIp: key,
 							}
 							k.netCommandChan <- command
 						}

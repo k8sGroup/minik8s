@@ -35,16 +35,17 @@ const Path = "/registry/:resource/:namespace/:resourceName"
 const PrefixPath = "/registry/:resource/:namespace"
 const ParamResource = "resource"
 const ParamResourceName = "resourceName"
-const ParamClusterIp = "clusterIp"
 const ParamType = "type"
 const NODE_NAME = "name"
 
 // path for kube client
 const (
-	RS          = "/rs/:resourceName"
-	POD         = "/pod/:resourceName"
-	NODE        = "/node/register/:clusterIp"
-	NODE_PREFIX = "/node/register"
+	RS          = "/registry/rs/default/:resourceName"
+	POD         = "/registry/pod/default/:resourceName"
+	NODE        = "/registry/node/default/:resourceName"
+	NODE_PREFIX = "/registry/node/default"
+
+	POD_TEST = "/pod/test/:resourceName"
 )
 
 var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "hpa"}

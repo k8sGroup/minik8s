@@ -1,25 +1,28 @@
 package kubelet
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/net/context"
 	"minik8s/object"
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
+	"minik8s/pkg/kubeNetSupport"
+	"minik8s/pkg/kubeNetSupport/iptablesManager"
 	"minik8s/pkg/kubelet/config"
+	"minik8s/pkg/kubelet/monitor"
 	"minik8s/pkg/kubelet/podManager"
 	"minik8s/pkg/kubelet/types"
-	"minik8s/pkg/kubeproxy"
-	"minik8s/pkg/kubeproxy/iptablesManager"
 	"minik8s/pkg/listerwatcher"
+	"time"
 )
 
 type Kubelet struct {
-	podManager *podManager.PodManager
-	kubeproxy  *kubeproxy.Kubeproxy
-	PodConfig  *config.PodConfig
+	podManager     *podManager.PodManager
+	kubeNetSupport *kubeNetSupport.KubeNetSupport
+	PodConfig      *config.PodConfig
+	podMonitor     *monitor.DockerMonitor
 
 	ls          *listerwatcher.ListerWatcher
 	stopChannel <-chan struct{}
@@ -29,8 +32,8 @@ type Kubelet struct {
 
 func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kubelet {
 	kubelet := &Kubelet{}
-	kubelet.podManager = podManager.NewPodManager()
-	kubelet.kubeproxy, kubelet.Err = kubeproxy.NewKubeproxy(lsConfig, clientConfig)
+	kubelet.podManager = podManager.NewPodManager(clientConfig)
+	kubelet.kubeNetSupport, kubelet.Err = kubeNetSupport.NewKubeNetSupport(lsConfig, clientConfig, false)
 
 	restClient := client.RESTClient{
 		Base: "http://" + clientConfig.Host,
@@ -47,13 +50,18 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 	// initialize pod config
 	kubelet.PodConfig = config.NewPodConfig()
 
+	kubelet.podMonitor = monitor.NewDockerMonitor()
+
 	return kubelet
 }
 
 func (kl *Kubelet) Run() {
-	kl.kubeproxy.StartKubeProxy()
+	kl.kubeNetSupport.StartKubeNetSupport()
+	kl.podManager.StartPodManager()
 	updates := kl.PodConfig.GetUpdates()
-	kl.syncLoop(updates, kl)
+	go kl.podMonitor.Listener()
+	go kl.syncLoop(updates, kl)
+	go kl.DoMonitor(context.Background())
 }
 
 func (kl *Kubelet) syncLoop(updates <-chan types.PodUpdate, handler SyncHandler) {
@@ -76,17 +84,17 @@ func (k *Kubelet) AddPodPortMapping(podName string, podPort string, hostPort str
 	if err != nil {
 		return iptablesManager.PortMapping{}, err
 	}
-	return k.kubeproxy.AddPortMapping(p, podPort, hostPort)
+	return k.kubeNetSupport.AddPortMapping(p, podPort, hostPort)
 }
 func (k *Kubelet) RemovePortMapping(podName string, podPort string, hostPort string) error {
 	p, err := k.podManager.GetPodSnapShoot(podName)
 	if err != nil {
 		return err
 	}
-	return k.kubeproxy.RemovePortMapping(p, podPort, hostPort)
+	return k.kubeNetSupport.RemovePortMapping(p, podPort, hostPort)
 }
 func (k *Kubelet) GetPodMappingInfo() []iptablesManager.PortMapping {
-	return k.kubeproxy.GetKubeproxySnapShoot().PortMappings
+	return k.kubeNetSupport.GetKubeproxySnapShoot().PortMappings
 }
 
 type SyncHandler interface {
@@ -165,15 +173,8 @@ func (kl *Kubelet) HandlePodAdditions(pods []*object.Pod) {
 	for _, pod := range pods {
 		fmt.Printf("[Kubelet] Prepare add pod:%s\n", pod.Name)
 		err := kl.podManager.AddPod(pod)
-
 		if err != nil {
-			fmt.Printf("[Kubelet] Add pod fail...,err:%v\n", err)
-		} else {
-			// update pod status
-			p, _ := kl.podManager.GetPodSnapShoot(pod.Name)
-			//p.Status = object.PodRunning
-			pod.Status.Phase = p.Status
-			kl.Client.UpdatePods(context.TODO(), pod)
+			kl.Err = err
 		}
 	}
 }
@@ -203,4 +204,15 @@ func (kl *Kubelet) HandlePodSyncs(pods []*object.Pod) {
 
 func (kl *Kubelet) HandlePodCleanups() error {
 	return nil
+}
+
+func (kl *Kubelet) DoMonitor(ctx context.Context) {
+	for {
+		fmt.Printf("[DoMonitor] New round monitoring...\n")
+		podMap := kl.podManager.CopyUid2pod()
+		for _, pod := range podMap {
+			kl.podMonitor.MetricDockerStat(ctx, pod)
+		}
+		time.Sleep(time.Second * 2)
+	}
 }

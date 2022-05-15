@@ -7,7 +7,7 @@ import (
 //集群ip--分配的网段
 type IpPair struct {
 	//集群中的物理ip
-	ClusterIp string
+	PhysicalIp string
 	//为该物理机分配的pod网段
 	NodeIpAndMask string
 }
@@ -28,29 +28,29 @@ func NewNetConfigStore() *NetConfigStore {
 	return res
 }
 
-func (netConfigStore *NetConfigStore) AddNewNode(clusterIp string) (IpPair, error) {
+func (netConfigStore *NetConfigStore) AddNewNode(physicalIp string) (IpPair, error) {
 	//先检查是否已经存在
-	flag := netConfigStore.checkIfExist(clusterIp)
+	flag := netConfigStore.checkIfExist(physicalIp)
 	if flag {
-		return IpPair{}, errors.New(clusterIp + " already exist")
+		return IpPair{}, errors.New(physicalIp + " already exist")
 	}
 	name, ipAndMask := GetNodeNameWithIpAndMask()
 	newIpPair := IpPair{
-		ClusterIp:     clusterIp,
+		PhysicalIp:    physicalIp,
 		NodeIpAndMask: ipAndMask,
 	}
 	netConfigStore.Name2IpPair[name] = newIpPair
 	return newIpPair, nil
 }
 
-func (netConfigStore *NetConfigStore) DeleteNode(clusterIp string) (IpPair, error) {
-	flag := netConfigStore.checkIfExist(clusterIp)
+func (netConfigStore *NetConfigStore) DeleteNode(physicalIp string) (IpPair, error) {
+	flag := netConfigStore.checkIfExist(physicalIp)
 	if !flag {
-		return IpPair{}, errors.New(clusterIp + " not exist")
+		return IpPair{}, errors.New(physicalIp + " not exist")
 	}
 	var del IpPair
 	for k, v := range netConfigStore.Name2IpPair {
-		if v.ClusterIp == clusterIp {
+		if v.PhysicalIp == physicalIp {
 			del = v
 			delete(netConfigStore.Name2IpPair, k)
 			return del, nil
@@ -62,9 +62,9 @@ func (netConfigStore *NetConfigStore) DeleteNode(clusterIp string) (IpPair, erro
 
 }
 
-func (netConfigStore *NetConfigStore) checkIfExist(clusterIp string) bool {
+func (netConfigStore *NetConfigStore) checkIfExist(physicalIp string) bool {
 	for _, v := range netConfigStore.Name2IpPair {
-		if v.ClusterIp == clusterIp {
+		if v.PhysicalIp == physicalIp {
 			return true
 		}
 	}

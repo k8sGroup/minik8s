@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"minik8s/pkg/client"
 	"minik8s/pkg/kubelet"
 	"minik8s/pkg/listerwatcher"
@@ -8,10 +9,25 @@ import (
 
 func main() {
 	// host is the address of master node
-	clientConfig := client.Config{Host: "127.0.0.1:8080"}
-	kube := kubelet.NewKubelet(listerwatcher.DefaultConfig(), clientConfig)
+	clientConfig := client.Config{Host: "192.168.1.7:8080"}
+	kube := kubelet.NewKubelet(listerwatcher.GetLsConfig("192.168.1.7"), clientConfig)
 	kube.Run()
-
+	//data, err := ioutil.ReadFile("./test/pod/example.yaml")
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+	//pod := &object.Pod{}
+	//err = yaml.Unmarshal([]byte(data), &pod)
+	//err = kube.AddPod(pod)
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+	var m int
+	for {
+		fmt.Println("查看错误信息\n")
+		fmt.Scanln(&m)
+		fmt.Println(kube.Err)
+	}
 }
 
 //

@@ -27,6 +27,13 @@ func (s *Server) deletePod(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
+	// if already zero just delete
+	if pod.Status.Phase == object.PodFailed {
+		err = s.store.Del(key)
+		ctx.Status(http.StatusOK)
+		return
+	}
+
 	// update pod phases to failed
 	pod.Status.Phase = object.PodFailed
 	raw, _ := json.Marshal(pod)
@@ -53,6 +60,13 @@ func (s *Server) deleteRS(ctx *gin.Context) {
 	if err != nil {
 		fmt.Printf("[deleteRS] pod unmarshal fail\n")
 		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	// if already zero just delete
+	if rs.Spec.Replicas == 0 {
+		err = s.store.Del(key)
+		ctx.Status(http.StatusOK)
 		return
 	}
 
