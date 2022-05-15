@@ -88,7 +88,7 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 
 	{
 		engine.DELETE(config.RS, s.deleteRS)
-		engine.DELETE(config.POD, s.deletePod)
+		//engine.DELETE(config.POD_TEST, s.deletePod)
 	}
 	{
 		engine.PUT(config.NODE, s.addNode)
