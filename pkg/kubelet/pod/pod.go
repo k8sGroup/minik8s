@@ -329,6 +329,7 @@ func filterChars(input []string) []string {
 //-------------------------------------------------------//
 
 //-----------------读取pod信息，需要读锁------------------------//
+// TODO: why use try lock
 func (p *Pod) GetPodSnapShoot() PodSnapShoot {
 	//p.rwLock.TryRLock()
 	//defer p.rwLock.RUnlock()
@@ -429,3 +430,27 @@ func (p *Pod) releaseResource() {
 }
 
 //-----------------------------------------------------------//
+
+func (p *Pod) GetContainers() []object.ContainerMeta {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	deepContainers := p.containers
+	return deepContainers
+}
+
+func (p *Pod) GetName() string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	deepName := p.name
+	return deepName
+}
+
+func (p *Pod) GetLabels() map[string]string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	deepLabel := make(map[string]string)
+	for key, val := range p.Label {
+		deepLabel[key] = val
+	}
+	return deepLabel
+}

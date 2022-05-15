@@ -3,7 +3,6 @@ package podManager
 import (
 	"errors"
 	"fmt"
-	"github.com/pquerna/ffjson/ffjson"
 	"minik8s/object"
 	"minik8s/pkg/client"
 	"minik8s/pkg/kubelet/dockerClient"
@@ -11,6 +10,8 @@ import (
 	"minik8s/pkg/kubelet/pod"
 	"sync"
 	"time"
+
+	"github.com/pquerna/ffjson/ffjson"
 )
 
 //定时更新间隔
@@ -68,7 +69,7 @@ func (p *PodManager) startTimer() {
 					if !compareSame(p.uid2podSnapshoot[v], newPodSnapShoot) {
 						//有区别产生，需要更新缓存以及etcd
 						oldPod, err := p.client.GetPod(k)
-						if err != nil {
+						if err != nil || oldPod == nil {
 							p.Err = err
 							continue
 						}
@@ -178,6 +179,17 @@ func (p *PodManager) PullImages(images []string) error {
 	commandWithImages.Images = images
 	response := dockerClient.HandleCommand(&(commandWithImages.Command))
 	return response.Err
+}
+
+// CopyUid2pod only copy the pointers in map, check before actual use
+func (p *PodManager) CopyUid2pod() map[string]*pod.Pod {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	uuidMap := make(map[string]*pod.Pod)
+	for key, val := range p.uid2pod {
+		uuidMap[key] = val
+	}
+	return uuidMap
 }
 
 func compareSame(p1 pod.PodSnapShoot, p2 pod.PodSnapShoot) bool {

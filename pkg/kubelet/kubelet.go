@@ -3,6 +3,7 @@ package kubelet
 import (
 	"encoding/json"
 	"fmt"
+	"golang.org/x/net/context"
 	"minik8s/object"
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
@@ -10,15 +11,18 @@ import (
 	"minik8s/pkg/kubeNetSupport"
 	"minik8s/pkg/kubeNetSupport/iptablesManager"
 	"minik8s/pkg/kubelet/config"
+	"minik8s/pkg/kubelet/monitor"
 	"minik8s/pkg/kubelet/podManager"
 	"minik8s/pkg/kubelet/types"
 	"minik8s/pkg/listerwatcher"
+	"time"
 )
 
 type Kubelet struct {
 	podManager     *podManager.PodManager
 	kubeNetSupport *kubeNetSupport.KubeNetSupport
 	PodConfig      *config.PodConfig
+	podMonitor     *monitor.DockerMonitor
 
 	ls          *listerwatcher.ListerWatcher
 	stopChannel <-chan struct{}
@@ -46,6 +50,8 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 	// initialize pod config
 	kubelet.PodConfig = config.NewPodConfig()
 
+	kubelet.podMonitor = monitor.NewDockerMonitor()
+
 	return kubelet
 }
 
@@ -53,7 +59,9 @@ func (kl *Kubelet) Run() {
 	kl.kubeNetSupport.StartKubeNetSupport()
 	kl.podManager.StartPodManager()
 	updates := kl.PodConfig.GetUpdates()
+	go kl.podMonitor.Listener()
 	go kl.syncLoop(updates, kl)
+	go kl.DoMonitor(context.Background())
 }
 
 func (kl *Kubelet) syncLoop(updates <-chan types.PodUpdate, handler SyncHandler) {
@@ -196,4 +204,15 @@ func (kl *Kubelet) HandlePodSyncs(pods []*object.Pod) {
 
 func (kl *Kubelet) HandlePodCleanups() error {
 	return nil
+}
+
+func (kl *Kubelet) DoMonitor(ctx context.Context) {
+	for {
+		fmt.Printf("[DoMonitor] New round monitoring...\n")
+		podMap := kl.podManager.CopyUid2pod()
+		for _, pod := range podMap {
+			kl.podMonitor.MetricDockerStat(ctx, pod)
+		}
+		time.Sleep(time.Second * 2)
+	}
 }
