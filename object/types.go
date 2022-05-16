@@ -19,6 +19,7 @@ const (
 type ObjectMeta struct {
 	Name   string            `json:"name" yaml:"name"`
 	Labels map[string]string `json:"labels" yaml:"labels"`
+	UID    string            `json:"uid" yaml:"uid"`
 
 	OwnerReferences []OwnerReference `json:"ownerReferences" yaml:"ownerReferences"`
 	Ctime           string
