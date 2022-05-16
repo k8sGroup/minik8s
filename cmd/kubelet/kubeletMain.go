@@ -7,10 +7,16 @@ import (
 	"minik8s/pkg/listerwatcher"
 )
 
+var (
+	LOCAL  = "127.0.0.1"
+	REMOTE = "192.168.1.7"
+)
+
 func main() {
 	// host is the address of master node
-	clientConfig := client.Config{Host: "192.168.1.7:8080"}
-	kube := kubelet.NewKubelet(listerwatcher.GetLsConfig("192.168.1.7"), clientConfig)
+	clientConfig := client.Config{Host: LOCAL + ":8080"}
+	//kube := kubelet.NewKubelet(listerwatcher.GetLsConfig("192.168.1.7"), clientConfig)
+	kube := kubelet.NewKubelet(listerwatcher.DefaultConfig(), clientConfig)
 	kube.Run()
 	//data, err := ioutil.ReadFile("./test/pod/example.yaml")
 	//if err != nil {

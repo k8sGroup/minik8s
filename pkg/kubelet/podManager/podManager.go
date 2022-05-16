@@ -68,7 +68,7 @@ func (p *PodManager) startTimer() {
 					newPodSnapShoot := pod.GetPodSnapShoot()
 					if !compareSame(p.uid2podSnapshoot[v], newPodSnapShoot) {
 						//有区别产生，需要更新缓存以及etcd
-						oldPod, err := p.client.GetPod(k)
+						oldPod, err := p.client.GetPod(k, v)
 						if err != nil || oldPod == nil {
 							p.Err = err
 							continue
@@ -140,7 +140,7 @@ func (p *PodManager) DeletePod(podName string) error {
 	delete(p.uid2podSnapshoot, uid)
 	delete(p.uid2pod, uid)
 	//提交delete pod的请求
-	err := p.client.DeletePod(podName)
+	err := p.client.DeletePod(podName, uid)
 	if err != nil {
 		return err
 	}

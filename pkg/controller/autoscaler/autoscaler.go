@@ -333,7 +333,7 @@ func (acc *AutoscalerController) monitoringDeploymentLoop(stopCh <-chan struct{}
 			if !rsExist {
 				goto StepEnd
 			}
-			pods, err := client.GetRSPods(acc.ls, rs.ObjectMeta.Name)
+			pods, err := client.GetRSPods(acc.ls, rs.ObjectMeta.Name, rs.UID)
 			if err != nil {
 				goto StepEnd
 			}
@@ -386,7 +386,7 @@ func (acc *AutoscalerController) monitoringReplicasetLoop(stopCh <-chan struct{}
 		}
 		vrs, ok := acc.replicasetMap.Get(replicasetKey)
 		if ok {
-			pods, err := client.GetRSPods(acc.ls, vrs.Replicaset.ObjectMeta.Name)
+			pods, err := client.GetRSPods(acc.ls, vrs.Replicaset.ObjectMeta.Name, vrs.Replicaset.UID)
 			if err != nil {
 				goto StepEnd
 			}

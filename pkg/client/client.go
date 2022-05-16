@@ -32,13 +32,12 @@ func DefaultClientConfig() Config {
 /******************************Pod*******************************/
 
 func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) error {
-	id := uuid.New()
-
-	podName := rs.Spec.Template.Name + id.String()
-	attachURL := "/registry/pod/default/" + podName
+	podUID := uuid.New().String()
+	attachURL := "/registry/pod/default/" + rs.Spec.Template.Name + podUID
 
 	pod, _ := GetPodFromRS(rs)
-	pod.Name = podName
+	pod.Name = rs.Spec.Template.Name
+	pod.UID = podUID
 	podRaw, _ := json.Marshal(pod)
 	reqBody := bytes.NewBuffer(podRaw)
 
@@ -61,7 +60,7 @@ func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) erro
 }
 
 func (r RESTClient) UpdatePods(pod *object.Pod) error {
-	attachURL := "/registry/pod/default/" + pod.Name
+	attachURL := "/registry/pod/default/" + pod.Name + pod.UID
 	err := Put(r.Base+attachURL, pod)
 	if err != nil {
 		return err
@@ -69,8 +68,8 @@ func (r RESTClient) UpdatePods(pod *object.Pod) error {
 	return nil
 }
 
-func (r RESTClient) DeletePod(podName string) error {
-	attachURL := "/registry/pod/default/" + podName
+func (r RESTClient) DeletePod(podName string, podUID string) error {
+	attachURL := "/registry/pod/default/" + podName + podUID
 	err := Del(r.Base + attachURL)
 	return err
 }
@@ -83,14 +82,15 @@ func GetPodFromRS(rs *object.ReplicaSet) (*object.Pod, error) {
 	owner := object.OwnerReference{
 		Kind:       object.ReplicaSetKind,
 		Name:       rs.Name,
+		UID:        rs.UID,
 		Controller: true,
 	}
 	pod.OwnerReferences = append(pod.OwnerReferences, owner)
 	return pod, nil
 }
 
-func (r RESTClient) GetPod(name string) (*object.Pod, error) {
-	attachUrl := "/registry/pod/default/" + name
+func (r RESTClient) GetPod(name string, podUID string) (*object.Pod, error) {
+	attachUrl := "/registry/pod/default/" + name + podUID
 	resp, err := Get(r.Base + attachUrl)
 	if err != nil {
 		return nil, err
@@ -105,8 +105,8 @@ func (r RESTClient) GetPod(name string) (*object.Pod, error) {
 
 /********************************RS*****************************/
 
-func GetRS(ls *listerwatcher.ListerWatcher, name string) (*object.ReplicaSet, error) {
-	attachURL := "/registry/rs/default/" + name
+func GetRS(ls *listerwatcher.ListerWatcher, name string, UID string) (*object.ReplicaSet, error) {
+	attachURL := "/registry/rs/default/" + name + UID
 
 	raw, err := ls.List(attachURL)
 	if err != nil {
@@ -128,7 +128,7 @@ func GetRS(ls *listerwatcher.ListerWatcher, name string) (*object.ReplicaSet, er
 	return result, nil
 }
 
-func GetRSPods(ls *listerwatcher.ListerWatcher, name string) ([]*object.Pod, error) {
+func GetRSPods(ls *listerwatcher.ListerWatcher, name string, UID string) ([]*object.Pod, error) {
 	raw, err := ls.List("/registry/pod/default")
 
 	var pods []*object.Pod
@@ -141,7 +141,7 @@ func GetRSPods(ls *listerwatcher.ListerWatcher, name string) ([]*object.Pod, err
 	for _, rawPod := range raw {
 		pod := &object.Pod{}
 		err = json.Unmarshal(rawPod.ValueBytes, &pod)
-		if ownBy(pod.OwnerReferences, name) {
+		if ownBy(pod.OwnerReferences, name, UID) {
 			pods = append(pods, pod)
 		}
 	}
@@ -154,37 +154,37 @@ func GetRSPods(ls *listerwatcher.ListerWatcher, name string) ([]*object.Pod, err
 
 }
 
-func (r RESTClient) DeleteRS(rsName string) error {
-	attachURL := "/registry/rs/default/" + rsName
+func (r RESTClient) DeleteRS(rsName string, UID string) error {
+	attachURL := "/registry/rs/default/" + rsName + UID
 	fmt.Printf("delete rs:" + attachURL + "\n")
 	err := Del(r.Base + attachURL)
 	return err
 }
 
-func ownBy(ownerReferences []object.OwnerReference, owner string) bool {
+func ownBy(ownerReferences []object.OwnerReference, owner string, UID string) bool {
 	for _, ref := range ownerReferences {
-		if ref.Name == owner {
+		if ref.Name == owner && ref.UID == UID {
 			return true
 		}
 	}
 	return false
 }
 
-func OwnByRs(pod *object.Pod) (bool, string) {
+func OwnByRs(pod *object.Pod) (exist bool, name string, UID string) {
 	ownerReferences := pod.OwnerReferences
 	if len(ownerReferences) == 0 {
-		return false, ""
+		return false, "", ""
 	}
 
 	// unmarshal and filter by ownership
 	for _, owner := range ownerReferences {
 		if owner.Kind == object.ReplicaSetKind {
 			fmt.Printf("[OwnByRs] owner:%v\n", owner.Name)
-			return true, owner.Name
+			return true, owner.Name, owner.UID
 		}
 	}
 
-	return false, ""
+	return false, "", ""
 }
 
 /********************************Node*****************************/
