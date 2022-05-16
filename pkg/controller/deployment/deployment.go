@@ -139,7 +139,7 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 				OwnerReferences: []object.OwnerReference{{
 					Kind:       "Deployment",
 					Name:       deployment.Metadata.Name,
-					UID:        "",
+					UID:        deployment.Metadata.UID,
 					Controller: false,
 				}},
 			},
@@ -161,16 +161,28 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 			fmt.Println(deployment)
 			surge := *deployment.Spec.Strategy.RollingUpdate.MaxSurge
 			replicas := deployment.Spec.Replicas
-			vs, ok := dc.replicasetMap.Get(rsKeyOld)
+			vs, isOldRSExist := dc.replicasetMap.Get(rsKeyOld)
 			var decreaseOldDone, increaseNewDone bool
 			increaseNewDone = false
 			var rsOld object.ReplicaSet
-			if !ok {
+			if !isOldRSExist {
+				// old replicaset doesn't exist
 				decreaseOldDone = true
 			} else {
 				rsOld = vs.Replicaset
 				decreaseOldDone = rsOld.Spec.Replicas <= 0
 			}
+
+			// clear old replicaset's owner
+			if isOldRSExist && !decreaseOldDone {
+				rsOld.OwnerReferences = []object.OwnerReference{}
+				err = client.Put(dc.apiServerBase+rsKeyOld, rsOld)
+				if err != nil {
+					klog.Errorf("%s\n", err.Error())
+				}
+			}
+
+			// create new replicaset and set its owner
 			rsNew := object.ReplicaSet{
 				ObjectMeta: object.ObjectMeta{
 					Name:   deployment.Metadata.Name,
@@ -198,6 +210,8 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 			if err != nil {
 				klog.Errorf("%s\n", err.Error())
 			}
+
+			dc.dm2rs.Put(res.Key, rsKeyNew)
 			increaseNewDone = rsNew.Spec.Replicas == replicas
 			decreaseOldDone = rsOld.Spec.Replicas == 0
 

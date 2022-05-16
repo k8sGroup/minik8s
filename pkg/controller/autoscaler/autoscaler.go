@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"minik8s/cmd/kube-controller-manager/util"
 	"minik8s/cmd/kubectl/app"
 	"minik8s/object"
@@ -22,6 +23,17 @@ const (
 	replicaset scalableType = "replicaset"
 	deployment scalableType = "deployment"
 )
+
+type cpuPercentage float64
+type memoryPercentage float64
+
+type metricHandler struct {
+	calculateFunc calculateStatus
+	upperBound    float64
+	lowerBound    float64
+}
+
+type calculateStatus func(statusList []resourceStatus) (cpuPercentage, memoryPercentage)
 
 type scalableObject struct {
 	kind scalableType
@@ -49,6 +61,7 @@ type AutoscalerController struct {
 	replicasetMap     *concurrentmap.ConcurrentMapTrait[string, object.VersionedReplicaset]
 	autoscalerMap     *concurrentmap.ConcurrentMapTrait[string, object.VersionedAutoscaler]
 	object2autoscaler *concurrentmap.ConcurrentMapTrait[scalableObject, stringAndChan] // mapping an object key to the autoscaler key
+	apiServerBase     string
 }
 
 func NewAutoscalerController(ctx context.Context, controllerCtx util.ControllerContext) *AutoscalerController {
@@ -63,6 +76,7 @@ func NewAutoscalerController(ctx context.Context, controllerCtx util.ControllerC
 		replicasetMap:     concurrentmap.NewConcurrentMapTrait[string, object.VersionedReplicaset](),
 		autoscalerMap:     concurrentmap.NewConcurrentMapTrait[string, object.VersionedAutoscaler](),
 		object2autoscaler: concurrentmap.NewConcurrentMapTrait[scalableObject, stringAndChan](),
+		apiServerBase:     "http://" + controllerCtx.MasterIP + ":" + controllerCtx.HttpServerPort,
 	}
 	return ac
 }
@@ -247,8 +261,29 @@ func (acc *AutoscalerController) handleAutoscalerPut(autoscalerKey string, vac o
 		klog.Errorf("%s\n", err.Error())
 		return
 	}
+	calculateFuncMap := make(map[string]metricHandler)
+	for _, metric := range vac.Autoscaler.Spec.Metrics {
+		if metric.Name == object.MetricCPU || metric.Name == object.MetricMemory {
+			switch metric.Strategy {
+			case object.MetricMax:
+				calculateFuncMap[metric.Name] = metricHandler{
+					calculateFunc: calculateMaxStatus,
+					upperBound:    float64(metric.Percentage) / 100,
+				}
+				break
+			case object.MetricAverage:
+				calculateFuncMap[metric.Name] = metricHandler{
+					calculateFunc: calculateAverageStatus,
+					upperBound:    float64(metric.Percentage) / 100,
+				}
+				break
+			default:
+				break
+			}
+		}
+	}
 	var ok bool
-	var monitoringLoop func(stopCh <-chan struct{}, deploymentKey string)
+	var monitoringLoop func(stopCh <-chan struct{}, deploymentKey string, calculateFuncMap map[string]metricHandler, maxReplicas int32, minReplicas int32)
 	switch scalableObj.kind {
 	case deployment:
 		_, ok = acc.deploymentMap.Get(scalableObj.key)
@@ -276,10 +311,10 @@ func (acc *AutoscalerController) handleAutoscalerPut(autoscalerKey string, vac o
 	}
 	acc.autoscalerMap.Put(autoscalerKey, vac)
 	acc.object2autoscaler.Put(scalableObj, autoscalerMeta)
-	go monitoringLoop(stopChan, scalableObj.key)
+	go monitoringLoop(stopChan, scalableObj.key, calculateFuncMap, vac.Autoscaler.Spec.MaxReplicas, vac.Autoscaler.Spec.MinReplicas)
 }
 
-func (acc *AutoscalerController) monitoringDeploymentLoop(stopCh <-chan struct{}, deploymentKey string) {
+func (acc *AutoscalerController) monitoringDeploymentLoop(stopCh <-chan struct{}, deploymentKey string, calculateFuncMap map[string]metricHandler, maxReplicas int32, minReplicas int32) {
 	for {
 		select {
 		case <-stopCh:
@@ -294,13 +329,55 @@ func (acc *AutoscalerController) monitoringDeploymentLoop(stopCh <-chan struct{}
 				And at a particular point in time, one deployment may have more than one replicaset.
 				They all have the same name but different keys.
 			*/
-			pods, err := client.GetRSPods(acc.ls, vdm.Deployment.Metadata.Name)
+			rs, rsExist := getControlledRS(vdm.Deployment, acc.replicasetMap.SnapShot())
+			if !rsExist {
+				goto StepEnd
+			}
+			pods, err := client.GetRSPods(acc.ls, rs.ObjectMeta.Name)
+			if err != nil {
+				goto StepEnd
+			}
+			podStatusList := acc.getPodsResourcePercentage(pods)
+
+			var cpu, cpuUpperBound, cpuLowerBound cpuPercentage
+			var memory, memoryUpperBound, memoryLowerBound memoryPercentage
+			var cpuMetric, memoryMetric bool
+			var handler metricHandler
+
+			if handler, cpuMetric = calculateFuncMap[object.MetricCPU]; cpuMetric {
+				cpu, _ = handler.calculateFunc(podStatusList)
+				cpuUpperBound = cpuPercentage(handler.upperBound)
+			}
+			if handler, memoryMetric = calculateFuncMap[object.MetricMemory]; memoryMetric {
+				_, memory = handler.calculateFunc(podStatusList)
+				memoryUpperBound = memoryPercentage(handler.upperBound)
+			}
+
+			rsKey := "/registry/rs/default/" + rs.Name + rs.UID
+			if (cpuMetric && cpu > cpuUpperBound) || (memoryMetric && memory > memoryUpperBound) {
+				rs.Spec.Replicas += 1
+				if rs.Spec.Replicas <= maxReplicas {
+					err = client.Put(acc.apiServerBase+rsKey, rs)
+					if err != nil {
+						goto StepEnd
+					}
+				}
+			} else if (cpuMetric && cpu < cpuLowerBound) && (memoryMetric && memory < memoryLowerBound) {
+				rs.Spec.Replicas -= 1
+				if rs.Spec.Replicas >= minReplicas {
+					err = client.Put(acc.apiServerBase+rsKey, rs)
+					if err != nil {
+						goto StepEnd
+					}
+				}
+			}
 		}
+	StepEnd:
 		time.Sleep(acc.scaleInterval)
 	}
 }
 
-func (acc *AutoscalerController) monitoringReplicasetLoop(stopCh <-chan struct{}, replicasetKey string) {
+func (acc *AutoscalerController) monitoringReplicasetLoop(stopCh <-chan struct{}, replicasetKey string, calculateFuncMap map[string]metricHandler, maxReplicas int32, minReplicas int32) {
 	for {
 		select {
 		case <-stopCh:
@@ -309,16 +386,90 @@ func (acc *AutoscalerController) monitoringReplicasetLoop(stopCh <-chan struct{}
 		}
 		vrs, ok := acc.replicasetMap.Get(replicasetKey)
 		if ok {
-			// TODO
 			pods, err := client.GetRSPods(acc.ls, vrs.Replicaset.ObjectMeta.Name)
 			if err != nil {
-				goto ErrorHandle
+				goto StepEnd
 			}
-			statusList := acc.getPodsResourcePercentage(pods)
+			podStatusList := acc.getPodsResourcePercentage(pods)
+
+			var cpu, cpuUpperBound, cpuLowerBound cpuPercentage
+			var memory, memoryUpperBound, memoryLowerBound memoryPercentage
+			var cpuMetric, memoryMetric bool
+			var handler metricHandler
+
+			if handler, cpuMetric = calculateFuncMap[object.MetricCPU]; cpuMetric {
+				cpu, _ = handler.calculateFunc(podStatusList)
+				cpuUpperBound = cpuPercentage(handler.upperBound)
+			}
+			if handler, memoryMetric = calculateFuncMap[object.MetricMemory]; memoryMetric {
+				_, memory = handler.calculateFunc(podStatusList)
+				memoryUpperBound = memoryPercentage(handler.upperBound)
+			}
+
+			rsKey := "/registry/rs/default/" + vrs.Replicaset.Name + vrs.Replicaset.UID
+			if (cpuMetric && cpu > cpuUpperBound) || (memoryMetric && memory > memoryUpperBound) {
+				vrs.Replicaset.Spec.Replicas += 1
+				if vrs.Replicaset.Spec.Replicas <= maxReplicas {
+					err = client.Put(acc.apiServerBase+rsKey, vrs.Replicaset)
+					if err != nil {
+						goto StepEnd
+					}
+				}
+			} else if (cpuMetric && cpu < cpuLowerBound) && (memoryMetric && memory < memoryLowerBound) {
+				vrs.Replicaset.Spec.Replicas -= 1
+				if vrs.Replicaset.Spec.Replicas >= minReplicas {
+					err = client.Put(acc.apiServerBase+rsKey, vrs.Replicaset)
+					if err != nil {
+						goto StepEnd
+					}
+				}
+			}
 		}
-	ErrorHandle:
+	StepEnd:
 		time.Sleep(acc.scaleInterval)
 	}
+}
+
+func getControlledRS(deployment object.Deployment, rsMap map[string]object.VersionedReplicaset) (object.ReplicaSet, bool) {
+	versionedRS := object.VersionedReplicaset{
+		Version: 0,
+	}
+	for _, vrs := range rsMap {
+		for _, owner := range vrs.Replicaset.OwnerReferences {
+			if owner.UID == deployment.Metadata.UID && owner.Name == deployment.Metadata.Name && vrs.Version >= versionedRS.Version {
+				versionedRS = vrs
+			}
+		}
+	}
+	if versionedRS.Version == 0 {
+		return versionedRS.Replicaset, false
+	} else {
+		return versionedRS.Replicaset, true
+	}
+}
+
+func calculateMaxStatus(statusList []resourceStatus) (cpuPercentage, memoryPercentage) {
+	var cpu float64 = 0
+	var memory float64 = 0
+	for _, status := range statusList {
+		cpu = math.Max(cpu, status.cpu)
+		memory = math.Max(memory, status.memory)
+	}
+	return cpuPercentage(cpu), memoryPercentage(memory)
+}
+
+func calculateAverageStatus(statusList []resourceStatus) (cpuPercentage, memoryPercentage) {
+	var cpu float64 = 0
+	var memory float64 = 0
+	length := len(statusList)
+	if length == 0 {
+		return 0, 0
+	}
+	for _, status := range statusList {
+		cpu += status.cpu
+		memory += status.memory
+	}
+	return cpuPercentage(cpu / float64(length)), memoryPercentage(memory / float64(length))
 }
 
 func (acc *AutoscalerController) getPodsResourcePercentage(pods []*object.Pod) []resourceStatus {
@@ -328,25 +479,25 @@ func (acc *AutoscalerController) getPodsResourcePercentage(pods []*object.Pod) [
 		var err error
 		var status resourceStatus
 		if pod == nil {
-			goto ErrorHandle
+			goto StepEnd
 		}
 		status.metadata = pod.ObjectMeta
 
-		utilization, err = acc.promClient.GetResource(object.CPU_RESOURCE, pod.Spec.NodeName, pod.Name, nil)
+		utilization, err = acc.promClient.GetResource(object.CPU_RESOURCE, pod.Name, pod.UID, nil)
 		if err != nil || utilization == nil {
-			goto ErrorHandle
+			goto StepEnd
 		}
 		status.cpu = *utilization
 
-		utilization, err = acc.promClient.GetResource(object.MEMORY_RESOURCE, pod.Spec.NodeName, pod.Name, nil)
+		utilization, err = acc.promClient.GetResource(object.MEMORY_RESOURCE, pod.Name, pod.UID, nil)
 		if err != nil || utilization == nil {
-			goto ErrorHandle
+			goto StepEnd
 		}
 		status.memory = *utilization
 
 		statusList = append(statusList, status)
 
-	ErrorHandle:
+	StepEnd:
 		continue
 	}
 	return statusList
