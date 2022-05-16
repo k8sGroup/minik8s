@@ -1,4 +1,4 @@
-package options
+package controllers
 
 import (
 	"github.com/spf13/pflag"

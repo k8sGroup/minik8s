@@ -2,6 +2,7 @@ package etcdstore
 
 import (
 	"context"
+	"fmt"
 	etcd "go.etcd.io/etcd/client/v3"
 	"minik8s/pkg/klog"
 	"time"
@@ -17,6 +18,10 @@ const (
 	DELETE WatchResType = 1
 )
 
+type String interface {
+	ToString() string
+}
+
 type WatchRes struct {
 	ResType         WatchResType
 	ResourceVersion int64
@@ -27,11 +32,19 @@ type WatchRes struct {
 	ValueBytes      []byte
 }
 
+func (w WatchRes) ToString() string {
+	return fmt.Sprintf("key\t\t\t%s\nresource version\t%d\ncreate version\t\t%d\ndata\t\t\t%s\n", w.Key, w.ResourceVersion, w.CreateVersion, string(w.ValueBytes))
+}
+
 type ListRes struct {
 	ResourceVersion int64
 	CreateVersion   int64
 	Key             string
 	ValueBytes      []byte
+}
+
+func (l ListRes) ToString() string {
+	return fmt.Sprintf("key\t\t\t%s\nresource version\t%d\ncreate version\t\t%d\ndata\t\t\t%s\n", l.Key, l.ResourceVersion, l.CreateVersion, string(l.ValueBytes))
 }
 
 func NewEtcdStore(endpoints []string, timeout time.Duration) (*Store, error) {

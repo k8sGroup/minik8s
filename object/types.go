@@ -19,6 +19,7 @@ const (
 type ObjectMeta struct {
 	Name   string            `json:"name" yaml:"name"`
 	Labels map[string]string `json:"labels" yaml:"labels"`
+	UID    string            `json:"uid" yaml:"uid"`
 
 	OwnerReferences []OwnerReference `json:"ownerReferences" yaml:"ownerReferences"`
 	Ctime           string
@@ -98,7 +99,7 @@ type Volume struct {
 }
 
 type Container struct {
-	Name         string        `json:"path" yaml:"name"`
+	Name         string        `json:"name" yaml:"name"`
 	Image        string        `json:"image" yaml:"image"`
 	Command      []string      `json:"command" yaml:"command"`
 	Args         []string      `json:"args" yaml:"args"`

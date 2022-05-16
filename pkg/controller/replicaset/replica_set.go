@@ -82,7 +82,6 @@ func (rsc *ReplicaSetController) worker(ctx context.Context) {
 		} else {
 			time.Sleep(time.Second)
 		}
-		klog.Infof("do some work\n")
 	}
 }
 
@@ -150,7 +149,7 @@ func (rsc *ReplicaSetController) podOperation(res etcdstore.WatchRes) {
 	isOwned, name := client.OwnByRs(pod)
 	if isOwned {
 		rs, err := client.GetRS(rsc.ls, name)
-		fmt.Printf("[podOperation] rs:%v owns:%v\n", rs.Name, pod.Name)
+		//fmt.Printf("[podOperation] rs:%v owns:%v\n", rs.Name, pod.Name)
 		if err == nil {
 			// encode object to key
 			key := getKey(rs)

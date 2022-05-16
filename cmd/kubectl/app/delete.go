@@ -15,12 +15,17 @@ var (
 	flagsDel flags
 
 	cmdDel = &cobra.Command{
-		Use:   "del <resource>",
-		Short: "delete resource with flags",
-		Args:  cobra.ExactArgs(1),
+		Use:   "del <resource> <resource-name>",
+		Short: "delete resource",
+		Args:  cobra.ExactArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
 			resource := args[0]
-			url := baseUrl + fmt.Sprintf("/registry/%s/%s/%s", resource, flagsDel.namespace, flagsDel.name)
+			resourceName := args[1]
+			if !commandLineResource.Contains(resource) {
+				fmt.Println("Unknown resource " + resource)
+				return
+			}
+			url := baseUrl + fmt.Sprintf("/registry/%s/default/%s", resource, resourceName)
 			err := client.Del(url)
 			if err != nil {
 				fmt.Println(err.Error())
@@ -33,7 +38,4 @@ var (
 
 func init() {
 	rootCmd.AddCommand(cmdDel)
-	cmdDel.Flags().StringVarP(&flagsDel.namespace, "namespace", "n", "default", "namespace for a specific resource")
-	cmdDel.Flags().StringVar(&flagsDel.name, "resource-name", "", "resource name")
-	_ = cmdDel.MarkFlagRequired("resource-name")
 }
