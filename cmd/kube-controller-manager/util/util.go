@@ -9,5 +9,6 @@ type ControllerContext struct {
 	Ls             *listerwatcher.ListerWatcher
 	MasterIP       string
 	HttpServerPort string
+	PromServerPort string
 	Config         *config.CompletedConfig
 }

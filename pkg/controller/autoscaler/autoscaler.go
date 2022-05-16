@@ -8,6 +8,7 @@ import (
 	"minik8s/cmd/kube-controller-manager/util"
 	"minik8s/cmd/kubectl/app"
 	"minik8s/object"
+	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/listerwatcher"
@@ -27,6 +28,12 @@ type scalableObject struct {
 	key  string
 }
 
+type resourceStatus struct {
+	metadata object.ObjectMeta
+	memory   float64
+	cpu      float64
+}
+
 type stringAndChan struct {
 	key    string
 	stopCh chan<- struct{}
@@ -34,6 +41,7 @@ type stringAndChan struct {
 
 type AutoscalerController struct {
 	ls                *listerwatcher.ListerWatcher
+	promClient        *client.PromClient
 	stopChannel       chan struct{}
 	resyncInterval    time.Duration
 	scaleInterval     time.Duration
@@ -44,8 +52,10 @@ type AutoscalerController struct {
 }
 
 func NewAutoscalerController(ctx context.Context, controllerCtx util.ControllerContext) *AutoscalerController {
+	promBase := fmt.Sprintf("http://%s:%s", controllerCtx.MasterIP, controllerCtx.PromServerPort)
 	ac := &AutoscalerController{
 		ls:                controllerCtx.Ls,
+		promClient:        client.NewPromClient(promBase),
 		stopChannel:       make(chan struct{}),
 		resyncInterval:    time.Duration(controllerCtx.Config.ResyncIntervals) * time.Second,
 		scaleInterval:     time.Duration(controllerCtx.Config.ScaleIntervals) * time.Second,
@@ -232,10 +242,31 @@ func (acc *AutoscalerController) watchReplicaset(res etcdstore.WatchRes) {
 }
 
 func (acc *AutoscalerController) handleAutoscalerPut(autoscalerKey string, vac object.VersionedAutoscaler) {
-	acc.autoscalerMap.Put(autoscalerKey, vac)
 	scalableObj, err := autoscaler2ScalableObject(vac)
 	if err != nil {
 		klog.Errorf("%s\n", err.Error())
+		return
+	}
+	var ok bool
+	var monitoringLoop func(stopCh <-chan struct{}, deploymentKey string)
+	switch scalableObj.kind {
+	case deployment:
+		_, ok = acc.deploymentMap.Get(scalableObj.key)
+		if !ok {
+			return
+		} else {
+			monitoringLoop = acc.monitoringDeploymentLoop
+		}
+		break
+	case replicaset:
+		_, ok = acc.replicasetMap.Get(scalableObj.key)
+		if !ok {
+			return
+		} else {
+			monitoringLoop = acc.monitoringReplicasetLoop
+		}
+		break
+	default:
 		return
 	}
 	stopChan := make(chan struct{})
@@ -243,21 +274,82 @@ func (acc *AutoscalerController) handleAutoscalerPut(autoscalerKey string, vac o
 		key:    autoscalerKey,
 		stopCh: stopChan,
 	}
+	acc.autoscalerMap.Put(autoscalerKey, vac)
 	acc.object2autoscaler.Put(scalableObj, autoscalerMeta)
-	go func(stopCh <-chan struct{}) {
-		for {
-			select {
-			case <-stopChan:
-				return
-			default:
-			}
-			//TODO : do something to scale out or scale down
-			{
+	go monitoringLoop(stopChan, scalableObj.key)
+}
 
-			}
-			time.Sleep(acc.scaleInterval)
+func (acc *AutoscalerController) monitoringDeploymentLoop(stopCh <-chan struct{}, deploymentKey string) {
+	for {
+		select {
+		case <-stopCh:
+			return
+		default:
 		}
-	}(stopChan)
+		vdm, ok := acc.deploymentMap.Get(deploymentKey)
+		if ok {
+			/*
+				The reason for using deployment here is that the replicaset which is controlled by a deployment
+				has the same name as its owner deployment's name.
+				And at a particular point in time, one deployment may have more than one replicaset.
+				They all have the same name but different keys.
+			*/
+			pods, err := client.GetRSPods(acc.ls, vdm.Deployment.Metadata.Name)
+		}
+		time.Sleep(acc.scaleInterval)
+	}
+}
+
+func (acc *AutoscalerController) monitoringReplicasetLoop(stopCh <-chan struct{}, replicasetKey string) {
+	for {
+		select {
+		case <-stopCh:
+			return
+		default:
+		}
+		vrs, ok := acc.replicasetMap.Get(replicasetKey)
+		if ok {
+			// TODO
+			pods, err := client.GetRSPods(acc.ls, vrs.Replicaset.ObjectMeta.Name)
+			if err != nil {
+				goto ErrorHandle
+			}
+			statusList := acc.getPodsResourcePercentage(pods)
+		}
+	ErrorHandle:
+		time.Sleep(acc.scaleInterval)
+	}
+}
+
+func (acc *AutoscalerController) getPodsResourcePercentage(pods []*object.Pod) []resourceStatus {
+	var statusList []resourceStatus
+	for _, pod := range pods {
+		var utilization *float64
+		var err error
+		var status resourceStatus
+		if pod == nil {
+			goto ErrorHandle
+		}
+		status.metadata = pod.ObjectMeta
+
+		utilization, err = acc.promClient.GetResource(object.CPU_RESOURCE, pod.Spec.NodeName, pod.Name, nil)
+		if err != nil || utilization == nil {
+			goto ErrorHandle
+		}
+		status.cpu = *utilization
+
+		utilization, err = acc.promClient.GetResource(object.MEMORY_RESOURCE, pod.Spec.NodeName, pod.Name, nil)
+		if err != nil || utilization == nil {
+			goto ErrorHandle
+		}
+		status.memory = *utilization
+
+		statusList = append(statusList, status)
+
+	ErrorHandle:
+		continue
+	}
+	return statusList
 }
 
 func (acc *AutoscalerController) handleAutoscalerDel(key string) {
