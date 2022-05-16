@@ -29,8 +29,7 @@ func NewControllerManagerCommand() *cobra.Command {
 }
 
 func Run(c *config.CompletedConfig) error {
-	controllerContext, err := CreateControllerContext()
-	controllerContext.Config = c
+	controllerContext, err := CreateControllerContext(c)
 	if err != nil {
 		return err
 	}
@@ -42,7 +41,7 @@ func Run(c *config.CompletedConfig) error {
 }
 
 // CreateControllerContext TODO: make global config variable
-func CreateControllerContext() (*util.ControllerContext, error) {
+func CreateControllerContext(c *config.CompletedConfig) (*util.ControllerContext, error) {
 	ls, err := listerwatcher.NewListerWatcher(listerwatcher.DefaultConfig())
 	if err != nil {
 		return nil, err
@@ -51,6 +50,8 @@ func CreateControllerContext() (*util.ControllerContext, error) {
 		Ls:             ls,
 		MasterIP:       "127.0.0.1",
 		HttpServerPort: "8080",
+		PromServerPort: "9090",
+		Config:         c,
 	}
 	return controllerContext, nil
 }

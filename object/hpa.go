@@ -1,15 +1,22 @@
 package object
 
+const (
+	MetricCPU     string = "cpu"
+	MetricMemory  string = "memory"
+	MetricMax     string = "max"
+	MetricAverage string = "average"
+)
+
 type Autoscaler struct {
 	Metadata ObjectMeta `json:"metadata" yaml:"metadata"`
 	Spec     HPASpec    `json:"spec" yaml:"spec"`
 }
 
 type HPASpec struct {
-	ScaleTargetRef HPARef  `json:"scaleTargetRef" yaml:"scaleTargetRef"`
-	MinReplicas    int32   `json:"minReplicas" yaml:"minReplicas"`
-	MaxReplicas    int32   `json:"maxReplicas" yaml:"maxReplicas"`
-	Metrics        Metrics `json:"metrics" yaml:"metrics"`
+	ScaleTargetRef HPARef   `json:"scaleTargetRef" yaml:"scaleTargetRef"`
+	MinReplicas    int32    `json:"minReplicas" yaml:"minReplicas"`
+	MaxReplicas    int32    `json:"maxReplicas" yaml:"maxReplicas"`
+	Metrics        []Metric `json:"metrics" yaml:"metrics"`
 }
 
 type HPARef struct {
@@ -18,16 +25,8 @@ type HPARef struct {
 	Name string `json:"name" yaml:"name"`
 }
 
-type Metrics struct {
-	Cpu    *CpuMetric    `json:"cpu" yaml:"cpu"`       // this field could be nil !
-	Memory *MemoryMetric `json:"memory" json:"memory"` // this field could be nil !
-}
-
-type CpuMetric struct {
-	AverageUtilization int32 `json:"averageUtilization" yaml:"averageUtilization"`
-}
-
-type MemoryMetric struct {
-	// example : 100mb 100MB 1gb 1GB
-	AverageUsage string `json:"averageUsage" yaml:"averageUsage"`
+type Metric struct {
+	Name       string `json:"name" yaml:"name"`             // MetricCPU or MetricMemory
+	Strategy   string `json:"strategy" yaml:"strategy"`     // MetricMax or MetricAverage
+	Percentage int32  `json:"percentage" yaml:"percentage"` // percentage/100
 }
