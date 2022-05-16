@@ -103,7 +103,7 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 	{
 		// user operation
 		engine.PUT(config.UserPodPath, s.userAddPod)
-		engine.PUT(config.UserRSPath, s.userAddPod)
+		engine.PUT(config.UserRSPath, s.userAddRS)
 	}
 
 	go s.daemon(watcherChan)

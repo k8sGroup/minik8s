@@ -84,33 +84,33 @@ func (s *Server) deleteRS(ctx *gin.Context) {
 }
 
 // just for user to do some operation
+// user add pod has unique name as the key, but also need to make uuid for other use
 func (s *Server) userAddPod(ctx *gin.Context) {
-	key := strings.Trim(ctx.Request.URL.Path, "/user")
-	uuid := uuid.New().String()
-	key += uuid
+	key := strings.TrimPrefix(ctx.Request.URL.Path, "/user")
+	uid := uuid.New().String()
 	body, err := ioutil.ReadAll(ctx.Request.Body)
 	pod := object.Pod{}
 	err = json.Unmarshal(body, &pod)
-	pod.UID = uuid
+	pod.UID = uid
 	if err != nil {
 		fmt.Printf("[deletePod] pod unmarshal fail\n")
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
 	body, _ = json.Marshal(pod)
+	fmt.Printf("key:%v\n", key)
 
 	err = s.store.Put(key, body)
 }
 
 // just for user to do some operation
 func (s *Server) userAddRS(ctx *gin.Context) {
-	key := strings.Trim(ctx.Request.URL.Path, "/user")
-	uuid := uuid.New().String()
-	key += uuid
+	key := strings.TrimPrefix(ctx.Request.URL.Path, "/user")
+	uid := uuid.New().String()
 	body, err := ioutil.ReadAll(ctx.Request.Body)
 	rs := object.ReplicaSet{}
 	err = json.Unmarshal(body, &rs)
-	rs.UID = uuid
+	rs.UID = uid
 	if err != nil {
 		fmt.Printf("[deletePod] pod unmarshal fail\n")
 		ctx.AbortWithStatus(http.StatusBadRequest)

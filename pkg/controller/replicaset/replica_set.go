@@ -190,12 +190,6 @@ func calculateStatus(rs *object.ReplicaSet, filteredPods []*object.Pod) object.R
 	return newStatus
 }
 
-// ge related pods to replicaset
-//func (rsc *ReplicaSetController) getRelatedPods(rs *object.ReplicaSet) ([]*object.Pod, error) {
-//	var relatedPods []*object.Pod
-//	return relatedPods, nil
-//}
-
 // choose pods to be deleted
 // simple policy
 func getPodsToDelete(filteredPods []*object.Pod, diff int) []*object.Pod {
