@@ -100,6 +100,11 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 		engine.GET(config.NODE_PREFIX, s.prefixGet)
 		engine.POST(config.NODE_PREFIX, s.prefixWatch)
 	}
+	{
+		// user operation
+		engine.PUT(config.UserPodPath, s.userAddPod)
+		engine.PUT(config.UserRSPath, s.userAddPod)
+	}
 
 	go s.daemon(watcherChan)
 

@@ -38,6 +38,11 @@ const ParamResourceName = "resourceName"
 const ParamType = "type"
 const NODE_NAME = "name"
 
+// UserPath is the API only for user operation
+// key is the path cutting user, and add uuid
+const UserPodPath = "/user/registry/pod/:namespace/:resourceName"
+const UserRSPath = "/user/registry/rs/:namespace/:resourceName"
+
 // path for kube client
 const (
 	RS          = "/registry/rs/default/:resourceName"

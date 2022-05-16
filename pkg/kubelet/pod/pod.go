@@ -87,7 +87,7 @@ type PodSnapShoot struct {
 func NewPodfromConfig(config *object.Pod) *Pod {
 	newPod := &Pod{}
 	newPod.name = config.ObjectMeta.Name
-	newPod.uid = uuid.NewV4().String()
+	newPod.uid = config.UID
 	newPod.ctime = time.Now().String()
 	newPod.canProbeWork = true
 	newPod.Label = config.ObjectMeta.Labels
@@ -443,6 +443,12 @@ func (p *Pod) GetName() string {
 	defer p.rwLock.RUnlock()
 	deepName := p.name
 	return deepName
+}
+
+func (p *Pod) GetUID() string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.uid
 }
 
 func (p *Pod) GetLabels() map[string]string {

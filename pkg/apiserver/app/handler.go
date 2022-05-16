@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"io/ioutil"
 	"minik8s/object"
 	"minik8s/pkg/apiserver/config"
 	"net/http"
+	"strings"
 )
 
 // do not delete pod in etcd directly, just modify the status
@@ -78,4 +81,41 @@ func (s *Server) deleteRS(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusBadRequest)
 	}
 	ctx.Status(http.StatusOK)
+}
+
+// just for user to do some operation
+func (s *Server) userAddPod(ctx *gin.Context) {
+	key := strings.Trim(ctx.Request.URL.Path, "/user")
+	uuid := uuid.New().String()
+	key += uuid
+	body, err := ioutil.ReadAll(ctx.Request.Body)
+	pod := object.Pod{}
+	err = json.Unmarshal(body, &pod)
+	pod.UID = uuid
+	if err != nil {
+		fmt.Printf("[deletePod] pod unmarshal fail\n")
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	body, _ = json.Marshal(pod)
+
+	err = s.store.Put(key, body)
+}
+
+// just for user to do some operation
+func (s *Server) userAddRS(ctx *gin.Context) {
+	key := strings.Trim(ctx.Request.URL.Path, "/user")
+	uuid := uuid.New().String()
+	key += uuid
+	body, err := ioutil.ReadAll(ctx.Request.Body)
+	rs := object.ReplicaSet{}
+	err = json.Unmarshal(body, &rs)
+	rs.UID = uuid
+	if err != nil {
+		fmt.Printf("[deletePod] pod unmarshal fail\n")
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	body, _ = json.Marshal(rs)
+	err = s.store.Put(key, body)
 }
