@@ -22,9 +22,9 @@ func NewPromClient(base string) *PromClient {
 }
 
 // GetResource  only support get cpu/memory used percentage of a pod
-func (c *PromClient) GetResource(resource object.Resource, nodeName string, podName string, tagPair *string) (*float64, error) {
+func (c *PromClient) GetResource(resource object.Resource, podName string, tagPair *string) (*float64, error) {
 	// make query url
-	url, err := c.makeQuery(resource, nodeName, podName, tagPair)
+	url, err := c.makeQuery(resource, podName, tagPair)
 	if err != nil || url == nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (c *PromClient) GetResource(resource object.Resource, nodeName string, podN
 	return val, err
 }
 
-func (c *PromClient) makeQuery(resource object.Resource, nodeName string, podName string, tagPair *string) (*string, error) {
+func (c *PromClient) makeQuery(resource object.Resource, podName string, tagPair *string) (*string, error) {
 	var resourceTag string
 	if resource == object.CPU_RESOURCE {
 		resourceTag = "cpu"
@@ -64,9 +64,9 @@ func (c *PromClient) makeQuery(resource object.Resource, nodeName string, podNam
 	var query string
 	// query=node_monitor{resource="cpu"}
 	if tagPair == nil {
-		query = fmt.Sprintf("query=node_monitor{resource=\"%s\",node=\"%s\",pod=\"%s\"}", resourceTag, nodeName, podName)
+		query = fmt.Sprintf("query=node_monitor{resource=\"%s\",pod=\"%s\"}", resourceTag, podName)
 	} else {
-		query = fmt.Sprintf("query=node_monitor{resource=\"%s\",node=\"%s\",pod=\"%s\",selector=\"%s\"}", resourceTag, nodeName, podName, *tagPair)
+		query = fmt.Sprintf("query=node_monitor{resource=\"%s\",pod=\"%s\",selector=\"%s\"}", resourceTag, podName, *tagPair)
 	}
 	url := c.Base + "/api/v1/query?" + query
 	return &url, nil
