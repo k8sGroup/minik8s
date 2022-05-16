@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"minik8s/pkg/client"
+	"minik8s/pkg/iptables"
 	"os"
 	"path"
 	"path/filepath"
@@ -16,17 +16,45 @@ func GetProjectAbsPath() (projectAbsPath string) {
 	return projectAbsPath
 }
 func main() {
-	clientConfig := client.Config{Host: "192.168.1.7:8080"}
-	restClient := client.RESTClient{
-		Base: "http://" + clientConfig.Host,
+	ipt, err := iptables.New()
+	if err != nil {
+		fmt.Println("ERROR")
+		fmt.Println(err)
 	}
-	ress, err := client.Get(restClient.Base + "/registry/node/default")
+	//create HONG-SEP chain
+
+	//err = ipt.NewChain("nat", "HONG-SEP")
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+	err = ipt.Append("nat", "HONG-SEP", "-s", "0/0", "-d", "0/0", "-p", "tcp", "-j", "DNAT", "--to-destination", "172.17.43.2:80")
 	if err != nil {
 		fmt.Println(err)
-	} else {
-		for _, res := range ress {
-			fmt.Println(string(res.ValueBytes), res.Key)
-		}
-
 	}
+
+	//create HONG-SVC chain
+	//err = ipt.NewChain("nat", "HONG-SVC")
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+	//err = ipt.Append("nat", "HONG-SVC", "-s", "0/0", "-d", "0/0", "-p", "all", "-j", "HONG-SEP")
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+
+	//create HONG-SERVICE chain
+	//err = ipt.NewChain("nat", "HONG-SERVICE")
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+	//err = ipt.Append("nat", "HONG-SERVICE", "-s", "0/0", "-d", "10.12.34.45", "-p", "all", "-j", "HONG-SVC")
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+	//add into OUTPUT chain
+	//err = ipt.Insert("nat", "PREROUTING", 1, "-j", "HONG-SERVICE", "-s", "0/0", "-d", "0/0", "-p", "all")
+	//err = ipt.Delete("nat", "OUTPUT", "-j", "HONG-SERVICE", "-s", "0/0", "-d", "0/0", "-p", "all")
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
 }
