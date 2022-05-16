@@ -23,14 +23,14 @@ func TestUnmarshalProm(t *testing.T) {
 func TestGetResource(t *testing.T) {
 	c := NewPromClient("http://localhost:9090")
 	// get cpu
-	cpuPercent, err := c.GetResource(object.CPU_RESOURCE, "test", "", nil)
+	cpuPercent, err := c.GetResource(object.CPU_RESOURCE, "", nil)
 	if err != nil || cpuPercent == nil {
 		t.Fail()
 	}
 	fmt.Printf("cpu:%f\n", *cpuPercent)
 
 	// get memory
-	memPercent, err := c.GetResource(object.MEMORY_RESOURCE, "test", "", nil)
+	memPercent, err := c.GetResource(object.MEMORY_RESOURCE, "", nil)
 	if err != nil {
 		t.Fail()
 	}
