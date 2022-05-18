@@ -15,6 +15,6 @@ type CompletedConfig struct {
 }
 
 func (c *Config) Complete() *CompletedConfig {
-	// TODO : complete config
+	// TODO : complete podConfig
 	return &CompletedConfig{c}
 }

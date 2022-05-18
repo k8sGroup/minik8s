@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"minik8s/pkg/etcdstore/netConfigStore"
+	"minik8s/pkg/etcdstore/nodeConfigStore"
 )
 
 func main() {
@@ -12,7 +12,7 @@ func main() {
 	//res, err := ipManager.GetRouteInfo()
 	//fmt.Println(res)
 	//fmt.Println(err)
-	fmt.Println(netConfigStore.GetNodeNameWithIpAndMask())
-	fmt.Println(netConfigStore.GetNodeNameWithIpAndMask())
-	fmt.Println(netConfigStore.GetNodeNameWithIpAndMask())
+	fmt.Println(nodeConfigStore.GetNodeNameWithIpAndMask())
+	fmt.Println(nodeConfigStore.GetNodeNameWithIpAndMask())
+	fmt.Println(nodeConfigStore.GetNodeNameWithIpAndMask())
 }
