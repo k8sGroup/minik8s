@@ -9,21 +9,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"minik8s/pkg/kubelet/pod"
 	"net/http"
-	"time"
 )
 
 type IMonitor interface {
 }
 
 type DockerMonitor struct {
-	// TODO: store the data that can identify a node
-	nodeName     string
 	dockerClient *client.Client
-	// TODO: remove, just for test
-	r *rand.Rand
 }
 
 func NewDockerMonitor() *DockerMonitor {
@@ -33,12 +27,10 @@ func NewDockerMonitor() *DockerMonitor {
 		fmt.Printf("[NewDockerMonitor] Init client fail\n")
 		return nil
 	}
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
 	fmt.Printf("[NewDockerMonitor] Init client\n")
 	return &DockerMonitor{
-		nodeName:     "test",
 		dockerClient: c,
-		r:            r,
 	}
 
 }
@@ -83,7 +75,7 @@ func (m *DockerMonitor) MetricDockerStat(ctx context.Context, pod *pod.Pod) {
 		fmt.Printf("[MetricDockerStat] cpu:%f%%  mem:%f%%\n", cpuPercent, memPercent)
 
 		serviceTag := selectorAppTag(pod.Label)
-		MakeMetricRecord(m.nodeName, pod.GetName(), serviceTag, memPercent, cpuPercent)
+		MakeMetricRecord(pod.GetName(), pod.GetUID(), serviceTag, memPercent, cpuPercent)
 	}
 }
 

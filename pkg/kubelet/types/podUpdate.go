@@ -11,13 +11,8 @@ const (
 	ADD
 	// DELETE signifies pods that are gracefully deleted from this source.
 	DELETE
-	// REMOVE signifies pods that have been removed from this source.
-	REMOVE
 	// UPDATE signifies pods have been updated in this source.
 	UPDATE
-	// RECONCILE signifies pods that have unexpected status in this source,
-	// kubelet should reconcile status with this source.
-	RECONCILE
 )
 const (
 	// Filesource idenitified updates from a file.

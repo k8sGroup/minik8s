@@ -38,6 +38,11 @@ const ParamResourceName = "resourceName"
 const ParamType = "type"
 const NODE_NAME = "name"
 
+// UserPath is the API only for user operation
+// key is the path cutting user, and add uuid
+const UserPodPath = "/user/registry/pod/:namespace/:resourceName"
+const UserRSPath = "/user/registry/rs/:namespace/:resourceName"
+
 // path for kube client
 const (
 	RS          = "/registry/rs/default/:resourceName"
@@ -45,8 +50,12 @@ const (
 	NODE        = "/registry/node/default/:resourceName"
 	NODE_PREFIX = "/registry/node/default"
 
-	POD_TEST = "/pod/test/:resourceName"
+	PodCONFIG       = "/registry/podConfig/default/:resourceName"
+	PodConfigPREFIX = "/registry/podConfig/default"
+	POD_TEST        = "/pod/test/:resourceName"
 )
+
+var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler", "podConfig"}
 
 type ServerConfig struct {
 	HttpPort       int
@@ -59,7 +68,7 @@ type ServerConfig struct {
 func DefaultServerConfig() *ServerConfig {
 	return &ServerConfig{
 		HttpPort:       8080,
-		ValidResources: []string{"pod", "rs", "node", "test"},
+		ValidResources: defaultValidResources,
 		EtcdEndpoints:  []string{"localhost:2379"},
 		EtcdTimeout:    5 * time.Second,
 		QueueConfig:    messaging.DefaultQConfig(),

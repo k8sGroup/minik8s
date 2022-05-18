@@ -35,6 +35,6 @@ services:
     hostname: prometheus
     restart: always
     volumes:
-      - ./build/config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./build/podConfig/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"

@@ -8,18 +8,17 @@ import (
 var (
 	podMetric = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "node_monitor",
-	}, []string{"resource", "node", "pod", "selector"})
+	}, []string{"resource", "pod", "uid", "selector"})
 )
 
-func MakeMetricRecord(nodeName string, podName string, selectorPair *string, memPercent float64, cpuPercent float64) {
-	nodeTag := nodeName
+func MakeMetricRecord(podName string, podUID string, selectorPair *string, memPercent float64, cpuPercent float64) {
 	podTag := podName
 	if selectorPair == nil {
-		podMetric.WithLabelValues("memory", nodeTag, podTag, "").Set(memPercent)
-		podMetric.WithLabelValues("cpu", nodeTag, podTag, "").Set(cpuPercent)
+		podMetric.WithLabelValues("memory", podTag, podUID, "").Set(memPercent)
+		podMetric.WithLabelValues("cpu", podTag, podUID, "").Set(cpuPercent)
 	} else {
-		podMetric.WithLabelValues("memory", nodeTag, podTag, *selectorPair).Set(memPercent)
-		podMetric.WithLabelValues("cpu", nodeTag, podTag, *selectorPair).Set(cpuPercent)
+		podMetric.WithLabelValues("memory", podTag, podUID, *selectorPair).Set(memPercent)
+		podMetric.WithLabelValues("cpu", podTag, podUID, *selectorPair).Set(cpuPercent)
 	}
 }
 

@@ -68,7 +68,7 @@ func (p *PodManager) startTimer() {
 					newPodSnapShoot := pod.GetPodSnapShoot()
 					if !compareSame(p.uid2podSnapshoot[v], newPodSnapShoot) {
 						//有区别产生，需要更新缓存以及etcd
-						oldPod, err := p.client.GetPod(k)
+						oldPod, err := p.client.GetRuntimePod(k, v)
 						if err != nil || oldPod == nil {
 							p.Err = err
 							continue
@@ -77,7 +77,7 @@ func (p *PodManager) startTimer() {
 						oldPod.Status.Phase = newPodSnapShoot.Status
 						oldPod.Status.PodIP = newPodSnapShoot.PodNetWork.Ipaddress
 						oldPod.Status.Err = newPodSnapShoot.Err
-						err = p.client.UpdatePods(oldPod)
+						err = p.client.UpdateRuntimePod(oldPod)
 						if err != nil {
 							p.Err = err
 							continue
@@ -119,7 +119,16 @@ func (p *PodManager) GetPodSnapShoot(podName string) (*pod.PodSnapShoot, error) 
 	res, _ := p.uid2podSnapshoot[uid]
 	return &res, nil
 }
-
+func (p *PodManager) GetPodSnapShootByUid(uid string) (*pod.PodSnapShoot, error) {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	res, ok := p.uid2podSnapshoot[uid]
+	if !ok {
+		err := errors.New(uid + "对应的pod不存在")
+		return nil, err
+	}
+	return &res, nil
+}
 func (p *PodManager) CheckIfPodExist(podName string) bool {
 	_, ok := p.name2uuid[podName]
 	return ok
@@ -134,13 +143,13 @@ func (p *PodManager) DeletePod(podName string) error {
 	}
 	uid, _ := p.name2uuid[podName]
 	pod_, _ := p.uid2pod[uid]
-	fmt.Printf("[DeletePod] Prepare delete pod")
+	fmt.Printf("[DeleteRuntimePod] Prepare delete pod")
 	pod_.DeletePod()
 	delete(p.name2uuid, podName)
 	delete(p.uid2podSnapshoot, uid)
 	delete(p.uid2pod, uid)
 	//提交delete pod的请求
-	err := p.client.DeletePod(podName)
+	err := p.client.DeleteRuntimePod(podName, uid)
 	if err != nil {
 		return err
 	}
@@ -159,17 +168,12 @@ func (p *PodManager) AddPod(config *object.Pod) error {
 	p.uid2pod[newPodShoot.Uid] = newPod
 	p.uid2podSnapshoot[newPodShoot.Uid] = newPodShoot
 	p.name2uuid[newPodShoot.Name] = newPodShoot.Uid
-	//把新的pod信息更新到etcd
-	//oldPod, err := p.client.GetPod(newPodShoot.Name)
-	//if err != nil {
-	//	return err
-	//}
 	config.Status.Phase = newPodShoot.Status
 	config.Status.PodIP = newPodShoot.PodNetWork.Ipaddress
 	config.ObjectMeta.Ctime = newPodShoot.Ctime
 	config.Status.Err = newPodShoot.Err
 	//把新的pod信息上传
-	err := p.client.UpdatePods(config)
+	err := p.client.UpdateRuntimePod(config)
 	return err
 }
 

@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"golang.org/x/net/context"
 	"minik8s/object"
+	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/kubeNetSupport"
 	"minik8s/pkg/kubeNetSupport/iptablesManager"
-	"minik8s/pkg/kubelet/config"
 	"minik8s/pkg/kubelet/monitor"
+	"minik8s/pkg/kubelet/podConfig"
 	"minik8s/pkg/kubelet/podManager"
 	"minik8s/pkg/kubelet/types"
 	"minik8s/pkg/listerwatcher"
@@ -21,7 +22,7 @@ import (
 type Kubelet struct {
 	podManager     *podManager.PodManager
 	kubeNetSupport *kubeNetSupport.KubeNetSupport
-	PodConfig      *config.PodConfig
+	PodConfig      *podConfig.PodConfig
 	podMonitor     *monitor.DockerMonitor
 
 	ls          *listerwatcher.ListerWatcher
@@ -47,14 +48,17 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 	}
 	kubelet.ls = ls
 
-	// initialize pod config
-	kubelet.PodConfig = config.NewPodConfig()
+	// initialize pod podConfig
+	kubelet.PodConfig = podConfig.NewPodConfig()
 
 	kubelet.podMonitor = monitor.NewDockerMonitor()
 
 	return kubelet
 }
-
+func (k *Kubelet) getNodeName() string {
+	netSupport := k.kubeNetSupport.GetKubeproxySnapShoot()
+	return netSupport.NodeName
+}
 func (kl *Kubelet) Run() {
 	kl.kubeNetSupport.StartKubeNetSupport()
 	kl.podManager.StartPodManager()
@@ -62,6 +66,8 @@ func (kl *Kubelet) Run() {
 	go kl.podMonitor.Listener()
 	go kl.syncLoop(updates, kl)
 	go kl.DoMonitor(context.Background())
+	go kl.ls.Watch(config.PodConfigPREFIX, kl.watchPod, kl.stopChannel)
+
 }
 
 func (kl *Kubelet) syncLoop(updates <-chan types.PodUpdate, handler SyncHandler) {
@@ -101,9 +107,6 @@ type SyncHandler interface {
 	HandlePodAdditions(pods []*object.Pod)
 	HandlePodUpdates(pods []*object.Pod)
 	HandlePodRemoves(pods []*object.Pod)
-	HandlePodReconcile(pods []*object.Pod)
-	HandlePodSyncs(pods []*object.Pod)
-	HandlePodCleanups() error
 }
 
 // TODO: channel pod type?
@@ -114,18 +117,13 @@ func (kl *Kubelet) syncLoopIteration(ch <-chan types.PodUpdate, handler SyncHand
 			fmt.Printf("Update channel is closed")
 			return false
 		}
-
 		switch u.Op {
 		case types.UPDATE:
 			handler.HandlePodUpdates(u.Pods)
 		case types.ADD:
 			handler.HandlePodAdditions(u.Pods)
-		case types.REMOVE:
-			handler.HandlePodRemoves(u.Pods)
-		case types.RECONCILE:
-			handler.HandlePodReconcile(u.Pods)
 		case types.DELETE:
-			handler.HandlePodUpdates(u.Pods)
+			handler.HandlePodRemoves(u.Pods)
 		}
 	}
 	return true
@@ -133,41 +131,77 @@ func (kl *Kubelet) syncLoopIteration(ch <-chan types.PodUpdate, handler SyncHand
 
 // TODO: check the message by node name. DO NOT handle pods not belong to this node
 func (kl *Kubelet) watchPod(res etcdstore.WatchRes) {
+	if res.ResType == etcdstore.DELETE {
+		//不管delete,实际的delete通过设置pod里边的status实现
+		return
+	}
 	pod := &object.Pod{}
 	err := json.Unmarshal(res.ValueBytes, pod)
-
 	if err != nil {
 		klog.Warnf("watchNewPod bad message\n")
 		return
 	}
-
-	// TODO: filter message by node name
 	// reject message if pod not assign pod or not belong to the node
 	if pod.Spec.NodeName == "" {
 		return
 	}
-
 	fmt.Printf("[watchPod] New message...\n")
-
 	pods := []*object.Pod{pod}
-
-	op := kl.getOpFromPod(pod)
-
-	podUp := types.PodUpdate{
-		Pods: pods,
-		Op:   op,
+	_, err2 := kl.podManager.GetPodSnapShootByUid(pod.UID)
+	if err2 != nil {
+		//pod 不存在,
+		if pod.Spec.NodeName != kl.getNodeName() {
+			//pod本地不存在且和本节点无关
+			return
+		}
+		if pod.Status.Phase != object.PodDelete {
+			//分配给自己的pod,且Phase不为Delete
+			podUp := types.PodUpdate{
+				Pods: pods,
+				Op:   types.ADD,
+			}
+			kl.PodConfig.GetUpdates() <- podUp
+		} else {
+			//命令删除同时已经删除，直接返回即可
+			return
+		}
+	} else {
+		//已经存在该pod
+		if pod.Spec.NodeName == kl.getNodeName() {
+			if pod.Status.Phase == object.PodDelete {
+				//需要删除pod
+				podUp := types.PodUpdate{
+					Pods: pods,
+					Op:   types.DELETE,
+				}
+				kl.PodConfig.GetUpdates() <- podUp
+			} else {
+				//节点对应上，那么是修改配置文件
+				podUp := types.PodUpdate{
+					Pods: pods,
+					Op:   types.UPDATE,
+				}
+				kl.PodConfig.GetUpdates() <- podUp
+			}
+		} else {
+			//自己存在该pod但是被分配到了其他地方, 应该删除本地的pod
+			podUp := types.PodUpdate{
+				Pods: pods,
+				Op:   types.DELETE,
+			}
+			kl.PodConfig.GetUpdates() <- podUp
+		}
 	}
-
-	kl.PodConfig.GetUpdates() <- podUp
+	return
 }
 
-func (kl *Kubelet) getOpFromPod(pod *object.Pod) types.PodOperation {
-	op := types.ADD
-	if pod.Status.Phase == object.PodFailed {
-		op = types.DELETE
-	}
-	return op
-}
+//func (kl *Kubelet) getOpFromPod(pod *object.Pod) types.PodOperation {
+//	op := types.ADD
+//	if pod.Status.Phase == object.PodFailed {
+//		op = types.DELETE
+//	}
+//	return op
+//}
 
 func (kl *Kubelet) HandlePodAdditions(pods []*object.Pod) {
 	for _, pod := range pods {
@@ -180,7 +214,24 @@ func (kl *Kubelet) HandlePodAdditions(pods []*object.Pod) {
 }
 
 func (kl *Kubelet) HandlePodUpdates(pods []*object.Pod) {
-
+	//先删除原来的再增加新的
+	for _, pod := range pods {
+		err := kl.podManager.DeletePod(pod.Name)
+		if err != nil {
+			fmt.Printf("[Kubelet] Delete pod fail...")
+			fmt.Printf(err.Error())
+			kl.Err = err
+		}
+	}
+	//创建新的
+	for _, pod := range pods {
+		err := kl.podManager.AddPod(pod)
+		if err != nil {
+			fmt.Printf("[Kubelet] Add pod fail...")
+			fmt.Printf(err.Error())
+			kl.Err = err
+		}
+	}
 }
 
 func (kl *Kubelet) HandlePodRemoves(pods []*object.Pod) {
@@ -192,18 +243,6 @@ func (kl *Kubelet) HandlePodRemoves(pods []*object.Pod) {
 			fmt.Printf("[Kubelet] Delete pod fail...")
 		}
 	}
-}
-
-func (kl *Kubelet) HandlePodReconcile(pods []*object.Pod) {
-
-}
-
-func (kl *Kubelet) HandlePodSyncs(pods []*object.Pod) {
-
-}
-
-func (kl *Kubelet) HandlePodCleanups() error {
-	return nil
 }
 
 func (kl *Kubelet) DoMonitor(ctx context.Context) {

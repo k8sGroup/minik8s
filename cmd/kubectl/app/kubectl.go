@@ -26,7 +26,7 @@ func Execute() error {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.odin.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "podConfig", "", "podConfig file (default is $HOME/.odin.yaml)")
 	rootCmd.PersistentFlags().Bool("viper", true, "use Viper for configuration")
 }
 
@@ -49,7 +49,7 @@ func initConfig() {
 	}
 	viper.SetDefault("url", "http://localhost:8080")
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Printf("Using config file: %s\n", viper.ConfigFileUsed())
+		fmt.Printf("Using podConfig file: %s\n", viper.ConfigFileUsed())
 	}
 	baseUrl = viper.GetString("url")
 }

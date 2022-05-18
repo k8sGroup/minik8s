@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/etcdstore"
-	"minik8s/pkg/etcdstore/netConfigStore"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/messaging"
 	"net/http"
@@ -29,17 +28,15 @@ type Ticket struct {
 }
 
 type Server struct {
-	engine         *gin.Engine
-	port           int
-	resourceSet    mapset.Set[string]
-	store          *etcdstore.Store
-	publisher      *messaging.Publisher
-	watcherMap     map[string]*watcher
-	watcherMtx     sync.Mutex // watcherMtx 保护watcherCount
-	watcherChan    chan watchOpt
-	ticketSeller   *atomic.Uint64
-	netConfigStore *netConfigStore.NetConfigStore
-	//kubeNetSupport *kubeNetSupport.KubeNetSupport
+	engine       *gin.Engine
+	port         int
+	resourceSet  mapset.Set[string]
+	store        *etcdstore.Store
+	publisher    *messaging.Publisher
+	watcherMap   map[string]*watcher
+	watcherMtx   sync.Mutex // watcherMtx 保护watcherCount
+	watcherChan  chan watchOpt
+	ticketSeller *atomic.Uint64
 }
 
 type watcher struct {
@@ -63,15 +60,14 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 	//	return nil, err2
 	//}
 	s := &Server{
-		engine:         engine,
-		port:           c.HttpPort,
-		resourceSet:    mapset.NewSet[string](c.ValidResources...),
-		store:          store,
-		publisher:      publisher,
-		watcherMap:     map[string]*watcher{},
-		watcherChan:    watcherChan,
-		ticketSeller:   atomic.NewUint64(0),
-		netConfigStore: netConfigStore.NewNetConfigStore(),
+		engine:       engine,
+		port:         c.HttpPort,
+		resourceSet:  mapset.NewSet[string](c.ValidResources...),
+		store:        store,
+		publisher:    publisher,
+		watcherMap:   map[string]*watcher{},
+		watcherChan:  watcherChan,
+		ticketSeller: atomic.NewUint64(0),
 		//kubeNetSupport: kubeNetSupport,
 	}
 
@@ -88,17 +84,22 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 
 	{
 		engine.DELETE(config.RS, s.deleteRS)
-		//engine.DELETE(config.POD_TEST, s.deletePod)
+		//engine.DELETE(podConfig.POD_TEST, s.deletePod)
 	}
 	{
 		engine.PUT(config.NODE, s.addNode)
 		engine.GET(config.NODE, s.get)
 		engine.POST(config.NODE, s.watch)
-		engine.DELETE(config.NODE, s.del)
+		engine.DELETE(config.NODE, s.deleteNode)
 	}
 	{
 		engine.GET(config.NODE_PREFIX, s.prefixGet)
 		engine.POST(config.NODE_PREFIX, s.prefixWatch)
+	}
+	{
+		// user operation
+		engine.PUT(config.UserPodPath, s.userAddPod)
+		engine.PUT(config.UserRSPath, s.userAddRS)
 	}
 
 	go s.daemon(watcherChan)

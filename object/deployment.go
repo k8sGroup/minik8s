@@ -21,6 +21,10 @@ type StrategyRollingUpdate struct {
 	MaxUnavailable *int32 `json:"maxUnavailable" yaml:"maxUnavailable"`
 }
 
+func (d *Deployment) Complete() {
+	d.Spec.Complete()
+}
+
 func (ds *DeploymentSpec) Complete() {
 	if ds.Strategy == nil {
 		ds.Strategy = &DeploymentStrategy{Type: "rollingUpdate"}
