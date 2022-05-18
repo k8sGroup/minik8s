@@ -6,6 +6,7 @@ const (
 	PodSucceeded string = "Succeeded"
 	PodFailed    string = "Failed"
 	PodUnknown   string = "Unknown"
+	PodDelete    string = "Delete"
 
 	// SUCCESS http status code
 	SUCCESS int = 200
@@ -137,9 +138,9 @@ type EnvEntry struct {
 /*******************Node*************************/
 
 type Node struct {
-	ObjectMeta `json:"metadata" yaml:"metadata"`
-	Spec       NodeSpec   `json:"spec" yaml:"spec"`
-	Status     NodeStatus `json:"status" yaml:"status"`
+	MetaData ObjectMeta `json:"metadata" yaml:"metadata"`
+	Spec     NodeSpec   `json:"spec" yaml:"spec"`
+	Status   NodeStatus `json:"status" yaml:"status"`
 }
 
 type NodeList struct {
@@ -147,6 +148,10 @@ type NodeList struct {
 }
 
 type NodeSpec struct {
+	//物理ip地址
+	PhysicalIp string `json:"physicalIp" yaml:"physicalIp""`
+	//为该节点分配的pod网段
+	NodeIpAndMask string `json:"nodeIpAndMask" yaml:"nodeIpAndMask"`
 }
 
 type NodeStatus struct {

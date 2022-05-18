@@ -1,4 +1,4 @@
-package netConfigStore
+package nodeConfigStore
 
 import (
 	"fmt"

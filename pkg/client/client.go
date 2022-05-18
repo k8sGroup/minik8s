@@ -2,6 +2,7 @@ package client
 
 import (
 	"github.com/google/uuid"
+	"minik8s/pkg/apiserver/config"
 
 	"bytes"
 	"context"
@@ -59,7 +60,7 @@ func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) erro
 	return err
 }
 
-func (r RESTClient) UpdatePods(pod *object.Pod) error {
+func (r RESTClient) UpdateRuntimePod(pod *object.Pod) error {
 	attachURL := "/registry/pod/default/" + pod.Name + pod.UID
 	err := Put(r.Base+attachURL, pod)
 	if err != nil {
@@ -68,10 +69,33 @@ func (r RESTClient) UpdatePods(pod *object.Pod) error {
 	return nil
 }
 
-func (r RESTClient) DeletePod(podName string, podUID string) error {
+func (r RESTClient) DeleteRuntimePod(podName string, podUID string) error {
 	attachURL := "/registry/pod/default/" + podName + podUID
 	err := Del(r.Base + attachURL)
 	return err
+}
+func (r RESTClient) UpdateConfigPod(pod *object.Pod) error {
+	attachURL := config.PodConfigPREFIX + "/" + pod.Name + pod.UID
+	err := Put(r.Base+attachURL, pod)
+	return err
+}
+func (r RESTClient) DeleteConfigPod(podName string, podUID string) error {
+	attachURL := config.PodConfigPREFIX + "/" + podName + podUID
+	err := Del(r.Base + attachURL)
+	return err
+}
+func (r RESTClient) GetConfigPod(name string, podUID string) (*object.Pod, error) {
+	attachUrl := config.PodConfigPREFIX + "/" + name + podUID
+	resp, err := Get(r.Base + attachUrl)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp) == 0 {
+		return nil, nil
+	}
+	result := &object.Pod{}
+	err = json.Unmarshal(resp[0].ValueBytes, result)
+	return result, err
 }
 
 // GetPodFromRS TODO: type conversion
@@ -89,7 +113,7 @@ func GetPodFromRS(rs *object.ReplicaSet) (*object.Pod, error) {
 	return pod, nil
 }
 
-func (r RESTClient) GetPod(name string, podUID string) (*object.Pod, error) {
+func (r RESTClient) GetRuntimePod(name string, podUID string) (*object.Pod, error) {
 	attachUrl := "/registry/pod/default/" + name + podUID
 	resp, err := Get(r.Base + attachUrl)
 	if err != nil {
@@ -213,22 +237,22 @@ func GetNodes(ls *listerwatcher.ListerWatcher) ([]*object.Node, error) {
 	return nodes, nil
 }
 
-func (r RESTClient) RegisterNode(node *object.Node) error {
-	if node.Name == "" {
-		return errors.New("invalid node name")
-	}
-	attachURL := "/registry/node/default/" + node.Name
-	body, err := json.Marshal(node)
-	reqBody := bytes.NewBuffer(body)
-
-	req, _ := http.NewRequest("PUT", r.Base+attachURL, reqBody)
-	resp, _ := http.DefaultClient.Do(req)
-
-	if err != nil || resp.StatusCode != 200 {
-		fmt.Printf("[RegisterNode] unmarshal fail\n")
-	}
-	return nil
-}
+//func (r RESTClient) RegisterNode(node *object.Node) error {
+//	if node.Name == "" {
+//		return errors.New("invalid node name")
+//	}
+//	attachURL := "/registry/node/default/" + node.Name
+//	body, err := json.Marshal(node)
+//	reqBody := bytes.NewBuffer(body)
+//
+//	req, _ := http.NewRequest("PUT", r.Base+attachURL, reqBody)
+//	resp, _ := http.DefaultClient.Do(req)
+//
+//	if err != nil || resp.StatusCode != 200 {
+//		fmt.Printf("[RegisterNode] unmarshal fail\n")
+//	}
+//	return nil
+//}
 
 /********************************watch*****************************/
 

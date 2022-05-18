@@ -40,7 +40,7 @@ func Run(c *config.CompletedConfig) error {
 	select {}
 }
 
-// CreateControllerContext TODO: make global config variable
+// CreateControllerContext TODO: make global podConfig variable
 func CreateControllerContext(c *config.CompletedConfig) (*util.ControllerContext, error) {
 	ls, err := listerwatcher.NewListerWatcher(listerwatcher.DefaultConfig())
 	if err != nil {

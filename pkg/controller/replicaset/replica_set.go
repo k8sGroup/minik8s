@@ -122,7 +122,7 @@ func (rsc *ReplicaSetController) podOperation(res etcdstore.WatchRes) {
 	isOwned, name, UID := client.OwnByRs(pod)
 	if isOwned {
 		rs, err := client.GetRS(rsc.ls, name, UID)
-		//fmt.Printf("[podOperation] rs:%v owns:%v\n", rs.Name, pod.Name)
+		//fmt.Printf("[podOperation] rs:%v owns:%v\n", rs.NodeName, pod.NodeName)
 		if err == nil {
 			// encode object to key
 			key := getKey(rs)
@@ -175,7 +175,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		fmt.Printf("[manageReplicas] del pods number:%v\n", len(podsToDelete))
 
 		for _, pod := range podsToDelete {
-			err := rsc.Client.DeletePod(pod.Name, pod.UID)
+			err := rsc.Client.DeleteRuntimePod(pod.Name, pod.UID)
 			if err != nil {
 				klog.Errorf("delete pod fail\n")
 			}

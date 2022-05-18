@@ -1,4 +1,4 @@
-package config
+package podConfig
 
 import (
 	"minik8s/object"

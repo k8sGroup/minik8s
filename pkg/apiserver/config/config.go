@@ -50,10 +50,12 @@ const (
 	NODE        = "/registry/node/default/:resourceName"
 	NODE_PREFIX = "/registry/node/default"
 
-	POD_TEST = "/pod/test/:resourceName"
+	PodCONFIG       = "/registry/podConfig/default/:resourceName"
+	PodConfigPREFIX = "/registry/podConfig/default"
+	POD_TEST        = "/pod/test/:resourceName"
 )
 
-var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler"}
+var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler", "podConfig"}
 
 type ServerConfig struct {
 	HttpPort       int

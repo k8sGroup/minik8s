@@ -14,9 +14,9 @@ var (
 
 func main() {
 	// host is the address of master node
-	clientConfig := client.Config{Host: LOCAL + ":8080"}
+	clientConfig := client.Config{Host: REMOTE + ":8080"}
 	//kube := kubelet.NewKubelet(listerwatcher.GetLsConfig("192.168.1.7"), clientConfig)
-	kube := kubelet.NewKubelet(listerwatcher.DefaultConfig(), clientConfig)
+	kube := kubelet.NewKubelet(listerwatcher.GetLsConfig(REMOTE), clientConfig)
 	kube.Run()
 	//data, err := ioutil.ReadFile("./test/pod/example.yaml")
 	//if err != nil {
@@ -108,7 +108,7 @@ func main() {
 //			fmt.Printf("输入pod名字\n")
 //			var name string
 //			fmt.Scanln(&name)
-//			err := p.DeletePod(name)
+//			err := p.DeleteRuntimePod(name)
 //			if err != nil {
 //				fmt.Printf(err.Error())
 //				continue

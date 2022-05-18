@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"minik8s/object"
 	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
-	"minik8s/pkg/etcdstore/netConfigStore"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/kubeNetSupport/boot"
 	"minik8s/pkg/kubeNetSupport/iptablesManager"
@@ -47,8 +47,10 @@ type KubeNetSupport struct {
 	myphysicalIp string
 	//自己分配的网段
 	myIpAndMask string
-	bootStatus  int
-	err         error
+	//节点的名字
+	myNodeName string
+	bootStatus int
+	err        error
 }
 type CommandWorker struct {
 	isMaster bool
@@ -101,10 +103,11 @@ type NetCommandResponse struct {
 }
 type KubeNetSupportSnapShoot struct {
 	PortMappings []iptablesManager.PortMapping
+	//map ip to pipe
 	IpPipeMap    map[string]string
-	IpPairs      []netConfigStore.IpPair
 	MyphysicalIp string
 	MyIpAndMask  string
+	NodeName     string
 	Error        string
 	BootStatus   int
 }
@@ -147,6 +150,7 @@ func NewKubeNetSupport(lsConfig *listerwatcher.Config, clientConfig client.Confi
 		MyIpAndMask:  newKubeNetSupport.myIpAndMask,
 		Error:        sErr,
 		BootStatus:   newKubeNetSupport.bootStatus,
+		NodeName:     newKubeNetSupport.myNodeName,
 	}
 	return newKubeNetSupport, nil
 }
@@ -163,7 +167,7 @@ func (k *KubeNetSupport) registerNode() error {
 	go k.ls.Watch(config.NODE_PREFIX, k.watchRegister, k.stopChannel)
 	time.Sleep(2 * time.Second)
 	//获取所有其他的节点
-	res, err := k.getIpPairs()
+	res, err := k.getNodes()
 	if err != nil {
 		return err
 	}
@@ -171,7 +175,7 @@ func (k *KubeNetSupport) registerNode() error {
 	fmt.Println(res)
 	//设置map， 暂时不生成command，用MASK占位
 	for _, value := range res {
-		k.ipPipeMap[value.PhysicalIp] = MASK
+		k.ipPipeMap[value.Spec.PhysicalIp] = MASK
 	}
 	//发起注册的http请求
 	attachURL := config.NODE_PREFIX + "/" + k.myphysicalIp
@@ -181,19 +185,19 @@ func (k *KubeNetSupport) registerNode() error {
 	}
 	return nil
 }
-func (k *KubeNetSupport) getIpPairs() ([]netConfigStore.IpPair, error) {
+func (k *KubeNetSupport) getNodes() ([]object.Node, error) {
 	raw, err := k.ls.List(config.NODE_PREFIX)
 	if err != nil {
 		return nil, err
 	}
-	var res []netConfigStore.IpPair
+	var res []object.Node
 	if len(raw) == 0 {
 		return res, nil
 	}
 	for _, rawPair := range raw {
-		ipPair := &netConfigStore.IpPair{}
-		err = json.Unmarshal(rawPair.ValueBytes, &ipPair)
-		res = append(res, *ipPair)
+		node := &object.Node{}
+		err = json.Unmarshal(rawPair.ValueBytes, node)
+		res = append(res, *node)
 	}
 	return res, nil
 }
@@ -248,6 +252,7 @@ func (kubeproxy *KubeNetSupport) GetKubeproxySnapShoot() KubeNetSupportSnapShoot
 			MyIpAndMask:  kubeproxy.myIpAndMask,
 			Error:        sErr,
 			BootStatus:   kubeproxy.bootStatus,
+			NodeName:     kubeproxy.myNodeName,
 		}
 		kubeproxy.rwLock.RUnlock()
 		return kubeproxy.kubeproxySnapShoot
@@ -263,41 +268,42 @@ func (kp *KubeNetSupport) watchRegister(res etcdstore.WatchRes) {
 		//不需要管其他节点删除的情况
 		return
 	}
-	ipPair := &netConfigStore.IpPair{}
-	err := json.Unmarshal(res.ValueBytes, ipPair)
+	node := &object.Node{}
+	err := json.Unmarshal(res.ValueBytes, node)
 	if err != nil {
 		klog.Warnf("watchRegister unmarshal faield")
 	}
-	kp.watchAndHandleInner(ipPair)
+	kp.watchAndHandleInner(node)
 }
 
 //只有先init才能去进行其他gre端口的创建
 //所以如果没有boot同时有一大堆gre端口等着创建，可以先在map中生成空映射，等到收到boot成功的response再去生成command
 //此外不需要考虑gre端口的销毁，因为每个gre端口是唯一生成的，不会重复，另外就算其他节点没注册但是连接着,网段的唯一性也可以保证不会出错
 
-func (k *KubeNetSupport) watchAndHandleInner(ipPair *netConfigStore.IpPair) {
+func (k *KubeNetSupport) watchAndHandleInner(node *object.Node) {
 	k.rwLock.Lock()
 	defer k.rwLock.Unlock()
 	fmt.Println("watchAndHandle receive command\n")
 	switch k.bootStatus {
 	case NOT_BOOT:
 		//根据是否是自己的ip区别对待
-		if ipPair.PhysicalIp == k.myphysicalIp {
+		if node.Spec.PhysicalIp == k.myphysicalIp {
 			command := NetCommand{
 				Op:         OP_BOOT_NET,
-				physicalIp: ipPair.PhysicalIp,
-				IpAndMask:  ipPair.NodeIpAndMask,
+				physicalIp: node.Spec.PhysicalIp,
+				IpAndMask:  node.Spec.NodeIpAndMask,
 			}
-			k.myIpAndMask = ipPair.NodeIpAndMask
+			k.myIpAndMask = node.Spec.NodeIpAndMask
+			k.myNodeName = node.MetaData.Name
 			k.bootStatus = IS_BOOTING
 			k.netCommandChan <- command
 		} else {
-			k.ipPipeMap[ipPair.PhysicalIp] = MASK
+			k.ipPipeMap[node.Spec.PhysicalIp] = MASK
 		}
 		return
 	case BOOT_FAILED:
 		//上次boot失败，尝试再次boot
-		k.ipPipeMap[ipPair.PhysicalIp] = MASK
+		k.ipPipeMap[node.Spec.PhysicalIp] = MASK
 		command := NetCommand{
 			Op:         OP_BOOT_NET,
 			physicalIp: k.myphysicalIp,
@@ -307,13 +313,13 @@ func (k *KubeNetSupport) watchAndHandleInner(ipPair *netConfigStore.IpPair) {
 		return
 	case IS_BOOTING:
 		//同样不需要生成实际的command
-		k.ipPipeMap[ipPair.PhysicalIp] = MASK
+		k.ipPipeMap[node.Spec.PhysicalIp] = MASK
 		return
 	case BOOT_SUCCEED:
 		//生成command
 		command := NetCommand{
 			Op:         OP_ADD_VXLAN,
-			physicalIp: ipPair.PhysicalIp,
+			physicalIp: node.Spec.PhysicalIp,
 		}
 		k.netCommandChan <- command
 		return
