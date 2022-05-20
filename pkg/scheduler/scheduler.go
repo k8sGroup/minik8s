@@ -135,11 +135,11 @@ func (sched *Scheduler) watchNewPod(res etcdstore.WatchRes) {
 	pod := &object.Pod{}
 	err := json.Unmarshal(res.ValueBytes, pod)
 	if err != nil {
-		fmt.Printf("watchNewPod bad message\n")
+		fmt.Printf("watchNewPod bad message pod:%+v\n", pod)
 		return
 	}
 	// check whether scheduled
-	fmt.Println("watch new Config Pod with name:%s\n", pod.Name)
+	fmt.Printf("watch new Config Pod with name:%s\n", pod.Name)
 	if pod.Spec.NodeName != "" {
 		return
 	}

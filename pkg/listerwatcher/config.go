@@ -25,7 +25,7 @@ func GetLsConfig(host string) *Config {
 		QueueConfig: &messaging.QConfig{
 			User:          "root",
 			Password:      "123456",
-			Host:          "192.168.1.7",
+			Host:          host,
 			Port:          "5672",
 			MaxRetry:      10,
 			RetryInterval: 5 * time.Second,

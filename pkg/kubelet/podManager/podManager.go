@@ -130,7 +130,11 @@ func (p *PodManager) GetPodSnapShootByUid(uid string) (*pod.PodSnapShoot, error)
 	return &res, nil
 }
 func (p *PodManager) CheckIfPodExist(podName string) bool {
+	// check both name and uuid
 	_, ok := p.name2uuid[podName]
+	if !ok {
+		return false
+	}
 	return ok
 }
 
@@ -149,7 +153,7 @@ func (p *PodManager) DeletePod(podName string) error {
 	delete(p.uid2podSnapshoot, uid)
 	delete(p.uid2pod, uid)
 	//提交delete pod的请求
-	err := p.client.DeleteRuntimePod(podName, uid)
+	err := p.client.DeleteRuntimePod(podName)
 	if err != nil {
 		return err
 	}

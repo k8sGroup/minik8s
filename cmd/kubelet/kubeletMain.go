@@ -10,13 +10,14 @@ import (
 var (
 	LOCAL  = "127.0.0.1"
 	REMOTE = "192.168.1.7"
+	MASTER = "192.168.1.4"
 )
 
 func main() {
 	// host is the address of master node
-	clientConfig := client.Config{Host: REMOTE + ":8080"}
+	clientConfig := client.Config{Host: MASTER + ":8080"}
 	//kube := kubelet.NewKubelet(listerwatcher.GetLsConfig("192.168.1.7"), clientConfig)
-	kube := kubelet.NewKubelet(listerwatcher.GetLsConfig(REMOTE), clientConfig)
+	kube := kubelet.NewKubelet(listerwatcher.GetLsConfig(MASTER), clientConfig)
 	kube.Run()
 	//data, err := ioutil.ReadFile("./test/pod/example.yaml")
 	//if err != nil {

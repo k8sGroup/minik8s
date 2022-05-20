@@ -3,7 +3,6 @@ package kubelet
 import (
 	"encoding/json"
 	"fmt"
-	"golang.org/x/net/context"
 	"minik8s/object"
 	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/client"
@@ -17,6 +16,8 @@ import (
 	"minik8s/pkg/kubelet/types"
 	"minik8s/pkg/listerwatcher"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 type Kubelet struct {
@@ -200,7 +201,7 @@ func (kl *Kubelet) watchFile(res etcdstore.WatchRes) {
 }
 func (kl *Kubelet) HandlePodAdditions(pods []*object.Pod) {
 	for _, pod := range pods {
-		fmt.Printf("[Kubelet] Prepare add pod:%s\n", pod.Name)
+		fmt.Printf("[Kubelet] Prepare add pod:%s\npod:%+v\n", pod.Name, pod)
 		err := kl.podManager.AddPod(pod)
 		if err != nil {
 			kl.Err = err
@@ -235,14 +236,14 @@ func (kl *Kubelet) HandlePodRemoves(pods []*object.Pod) {
 		err := kl.podManager.DeletePod(pod.Name)
 		// already modify pod status to failed in api server
 		if err != nil {
-			fmt.Printf("[Kubelet] Delete pod fail...")
+			fmt.Printf("[Kubelet] Delete pod fail...\n")
 		}
 	}
 }
 
 func (kl *Kubelet) DoMonitor(ctx context.Context) {
 	for {
-		fmt.Printf("[DoMonitor] New round monitoring...\n")
+		// fmt.Printf("[DoMonitor] New round monitoring...\n")
 		podMap := kl.podManager.CopyUid2pod()
 		for _, pod := range podMap {
 			kl.podMonitor.MetricDockerStat(ctx, pod)
