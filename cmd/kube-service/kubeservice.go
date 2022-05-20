@@ -21,13 +21,27 @@ func main() {
 		fmt.Println("ERROR")
 		fmt.Println(err)
 	}
+
+	//nodePort part
+	//err = ipt.NewChain("nat", "HONG-NODE-PORT")
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+	//err = ipt.Append("nat", "HONG-SERVICE", "-p", "all", "-j", "HONG-NODE-PORT", "-m", "addrtype", "--dst-type", "LOCAL")
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+	//err = ipt.Append("nat", "HONG-NODE-PORT", "-p", "tcp", "--dport", "8070", "-j", "HONG-SVC")
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
 	//create HONG-SEP chain
 
 	//err = ipt.NewChain("nat", "HONG-SEP")
 	//if err != nil {
 	//	fmt.Println(err)
 	//}
-	err = ipt.Append("nat", "HONG-SEP", "-s", "0/0", "-d", "0/0", "-p", "tcp", "-j", "DNAT", "--to-destination", "172.17.43.2:80")
+	err = ipt.Delete("nat", "HONG-SEP", "-s", "0/0", "-d", "0/0", "-p", "tcp", "-j", "DNAT", "--to-destination", "10.119.11.159:11111")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -37,23 +51,24 @@ func main() {
 	//if err != nil {
 	//	fmt.Println(err)
 	//}
-	//err = ipt.Append("nat", "HONG-SVC", "-s", "0/0", "-d", "0/0", "-p", "all", "-j", "HONG-SEP")
+	//err = ipt.Append("nat", "HONG-SVC", "-p", "tcp", "-j", "HONG-SEP")
 	//if err != nil {
 	//	fmt.Println(err)
 	//}
+	//err = ipt.NewChain("nat", "HONG-NODE-PORT")
 
 	//create HONG-SERVICE chain
 	//err = ipt.NewChain("nat", "HONG-SERVICE")
 	//if err != nil {
 	//	fmt.Println(err)
 	//}
-	//err = ipt.Append("nat", "HONG-SERVICE", "-s", "0/0", "-d", "10.12.34.45", "-p", "all", "-j", "HONG-SVC")
+	//err = ipt.Append("nat", "HONG-SERVICE", "-s", "0/0", "-d", "10.12.34.45", "-p", "tcp", "--dport", "8070", "-j", "HONG-SVC")
 	//if err != nil {
 	//	fmt.Println(err)
 	//}
-	//add into OUTPUT chain
+	////add into OUTPUT chain
 	//err = ipt.Insert("nat", "PREROUTING", 1, "-j", "HONG-SERVICE", "-s", "0/0", "-d", "0/0", "-p", "all")
-	//err = ipt.Delete("nat", "OUTPUT", "-j", "HONG-SERVICE", "-s", "0/0", "-d", "0/0", "-p", "all")
+	//err = ipt.Insert("nat", "OUTPUT", 1, "-j", "HONG-SERVICE", "-s", "0/0", "-d", "0/0", "-p", "all")
 	//if err != nil {
 	//	fmt.Println(err)
 	//}

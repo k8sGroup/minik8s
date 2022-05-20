@@ -156,3 +156,8 @@ type NodeSpec struct {
 
 type NodeStatus struct {
 }
+
+/************************Service************/
+type Service struct {
+	MetaData ObjectMeta `json:"metadata" yaml:"metadata"`
+}
