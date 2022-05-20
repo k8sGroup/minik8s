@@ -15,6 +15,9 @@ const (
 	// kind
 	PodKind        string = "Pod"
 	ReplicaSetKind string = "RS"
+
+	// Node
+	NodeShardFilePath string = "/home/sharedData"
 )
 
 type ObjectMeta struct {
