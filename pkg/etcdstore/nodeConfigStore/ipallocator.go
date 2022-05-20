@@ -12,6 +12,7 @@ const BASIC_MASK = "/16"
 const NODE_MASK = "/24"
 const NODE_LAST_FIELD = "1"
 const NODE_NAME_PREFIX = "node"
+const MasterNodeName = "node0"
 
 var count = 0
 var lock sync.Mutex

@@ -59,6 +59,7 @@ func (k *Kubelet) getNodeName() string {
 	netSupport := k.kubeNetSupport.GetKubeproxySnapShoot()
 	return netSupport.NodeName
 }
+
 func (kl *Kubelet) Run() {
 	kl.kubeNetSupport.StartKubeNetSupport()
 	kl.podManager.StartPodManager()
@@ -67,7 +68,7 @@ func (kl *Kubelet) Run() {
 	go kl.syncLoop(updates, kl)
 	go kl.DoMonitor(context.Background())
 	go kl.ls.Watch(config.PodConfigPREFIX, kl.watchPod, kl.stopChannel)
-
+	go kl.ls.Watch(config.SharedDataPrefix, kl.watchFile, kl.stopChannel)
 }
 
 func (kl *Kubelet) syncLoop(updates <-chan types.PodUpdate, handler SyncHandler) {
@@ -194,15 +195,9 @@ func (kl *Kubelet) watchPod(res etcdstore.WatchRes) {
 	}
 	return
 }
+func (kl *Kubelet) watchFile(res etcdstore.WatchRes) {
 
-//func (kl *Kubelet) getOpFromPod(pod *object.Pod) types.PodOperation {
-//	op := types.ADD
-//	if pod.Status.Phase == object.PodFailed {
-//		op = types.DELETE
-//	}
-//	return op
-//}
-
+}
 func (kl *Kubelet) HandlePodAdditions(pods []*object.Pod) {
 	for _, pod := range pods {
 		fmt.Printf("[Kubelet] Prepare add pod:%s\n", pod.Name)
