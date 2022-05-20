@@ -34,10 +34,10 @@ func DefaultClientConfig() Config {
 
 func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) error {
 	podUID := uuid.New().String()
-	attachURL := "/registry/pod/default/" + rs.Spec.Template.Name + podUID
+	attachURL := config.PodConfigPREFIX + "/" + rs.Spec.Template.Name + podUID
 
 	pod, _ := GetPodFromRS(rs)
-	pod.Name = rs.Spec.Template.Name
+	pod.Name = rs.Spec.Template.Name + podUID
 	pod.UID = podUID
 	podRaw, _ := json.Marshal(pod)
 	reqBody := bytes.NewBuffer(podRaw)
@@ -61,7 +61,7 @@ func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) erro
 }
 
 func (r RESTClient) UpdateRuntimePod(pod *object.Pod) error {
-	attachURL := "/registry/pod/default/" + pod.Name + pod.UID
+	attachURL := "/registry/pod/default/" + pod.Name
 	err := Put(r.Base+attachURL, pod)
 	if err != nil {
 		return err
@@ -69,23 +69,23 @@ func (r RESTClient) UpdateRuntimePod(pod *object.Pod) error {
 	return nil
 }
 
-func (r RESTClient) DeleteRuntimePod(podName string, podUID string) error {
-	attachURL := "/registry/pod/default/" + podName + podUID
+func (r RESTClient) DeleteRuntimePod(podName string) error {
+	attachURL := "/registry/pod/default/" + podName
 	err := Del(r.Base + attachURL)
 	return err
 }
 func (r RESTClient) UpdateConfigPod(pod *object.Pod) error {
-	attachURL := config.PodConfigPREFIX + "/" + pod.Name + pod.UID
+	attachURL := config.PodConfigPREFIX + "/" + pod.Name
 	err := Put(r.Base+attachURL, pod)
 	return err
 }
-func (r RESTClient) DeleteConfigPod(podName string, podUID string) error {
-	attachURL := config.PodConfigPREFIX + "/" + podName + podUID
+func (r RESTClient) DeleteConfigPod(podName string) error {
+	attachURL := config.PodConfigPREFIX + "/" + podName
 	err := Del(r.Base + attachURL)
 	return err
 }
-func (r RESTClient) GetConfigPod(name string, podUID string) (*object.Pod, error) {
-	attachUrl := config.PodConfigPREFIX + "/" + name + podUID
+func (r RESTClient) GetConfigPod(name string) (*object.Pod, error) {
+	attachUrl := config.PodConfigPREFIX + "/" + name
 	resp, err := Get(r.Base + attachUrl)
 	if err != nil {
 		return nil, err
@@ -153,7 +153,7 @@ func GetRS(ls *listerwatcher.ListerWatcher, name string, UID string) (*object.Re
 }
 
 func GetRSPods(ls *listerwatcher.ListerWatcher, name string, UID string) ([]*object.Pod, error) {
-	raw, err := ls.List("/registry/pod/default")
+	raw, err := ls.List(config.PodConfigPREFIX)
 
 	var pods []*object.Pod
 

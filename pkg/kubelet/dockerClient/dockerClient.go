@@ -66,14 +66,18 @@ func getPodNetworkSettings(containerId string) (*types.NetworkSettings, error) {
 	}
 	return res.NetworkSettings, nil
 }
-func isImageExist(a string, b string) bool {
-	if a == b {
-		return true
+func isImageExist(a string, tags []string) bool {
+	for _, b := range tags {
+		if a == b {
+			return true
+		}
+		tmp := a + ":latest"
+		if tmp == b {
+			return true
+		}
 	}
-	tmp := a + ":latest"
-	if tmp == b {
-		return true
-	}
+
+	fmt.Printf("Local image:%v Target image:%s\n", tags, a)
 	return false
 }
 func dockerClientPullImages(images []string) error {
@@ -90,7 +94,7 @@ func dockerClientPullImages(images []string) error {
 	for _, value := range images {
 		flag := false
 		for _, it := range resp {
-			if isImageExist(value, it.RepoTags[0]) {
+			if isImageExist(value, it.RepoTags) {
 				flag = true
 				break
 			}

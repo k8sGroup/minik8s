@@ -156,7 +156,13 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPods []*object.Pod, rs *object.ReplicaSet) error {
 	// make diff for current pods and expected number
 	diff := len(filteredPods) - int(rs.Spec.Replicas)
-	fmt.Printf("[manageReplicas] diff:%v\n", diff)
+
+	fmt.Printf("[manageReplicas] active:%v expected:%v diff:%v\n", len(filteredPods), int(rs.Spec.Replicas), diff)
+	fmt.Printf("[manageReplicas] active:")
+	for _, p := range filteredPods {
+		fmt.Printf("%s  ", p.Name)
+	}
+	fmt.Printf("\n")
 
 	if diff < 0 {
 		diff *= -1
@@ -175,9 +181,13 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		fmt.Printf("[manageReplicas] del pods number:%v\n", len(podsToDelete))
 
 		for _, pod := range podsToDelete {
-			err := rsc.Client.DeleteRuntimePod(pod.Name, pod.UID)
+			err := rsc.Client.DeleteConfigPod(pod.Name)
 			if err != nil {
-				klog.Errorf("delete pod fail\n")
+				klog.Errorf("delete pod config fail Name:%s uid:%s\n", pod.Name, pod.UID)
+			}
+			err = rsc.Client.DeleteRuntimePod(pod.Name)
+			if err != nil {
+				klog.Errorf("delete runtime pod fail Name:%s uid:%s\n", pod.Name, pod.UID)
 			}
 		}
 	}
