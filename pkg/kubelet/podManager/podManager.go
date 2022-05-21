@@ -63,12 +63,13 @@ func (p *PodManager) startTimer() {
 			case <-p.timer.C:
 				p.rwLock.Lock()
 				//对于每个pod调用GetSnapShoot更新信息
+				fmt.Println("[PodManager] timer reached")
 				for k, v := range p.name2uuid {
 					pod := p.uid2pod[v]
 					newPodSnapShoot := pod.GetPodSnapShoot()
 					if !compareSame(p.uid2podSnapshoot[v], newPodSnapShoot) {
 						//有区别产生，需要更新缓存以及etcd
-						oldPod, err := p.client.GetRuntimePod(k, v)
+						oldPod, err := p.client.GetRuntimePod(k)
 						if err != nil || oldPod == nil {
 							p.Err = err
 							continue
@@ -130,7 +131,11 @@ func (p *PodManager) GetPodSnapShootByUid(uid string) (*pod.PodSnapShoot, error)
 	return &res, nil
 }
 func (p *PodManager) CheckIfPodExist(podName string) bool {
+	// check both name and uuid
 	_, ok := p.name2uuid[podName]
+	if !ok {
+		return false
+	}
 	return ok
 }
 
@@ -149,7 +154,7 @@ func (p *PodManager) DeletePod(podName string) error {
 	delete(p.uid2podSnapshoot, uid)
 	delete(p.uid2pod, uid)
 	//提交delete pod的请求
-	err := p.client.DeleteRuntimePod(podName, uid)
+	err := p.client.DeleteRuntimePod(podName)
 	if err != nil {
 		return err
 	}

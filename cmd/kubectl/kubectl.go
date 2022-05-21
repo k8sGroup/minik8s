@@ -11,7 +11,7 @@ import (
 
 var (
 	LOCAL  = "127.0.0.1"
-	REMOTE = "192.168.1.7"
+	REMOTE = "10.119.11.164"
 )
 
 func main() {
@@ -22,14 +22,13 @@ func main() {
 	pod := &object.Pod{}
 	err = yaml.Unmarshal([]byte(data), &pod)
 	fmt.Println(*pod)
-	clientConfig := client.Config{Host: REMOTE + ":8080"}
+	clientConfig := client.Config{Host: LOCAL + ":8080"}
 	restClient := client.RESTClient{
 		Base: "http://" + clientConfig.Host,
 	}
 	pod.UID = uuid.NewV4().String()
 	restClient.UpdateConfigPod(pod)
 	podName := pod.Name
-	uid := pod.UID
 	var m int
 	for {
 		fmt.Println("输入操作类型\n")
@@ -37,7 +36,7 @@ func main() {
 		fmt.Scanln(&m)
 		switch m {
 		case 1:
-			value, err2 := restClient.GetConfigPod(podName, uid)
+			value, err2 := restClient.GetConfigPod(podName)
 			if err2 != nil {
 				fmt.Println(err2)
 			} else {
@@ -45,7 +44,7 @@ func main() {
 			}
 			continue
 		case 2:
-			value, err2 := restClient.GetRuntimePod(podName, uid)
+			value, err2 := restClient.GetRuntimePod(podName)
 			if err2 != nil {
 				fmt.Println(err2)
 			} else {
@@ -53,7 +52,7 @@ func main() {
 			}
 			continue
 		case 3:
-			value, err2 := restClient.GetConfigPod(podName, uid)
+			value, err2 := restClient.GetConfigPod(podName)
 			if err2 != nil {
 				fmt.Println(err2)
 			} else {
@@ -65,7 +64,7 @@ func main() {
 			}
 			continue
 		case 4:
-			value, err2 := restClient.GetConfigPod(podName, uid)
+			value, err2 := restClient.GetConfigPod(podName)
 			if err2 != nil {
 				fmt.Println(err2)
 			} else {

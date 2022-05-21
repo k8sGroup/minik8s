@@ -66,14 +66,18 @@ func getPodNetworkSettings(containerId string) (*types.NetworkSettings, error) {
 	}
 	return res.NetworkSettings, nil
 }
-func isImageExist(a string, b string) bool {
-	if a == b {
-		return true
+func isImageExist(a string, tags []string) bool {
+	for _, b := range tags {
+		if a == b {
+			return true
+		}
+		tmp := a + ":latest"
+		if tmp == b {
+			return true
+		}
 	}
-	tmp := a + ":latest"
-	if tmp == b {
-		return true
-	}
+
+	fmt.Printf("Local image:%v Target image:%s\n", tags, a)
 	return false
 }
 func dockerClientPullImages(images []string) error {
@@ -90,7 +94,7 @@ func dockerClientPullImages(images []string) error {
 	for _, value := range images {
 		flag := false
 		for _, it := range resp {
-			if isImageExist(value, it.RepoTags[0]) {
+			if isImageExist(value, it.RepoTags) {
 				flag = true
 				break
 			}
@@ -175,7 +179,7 @@ func createPause(ports []object.Port, name string) (container.ContainerCreateCre
 	}
 
 	resp, err := cli.ContainerCreate(context.Background(), &container.Config{
-		Image:        "gcr.io/google_containers/pause-amd64:3.0",
+		Image:        "registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.6",
 		ExposedPorts: exports,
 	}, &container.HostConfig{
 		IpcMode: container.IpcMode("shareable"),
@@ -272,7 +276,7 @@ func createContainersOfPod(containers []object.Container) ([]object.ContainerMet
 	var result []object.ContainerMeta
 	//先生成所有要暴露的port集合
 	var totlePort []object.Port
-	images := []string{"gcr.io/google_containers/pause-amd64:3.0"}
+	images := []string{"registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.6"}
 	//防止重名，先检查是否重名，有的话删除
 	var names []string
 	pauseName := "pause"
