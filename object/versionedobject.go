@@ -38,3 +38,29 @@ func SelectNewerAutoscaler(rs1 VersionedAutoscaler, rs2 VersionedAutoscaler) Ver
 		return rs2
 	}
 }
+
+type VersionedGPUJob struct {
+	Version int64
+	Job     GPUJob
+}
+
+func SelectNewerGPUJob(vj1 VersionedGPUJob, vj2 VersionedGPUJob) VersionedGPUJob {
+	if vj1.Version > vj2.Version {
+		return vj1
+	} else {
+		return vj2
+	}
+}
+
+type VersionedJobStatus struct {
+	Version   int64
+	JobStatus JobStatus
+}
+
+func SelectNewerJobStatus(vj1 VersionedJobStatus, vj2 VersionedJobStatus) VersionedJobStatus {
+	if vj1.Version > vj2.Version {
+		return vj1
+	} else {
+		return vj2
+	}
+}

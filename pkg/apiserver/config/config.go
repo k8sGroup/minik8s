@@ -59,7 +59,8 @@ const (
 	POD_TEST = "/pod/test/:resourceName"
 )
 
-var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler", "podConfig", "sharedData"}
+var defaultValidResources = []string{"pod", "rs", "deployment", "node",
+	"test", "autoscaler", "podConfig", "job", "jobStatus", "sharedData"}
 
 type ServerConfig struct {
 	HttpPort       int
