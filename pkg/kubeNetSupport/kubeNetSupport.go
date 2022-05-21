@@ -133,12 +133,7 @@ func NewKubeNetSupport(lsConfig *listerwatcher.Config, clientConfig client.Confi
 		Base: "http://" + clientConfig.Host,
 	}
 	newKubeNetSupport.Client = restClient
-	ips, err := tools.GetIPv4ByInterface(netconfig.ETH_NAME)
-	if err != nil {
-		newKubeNetSupport.err = err
-	} else {
-		newKubeNetSupport.myphysicalIp = ips[0]
-	}
+	newKubeNetSupport.myphysicalIp = tools.GetEns3IPv4Addr()
 	sErr := ""
 	if newKubeNetSupport.err != nil {
 		sErr = newKubeNetSupport.err.Error()
@@ -178,6 +173,7 @@ func (k *KubeNetSupport) registerNode() error {
 		k.ipPipeMap[value.Spec.PhysicalIp] = MASK
 	}
 	//发起注册的http请求
+	fmt.Println(k.myphysicalIp)
 	attachURL := config.NODE_PREFIX + "/" + k.myphysicalIp
 	err = k.Client.PutWrap(attachURL, nil)
 	if err != nil {

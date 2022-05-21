@@ -113,8 +113,8 @@ func GetPodFromRS(rs *object.ReplicaSet) (*object.Pod, error) {
 	return pod, nil
 }
 
-func (r RESTClient) GetRuntimePod(name string, podUID string) (*object.Pod, error) {
-	attachUrl := "/registry/pod/default/" + name + podUID
+func (r RESTClient) GetRuntimePod(name string) (*object.Pod, error) {
+	attachUrl := "/registry/pod/default/" + name
 	resp, err := Get(r.Base + attachUrl)
 	if err != nil {
 		return nil, err
