@@ -8,9 +8,10 @@ import (
 )
 
 var (
-	LOCAL  = "127.0.0.1"
-	REMOTE = "192.168.1.7"
-	MASTER = "192.168.1.4"
+	LOCAL   = "127.0.0.1"
+	REMOTE  = "192.168.1.7"
+	MASTER  = "192.168.1.4"
+	MASTER2 = "10.119.11.164"
 )
 
 func main() {

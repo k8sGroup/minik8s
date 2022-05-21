@@ -179,7 +179,7 @@ func createPause(ports []object.Port, name string) (container.ContainerCreateCre
 	}
 
 	resp, err := cli.ContainerCreate(context.Background(), &container.Config{
-		Image:        "gcr.io/google_containers/pause-amd64:3.0",
+		Image:        "registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.6",
 		ExposedPorts: exports,
 	}, &container.HostConfig{
 		IpcMode: container.IpcMode("shareable"),
@@ -276,7 +276,7 @@ func createContainersOfPod(containers []object.Container) ([]object.ContainerMet
 	var result []object.ContainerMeta
 	//先生成所有要暴露的port集合
 	var totlePort []object.Port
-	images := []string{"gcr.io/google_containers/pause-amd64:3.0"}
+	images := []string{"registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.6"}
 	//防止重名，先检查是否重名，有的话删除
 	var names []string
 	pauseName := "pause"

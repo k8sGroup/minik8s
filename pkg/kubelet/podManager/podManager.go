@@ -63,12 +63,13 @@ func (p *PodManager) startTimer() {
 			case <-p.timer.C:
 				p.rwLock.Lock()
 				//对于每个pod调用GetSnapShoot更新信息
+				fmt.Println("[PodManager] timer reached")
 				for k, v := range p.name2uuid {
 					pod := p.uid2pod[v]
 					newPodSnapShoot := pod.GetPodSnapShoot()
 					if !compareSame(p.uid2podSnapshoot[v], newPodSnapShoot) {
 						//有区别产生，需要更新缓存以及etcd
-						oldPod, err := p.client.GetRuntimePod(k, v)
+						oldPod, err := p.client.GetRuntimePod(k)
 						if err != nil || oldPod == nil {
 							p.Err = err
 							continue
