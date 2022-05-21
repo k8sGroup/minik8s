@@ -1,41 +1,34 @@
 package main
 
-import (
-	"fmt"
-	"minik8s/pkg/client"
-	"minik8s/pkg/kubelet"
-	"minik8s/pkg/listerwatcher"
-)
-
 var (
 	LOCAL  = "127.0.0.1"
 	REMOTE = "192.168.1.7"
 )
 
-func main() {
-	// host is the address of master node
-	clientConfig := client.Config{Host: REMOTE + ":8080"}
-	//kube := kubelet.NewKubelet(listerwatcher.GetLsConfig("192.168.1.7"), clientConfig)
-	kube := kubelet.NewKubelet(listerwatcher.GetLsConfig(REMOTE), clientConfig)
-	kube.Run()
-	//data, err := ioutil.ReadFile("./test/pod/example.yaml")
-	//if err != nil {
-	//	fmt.Println(err)
-	//}
-	//pod := &object.Pod{}
-	//err = yaml.Unmarshal([]byte(data), &pod)
-	//err = kube.AddPod(pod)
-	//if err != nil {
-	//	fmt.Println(err)
-	//}
-	var m int
-	for {
-		fmt.Println("查看错误信息\n")
-		fmt.Scanln(&m)
-		fmt.Println(kube.Err)
-	}
-}
-
+//
+//func main() {
+//	// host is the address of master node
+//	clientConfig := client.Config{Host: REMOTE + ":8080"}
+//	//kube := kubelet.NewKubelet(listerwatcher.GetLsConfig("192.168.1.7"), clientConfig)
+//	kube := kubelet.NewKubelet(listerwatcher.GetLsConfig(REMOTE), clientConfig)
+//	kube.Run()
+//	//data, err := ioutil.ReadFile("./test/pod/example.yaml")
+//	//if err != nil {
+//	//	fmt.Println(err)
+//	//}
+//	//pod := &object.Pod{}
+//	//err = yaml.Unmarshal([]byte(data), &pod)
+//	//err = kube.AddPod(pod)
+//	//if err != nil {
+//	//	fmt.Println(err)
+//	//}
+//	var m int
+//	for {
+//		fmt.Println("查看错误信息\n")
+//		fmt.Scanln(&m)
+//		fmt.Println(kube.Err)
+//	}
+//}
 //
 //func main() {
 //	sysType := runtime.GOOS
