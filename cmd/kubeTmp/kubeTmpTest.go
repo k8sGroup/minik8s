@@ -6,11 +6,12 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"minik8s/object"
+	"minik8s/pkg/client"
 	"minik8s/pkg/kubelet/podManager"
 )
 
 func main() {
-	//clientConfig := client.Config{Host: "127.0.0.1:8080"}
+	clientConfig := client.Config{Host: "127.0.0.1:8080"}
 	//restClient := client.RESTClient{
 	//	Base: "http://" + clientConfig.Host,
 	//}
@@ -22,7 +23,7 @@ func main() {
 	err = yaml.Unmarshal([]byte(data), &pod)
 	fmt.Println(*pod)
 	pod.UID = uuid.NewV4().String()
-	manager := podManager.NewPodManager()
+	manager := podManager.NewPodManager(clientConfig)
 	manager.StartPodManager()
 	err = manager.AddPod(pod)
 	if err != nil {

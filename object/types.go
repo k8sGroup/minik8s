@@ -159,3 +159,30 @@ type NodeSpec struct {
 
 type NodeStatus struct {
 }
+
+/****************Service****************************/
+type Service struct {
+	MetaData ObjectMeta `json:"metadata" yaml:"metadata"`
+}
+type ServiceSpec struct {
+	//service 的类型， 有clusterIp和 NodePort类型,默认为ClusterIp
+	Type string `json:"type" yaml:"type"`
+	//虚拟服务Ip地址， 可以手工指定或者由系统进行分配
+	ClusterIp string `json:"clusterIp" yaml:"clusterIp"`
+	//service需要暴露的端口列表
+	Ports []ServicePort `json:"ports" yaml:"ports"`
+	//selector
+	Selector map[string]string `json:"selector" yaml:"selector"`
+}
+type ServicePort struct {
+	//端口的名称
+	Name string `json:"name" yaml:"name"`
+	//端口协议, 支持TCP和UDP, 默认TCP
+	Protocol string `json:"protocol" yaml:"protocol"`
+	//服务监听的端口号
+	Port string `json:"port" yaml:"port"`
+	//需要转发到后端Pod的端口号
+	TargetPort string `json:"target" yaml:"targetPort"`
+	//当service类型为NodePort时，指定映射到物理机的端口号
+	NodePort string `json:"nodePort" yaml:"nodePort"`
+}
