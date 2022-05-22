@@ -1,6 +1,9 @@
 package controller
 
-import "minik8s/object"
+import (
+	"minik8s/object"
+	"minik8s/pkg/kubelet/pod"
+)
 
 func FilterActivePods(pods []*object.Pod) []*object.Pod {
 	var result []*object.Pod
@@ -13,6 +16,5 @@ func FilterActivePods(pods []*object.Pod) []*object.Pod {
 }
 
 func IsPodActive(p *object.Pod) bool {
-	return object.PodSucceeded != p.Status.Phase &&
-		object.PodFailed != p.Status.Phase
+	return (pod.POD_EXITED_STATUS != p.Status.Phase) && (pod.POD_FAILED_STATUS != p.Status.Phase)
 }

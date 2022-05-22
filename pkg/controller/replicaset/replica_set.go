@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"minik8s/cmd/kube-controller-manager/util"
 	"minik8s/object"
+	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/client"
 	"minik8s/pkg/controller"
 	"minik8s/pkg/etcdstore"
@@ -13,6 +14,7 @@ import (
 	"minik8s/pkg/listerwatcher"
 	concurrent_map "minik8s/util/map"
 	"minik8s/util/queue"
+	"sync"
 	"time"
 )
 
@@ -52,16 +54,16 @@ func (rsc *ReplicaSetController) Run(ctx context.Context) {
 
 func (rsc *ReplicaSetController) register() {
 	watchAdd := func(rsc *ReplicaSetController) {
-		err := rsc.ls.Watch("/registry/rs/default", rsc.addRS, rsc.stopChannel)
+		err := rsc.ls.Watch(config.RSConfigPrefix, rsc.addRS, rsc.stopChannel)
 		if err != nil {
-			fmt.Printf("[Scheduler] ListWatch init fail...")
+			fmt.Printf("[ReplicaSetController] ListWatch init fail...")
 		}
 	}
 
 	watchPod := func(rsc *ReplicaSetController) {
 		err := rsc.ls.Watch("/registry/pod/default", rsc.podOperation, rsc.stopChannel)
 		if err != nil {
-			fmt.Printf("[Scheduler] ListWatch init fail...")
+			fmt.Printf("[ReplicaSetController] ListWatch init fail...")
 		}
 	}
 
@@ -74,11 +76,14 @@ func (rsc *ReplicaSetController) register() {
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 func (rsc *ReplicaSetController) worker(ctx context.Context) {
+	var m sync.Mutex
 	for {
 		if !rsc.queue.Empty() {
 			key := rsc.queue.Front()
 			rsc.queue.Dequeue()
+			m.Lock()
 			rsc.syncReplicaSet(ctx, key.(string))
+			m.Unlock()
 		} else {
 			time.Sleep(time.Second)
 		}
@@ -119,9 +124,15 @@ func (rsc *ReplicaSetController) podOperation(res etcdstore.WatchRes) {
 		return
 	}
 
-	isOwned, name, UID := client.OwnByRs(pod)
+	if pod.Status.Phase == "" {
+		return
+	}
+
+	fmt.Printf("[podOperation] pod message:%v\n", pod)
+
+	isOwned, name, _ := client.OwnByRs(pod)
 	if isOwned {
-		rs, err := client.GetRS(rsc.ls, name, UID)
+		rs, err := client.GetRuntimeRS(rsc.ls, name)
 		//fmt.Printf("[podOperation] rs:%v owns:%v\n", rs.NodeName, pod.NodeName)
 		if err == nil {
 			// encode object to key
@@ -216,7 +227,7 @@ func putReplicaSet(ctx context.Context, c *client.RESTClient, rs *object.Replica
 
 	if rs.Spec.Replicas == 0 {
 		// do real deletion
-		err = c.DeleteRS(rs.Name, rs.UID)
+		err = c.DeleteRS(rs.Name)
 	} else {
 		err = c.PutWrap("/registry/rs/default/"+rs.Name, rs)
 	}

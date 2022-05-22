@@ -21,6 +21,7 @@ func main() {
 	//kube := kubelet.NewKubelet(listerwatcher.GetLsConfig("192.168.1.7"), clientConfig)
 	kube := kubelet.NewKubelet(listerwatcher.GetLsConfig(netconfig.MasterIp), clientConfig)
 	kube.Run()
+	fmt.Printf("kube run emd...\n")
 	//data, err := ioutil.ReadFile("./test/pod/example.yaml")
 	//if err != nil {
 	//	fmt.Println(err)
@@ -39,7 +40,6 @@ func main() {
 	}
 }
 
-//
 //func main() {
 //	sysType := runtime.GOOS
 //

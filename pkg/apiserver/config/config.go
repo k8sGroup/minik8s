@@ -57,15 +57,14 @@ const (
 	ServiceConfigPrefix = "/registry/serviceConfig/default"
 	Service             = "registry/service/default/:resourceName"
 	ServicePrefix       = "registry/service/default"
+	RSConfigPrefix = "/registry/rsConfig/default"
 
 	SharedData       = "/registry/sharedData/default/:resourceName"
 	SharedDataPrefix = "/registry/sharedData/default"
-
-	POD_TEST = "/pod/test/:resourceName"
 )
 
 var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler",
-	"podConfig", "sharedData", "service", "serviceConfig"}
+	"podConfig", "sharedData", "service", "serviceConfig", "rsConfig"}
 
 type ServerConfig struct {
 	HttpPort       int

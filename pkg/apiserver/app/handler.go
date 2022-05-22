@@ -105,7 +105,6 @@ func (s *Server) userAddPod(ctx *gin.Context) {
 
 // just for user to do some operation
 func (s *Server) userAddRS(ctx *gin.Context) {
-	key := strings.TrimPrefix(ctx.Request.URL.Path, "/user")
 	uid := uuid.New().String()
 	body, err := ioutil.ReadAll(ctx.Request.Body)
 	rs := object.ReplicaSet{}
@@ -117,5 +116,5 @@ func (s *Server) userAddRS(ctx *gin.Context) {
 		return
 	}
 	body, _ = json.Marshal(rs)
-	err = s.store.Put(key, body)
+	err = s.store.Put(config.RSConfigPrefix+"/"+rs.Name, body)
 }
