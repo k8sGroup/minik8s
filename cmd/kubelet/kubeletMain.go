@@ -5,20 +5,21 @@ import (
 	"minik8s/pkg/client"
 	"minik8s/pkg/kubelet"
 	"minik8s/pkg/listerwatcher"
+	"minik8s/pkg/netSupport/netconfig"
 )
 
-var (
-	LOCAL   = "127.0.0.1"
-	REMOTE  = "192.168.1.7"
-	MASTER  = "192.168.1.4"
-	MASTER2 = "10.119.11.164"
-)
+//var (
+//	LOCAL   = "127.0.0.1"
+//	REMOTE  = "192.168.1.7"
+//	MASTER  = "192.168.1.4"
+//	MASTER2 = "10.119.11.164"
+//)
 
 func main() {
 	// host is the address of master node
-	clientConfig := client.Config{Host: MASTER + ":8080"}
+	clientConfig := client.Config{Host: netconfig.MasterIp + ":8080"}
 	//kube := kubelet.NewKubelet(listerwatcher.GetLsConfig("192.168.1.7"), clientConfig)
-	kube := kubelet.NewKubelet(listerwatcher.GetLsConfig(MASTER), clientConfig)
+	kube := kubelet.NewKubelet(listerwatcher.GetLsConfig(netconfig.MasterIp), clientConfig)
 	kube.Run()
 	//data, err := ioutil.ReadFile("./test/pod/example.yaml")
 	//if err != nil {
