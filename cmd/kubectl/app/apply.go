@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-yaml/yaml"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"minik8s/object"
+	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/client"
 	"os"
 	"strings"
@@ -18,6 +20,7 @@ const (
 	Replicaset              string = "Replicaset"
 	HorizontalPodAutoscaler string = "HorizontalPodAutoscaler"
 	Test                    string = "Test"
+	GpuJob                  string = "GpuJob"
 )
 
 var (
@@ -67,45 +70,16 @@ func analyzeFile(path string) {
 
 	switch kind {
 	case Deployment:
-		deployment := object.Deployment{}
-		err = unmarshal(file, &deployment)
-		if err != nil {
-			fmt.Printf("Error unmarshaling file %s, %s\n", path, err.Error())
-			return
-		}
-		deployment.Complete()
-		fmt.Printf("%+v\n", deployment)
-		err = client.Put(baseUrl+"/registry/deployment/default/"+deployment.Metadata.Name, deployment)
-		if err != nil {
-			fmt.Printf("Error applying `file %s`.\n%s\n", path, err.Error())
-			return
-		}
+		CaseDeployment(file, path, unmarshal)
 		break
 	case Replicaset:
-		replicaset := object.ReplicaSet{}
-		err = unmarshal(file, &replicaset)
-		if err != nil {
-			fmt.Printf("Error unmarshaling file %s\n", path)
-			return
-		}
-		err = client.Put(baseUrl+"/registry/rs/default/"+replicaset.ObjectMeta.Name, replicaset)
-		if err != nil {
-			fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
-			return
-		}
+		CaseReplicaset(file, path, unmarshal)
 		break
 	case HorizontalPodAutoscaler:
-		hpa := object.Autoscaler{}
-		err = unmarshal(file, &hpa)
-		if err != nil {
-			fmt.Printf("Error unmarshaling file %s\n", path)
-			return
-		}
-		err = client.Put(baseUrl+"/registry/autoscaler/default/"+hpa.Metadata.Name, hpa)
-		if err != nil {
-			fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
-			return
-		}
+		CaseHPA(file, path, unmarshal)
+		break
+	case GpuJob:
+		CaseGpuJob(file, path, unmarshal)
 		break
 	case Test:
 		err = client.Put(baseUrl+"/registry/test/default/test1", "{test:\"test\"}")
@@ -114,11 +88,87 @@ func analyzeFile(path string) {
 		}
 		break
 	case "":
-		fmt.Printf("kind is unspecified\n")
+		fmt.Printf("kind field is unspecified\n")
 		return
 	default:
 		fmt.Printf("Unsupported kind %s\n", kind)
 		return
 	}
 	fmt.Println("Applied!")
+}
+
+func CaseDeployment(file []byte, path string, unmarshal func([]byte, any) error) {
+	deployment := object.Deployment{}
+	err := unmarshal(file, &deployment)
+	if err != nil {
+		fmt.Printf("Error unmarshaling file %s, %s\n", path, err.Error())
+		return
+	}
+	deployment.Complete()
+	fmt.Printf("%+v\n", deployment)
+	err = client.Put(baseUrl+"/registry/deployment/default/"+deployment.Metadata.Name, deployment)
+	if err != nil {
+		fmt.Printf("Error applying `file %s`.\n%s\n", path, err.Error())
+		return
+	}
+}
+
+func CaseReplicaset(file []byte, path string, unmarshal func([]byte, any) error) {
+	replicaset := object.ReplicaSet{}
+	err := unmarshal(file, &replicaset)
+	if err != nil {
+		fmt.Printf("Error unmarshaling file %s\n", path)
+		return
+	}
+	err = client.Put(baseUrl+"/registry/rs/default/"+replicaset.ObjectMeta.Name, replicaset)
+	if err != nil {
+		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
+		return
+	}
+}
+
+func CaseHPA(file []byte, path string, unmarshal func([]byte, any) error) {
+	hpa := object.Autoscaler{}
+	err := unmarshal(file, &hpa)
+	if err != nil {
+		fmt.Printf("Error unmarshaling file %s\n", path)
+		return
+	}
+	err = client.Put(baseUrl+"/registry/autoscaler/default/"+hpa.Metadata.Name, hpa)
+	if err != nil {
+		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
+		return
+	}
+}
+
+func CaseGpuJob(file []byte, path string, unmarshal func([]byte, any) error) {
+	uid := uuid.New().String()
+	gpuJob := object.GPUJob{}
+	err := unmarshal(file, &gpuJob)
+	if err != nil {
+		fmt.Printf("Error unmarshaling file %s\n", path)
+		return
+	}
+	gpuJob.Metadata.UID = uid
+	zip, err := os.ReadFile(gpuJob.Spec.ZipPath)
+	if err != nil {
+		fmt.Printf("Error reading zip file `%s`\n.%s\n", gpuJob.Spec.ZipPath, err.Error())
+		return
+	}
+	jobKey := "job-" + uid
+	jobZip := object.JobZipFile{
+		Key:   jobKey,
+		Slurm: gpuJob.GenerateSlurmScript(),
+		Zip:   zip,
+	}
+	err = client.Put(baseUrl+config.SharedDataPrefix+"/"+jobKey, jobZip)
+	if err != nil {
+		fmt.Printf("Error uploading file `%s`\n.%s\n", gpuJob.Spec.ZipPath, err.Error())
+		return
+	}
+	err = client.Put(baseUrl+"/registry/job/default/"+jobKey, gpuJob)
+	if err != nil {
+		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
+		return
+	}
 }

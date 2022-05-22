@@ -20,14 +20,45 @@ services:
     restart: always
     hostname: etcd_host
     ports:
-      - "2379:2379"
-      - "2380:2380"
-      - "4001:4001"
+      - "12379:2379"
+      - "12380:2380"
+      - "14001:4001"
     volumes:
-      - ./docker/etcdstore/data:/bitnami/etcdstore/data
+      - ./docker/etcdstore/data:/bitnami/etcd/data
     environment:
       - ALLOW_NONE_AUTHENTICATION=yes
       - ETCD_ADVERTISE_CLIENT_URLS=http://etcdstore:2379
+
+  etcdv2:
+    image: quay.io/coreos/etcd:v3.3.12
+    container_name: etcdstorev2
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    environment:
+      ETCDCTL_API: 2
+    volumes:
+      - ./docker/etcdstorev2/data:/etcd-data
+    command:
+      - "/usr/local/bin/etcd"
+      - "--name"
+      - "s1"
+      - "--data-dir"
+      - "/etcd-data"
+      - "--advertise-client-urls"
+      - "http://0.0.0.0:2379"
+      - --listen-client-urls
+      - "http://0.0.0.0:2379"
+      - "--initial-advertise-peer-urls"
+      - "http://0.0.0.0:2380"
+      - "--listen-peer-urls"
+      - "http://0.0.0.0:2380"
+      - "--initial-cluster-token"
+      - "tkn"
+      - "--initial-cluster"
+      - "s1=http://0.0.0.0:2380"
+      - "--initial-cluster-state"
+      - "new"
 
   prometheus:
     image: prom/prometheus

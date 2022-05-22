@@ -3,6 +3,8 @@ package object
 import (
 	"errors"
 	"fmt"
+	mapset "github.com/deckarep/golang-set/v2"
+	"go.uber.org/atomic"
 	"strings"
 )
 
@@ -14,6 +16,7 @@ type GPUJob struct {
 type JobSpec struct {
 	SlurmConfig JobConfig `json:"slurmConfig" yaml:"slurmConfig"`
 	Commands    []string  `json:"commands" yaml:"commands"`
+	ZipPath     string    `json:"zipPath" yaml:"zipPath"`
 }
 
 type JobConfig struct {
@@ -91,17 +94,23 @@ const (
 )
 
 const (
-	Username1 string = "stu625"
-	Password1        = "%Fi4X^n@"
-	Username2        = "stu626"
-	Password2        = "2#Sp8Ejw"
-	Username3        = "stu627"
-	Password3        = "YYT!Y9ok"
+	username0 string = "stu625"
+	password0        = "%Fi4X^n@"
+	username1        = "stu626"
+	password1        = "2#Sp8Ejw"
+	username2        = "stu627"
+	password2        = "YYT!Y9ok"
 )
 
+var HostSySet = mapset.NewSet[string]("64c512g", "a100")
+var HostPiAndAISet = mapset.NewSet[string]("small", "debug", "cpu", "dgx2")
+var HostArmSet = mapset.NewSet[string]("arm128c256g")
+
 type Account struct {
-	username string
-	password string
+	username       string
+	password       string
+	host           string
+	remoteBasePath string
 }
 
 func NewGPUAccount(username string, password string) *Account {
@@ -111,16 +120,22 @@ func NewGPUAccount(username string, password string) *Account {
 	}
 }
 
-func (account *Account) RemoteBasePath(cluster string) (string, error) {
-	switch cluster {
+func (account *Account) SetRemoteBasePath(host string) error {
+	switch host {
 	case HostSy:
-		return fmt.Sprintf("/dssg/home/acct-stu/%s", account.username), nil
+		account.host = host
+		account.remoteBasePath = fmt.Sprintf("/dssg/home/acct-stu/%s", account.username)
+		return nil
 	case HostPiAndAI:
-		return fmt.Sprintf("/lustre/home/acct-stu/%s", account.username), nil
+		account.host = host
+		account.remoteBasePath = fmt.Sprintf("/lustre/home/acct-stu/%s", account.username)
+		return nil
 	case HostArm:
-		return fmt.Sprintf("/lustre/home/acct-stu/%s", account.username), nil
+		account.host = host
+		account.remoteBasePath = fmt.Sprintf("/lustre/home/acct-stu/%s", account.username)
+		return nil
 	default:
-		return "", errors.New("unknown cluster type")
+		return errors.New("unknown host type")
 	}
 }
 
@@ -130,4 +145,58 @@ func (account *Account) GetUsername() string {
 
 func (account *Account) GetPassword() string {
 	return account.password
+}
+
+func (account *Account) GetHost() string {
+	return account.host
+}
+
+func (account *Account) GetRemoteBasePath() string {
+	return account.remoteBasePath
+}
+
+type JobZipFile struct {
+	Key   string `json:"key" yaml:"key"` // format : job-uuid
+	Slurm []byte `json:"slurm" yaml:"slurm"`
+	Zip   []byte `json:"zip" yaml:"zip"`
+}
+
+type AccountAllocator struct {
+	counter *atomic.Uint64
+}
+
+func NewAccountAllocator() *AccountAllocator {
+	return &AccountAllocator{
+		counter: atomic.NewUint64(0),
+	}
+}
+
+func (a *AccountAllocator) Allocate(partition string) (*Account, error) {
+	var host string
+	if HostSySet.Contains(strings.ToLower(partition)) {
+		host = HostSy
+	} else if HostPiAndAISet.Contains(strings.ToLower(partition)) {
+		host = HostPiAndAI
+	} else if HostArmSet.Contains(strings.ToLower(partition)) {
+		host = HostArm
+	} else {
+		return nil, errors.New("illegal partition")
+	}
+	t := a.counter.Add(1)
+	var account *Account
+	switch t % 3 {
+	case 0:
+		account = NewGPUAccount(username0, password0)
+	case 1:
+		account = NewGPUAccount(username1, password1)
+	case 2:
+		account = NewGPUAccount(username2, password2)
+	default:
+		return nil, errors.New("allocation error")
+	}
+	err := account.SetRemoteBasePath(host)
+	if err != nil {
+		return nil, err
+	}
+	return account, nil
 }

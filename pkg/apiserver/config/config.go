@@ -31,6 +31,8 @@ apiServer 的路径是 /registry/{resource}/{namespace}/{resource_name}
 /registry/serviceaccounts/default/default
 */
 
+const SharedDataDirectory = "/home/SharedData"
+
 const Path = "/registry/:resource/:namespace/:resourceName"
 const PrefixPath = "/registry/:resource/:namespace"
 const ParamResource = "resource"
@@ -74,7 +76,7 @@ func DefaultServerConfig() *ServerConfig {
 	return &ServerConfig{
 		HttpPort:       8080,
 		ValidResources: defaultValidResources,
-		EtcdEndpoints:  []string{"localhost:2379"},
+		EtcdEndpoints:  []string{"localhost:12379"},
 		EtcdTimeout:    5 * time.Second,
 		QueueConfig:    messaging.DefaultQConfig(),
 	}
