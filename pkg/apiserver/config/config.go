@@ -53,13 +53,18 @@ const (
 	PodCONFIG       = "/registry/podConfig/default/:resourceName"
 	PodConfigPREFIX = "/registry/podConfig/default"
 
+	ServiceConfig       = "/registry/serviceConfig/default/:resourceName"
+	ServiceConfigPrefix = "/registry/serviceConfig/default"
+	Service             = "registry/service/default/:resourceName"
+	ServicePrefix       = "registry/service/default"
 	RSConfigPrefix = "/registry/rsConfig/default"
 
 	SharedData       = "/registry/sharedData/default/:resourceName"
 	SharedDataPrefix = "/registry/sharedData/default"
 )
 
-var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler", "podConfig", "sharedData", "rsConfig"}
+var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler",
+	"podConfig", "sharedData", "service", "serviceConfig", "rsConfig"}
 
 type ServerConfig struct {
 	HttpPort       int
@@ -73,7 +78,7 @@ func DefaultServerConfig() *ServerConfig {
 	return &ServerConfig{
 		HttpPort:       8080,
 		ValidResources: defaultValidResources,
-		EtcdEndpoints:  []string{"localhost:2379"},
+		EtcdEndpoints:  []string{"localhost:12379"},
 		EtcdTimeout:    5 * time.Second,
 		QueueConfig:    messaging.DefaultQConfig(),
 	}
