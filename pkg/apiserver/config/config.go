@@ -53,13 +53,19 @@ const (
 	PodCONFIG       = "/registry/podConfig/default/:resourceName"
 	PodConfigPREFIX = "/registry/podConfig/default"
 
+	ServiceConfig       = "/registry/serviceConfig/default/:resourceName"
+	ServiceConfigPrefix = "/registry/serviceConfig/default"
+	Service             = "registry/service/default/:resourceName"
+	ServicePrefix       = "registry/service/default"
+
 	SharedData       = "/registry/sharedData/default/:resourceName"
 	SharedDataPrefix = "/registry/sharedData/default"
 
 	POD_TEST = "/pod/test/:resourceName"
 )
 
-var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler", "podConfig", "sharedData"}
+var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler",
+	"podConfig", "sharedData", "service", "serviceConfig"}
 
 type ServerConfig struct {
 	HttpPort       int

@@ -8,13 +8,12 @@ import (
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
-	"minik8s/pkg/kubeNetSupport"
-	"minik8s/pkg/kubeNetSupport/iptablesManager"
 	"minik8s/pkg/kubelet/monitor"
 	"minik8s/pkg/kubelet/podConfig"
 	"minik8s/pkg/kubelet/podManager"
 	"minik8s/pkg/kubelet/types"
 	"minik8s/pkg/listerwatcher"
+	"minik8s/pkg/netSupport"
 	"time"
 
 	"golang.org/x/net/context"
@@ -22,21 +21,18 @@ import (
 
 type Kubelet struct {
 	podManager     *podManager.PodManager
-	kubeNetSupport *kubeNetSupport.KubeNetSupport
 	PodConfig      *podConfig.PodConfig
 	podMonitor     *monitor.DockerMonitor
-
-	ls          *listerwatcher.ListerWatcher
-	stopChannel <-chan struct{}
-	Client      client.RESTClient
-	Err         error
+	kubeNetSupport *netSupport.KubeNetSupport
+	ls             *listerwatcher.ListerWatcher
+	stopChannel    <-chan struct{}
+	Client         client.RESTClient
+	Err            error
 }
 
 func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kubelet {
 	kubelet := &Kubelet{}
 	kubelet.podManager = podManager.NewPodManager(clientConfig)
-	kubelet.kubeNetSupport, kubelet.Err = kubeNetSupport.NewKubeNetSupport(lsConfig, clientConfig, false)
-
 	restClient := client.RESTClient{
 		Base: "http://" + clientConfig.Host,
 	}
@@ -48,7 +44,10 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 		fmt.Printf("[NewKubelet] list watch start fail...")
 	}
 	kubelet.ls = ls
-
+	kubelet.kubeNetSupport, err = netSupport.NewKubeNetSupport(lsConfig, clientConfig)
+	if err != nil {
+		fmt.Printf("[NewKubelet] new kubeNetSupport fail")
+	}
 	// initialize pod podConfig
 	kubelet.PodConfig = podConfig.NewPodConfig()
 
@@ -86,23 +85,6 @@ func (k *Kubelet) GetPodInfo(podName string) ([]byte, error) {
 }
 func (k *Kubelet) DeletePod(podName string) error {
 	return k.podManager.DeletePod(podName)
-}
-func (k *Kubelet) AddPodPortMapping(podName string, podPort string, hostPort string) (iptablesManager.PortMapping, error) {
-	p, err := k.podManager.GetPodSnapShoot(podName)
-	if err != nil {
-		return iptablesManager.PortMapping{}, err
-	}
-	return k.kubeNetSupport.AddPortMapping(p, podPort, hostPort)
-}
-func (k *Kubelet) RemovePortMapping(podName string, podPort string, hostPort string) error {
-	p, err := k.podManager.GetPodSnapShoot(podName)
-	if err != nil {
-		return err
-	}
-	return k.kubeNetSupport.RemovePortMapping(p, podPort, hostPort)
-}
-func (k *Kubelet) GetPodMappingInfo() []iptablesManager.PortMapping {
-	return k.kubeNetSupport.GetKubeproxySnapShoot().PortMappings
 }
 
 type SyncHandler interface {

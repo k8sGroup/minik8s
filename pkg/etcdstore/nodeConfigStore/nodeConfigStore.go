@@ -3,6 +3,7 @@ package nodeConfigStore
 import (
 	"errors"
 	"fmt"
+	uuid "github.com/satori/go.uuid"
 	"minik8s/object"
 	"sync"
 	"time"
@@ -45,30 +46,24 @@ func GetNodes() []*object.Node {
 	}
 	return res
 }
-func AddNewNode(physicalIp string) (*object.Node, error) {
+
+//主要任务是分配一个
+func AddNewNode(node *object.Node) (*object.Node, error) {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	//先检查是否已经存在
 	netConfigStore := getNetConfigStore()
-	flag := netConfigStore.checkIfExist(physicalIp)
+	flag := netConfigStore.checkIfExist(node.Spec.DynamicIp)
 	if flag {
-		return nil, errors.New(physicalIp + " already exist")
+		return nil, errors.New("[nodeConfigStore]" + node.Spec.DynamicIp + " already exist")
 	}
-	name, ipAndMask := GetNodeNameWithIpAndMask()
-	newNode := &object.Node{
-		Spec: object.NodeSpec{
-			PhysicalIp:    physicalIp,
-			NodeIpAndMask: ipAndMask,
-		},
-		MetaData: object.ObjectMeta{
-			Name:  name,
-			Ctime: time.Now().Format("2006-01-02 15:04:05"),
-		},
-	}
-	netConfigStore.Name2Node[name] = newNode
+	name := GetNodeName()
+	node.MetaData.Name = name
+	node.MetaData.Ctime = time.Now().Format("2006-01-02 15:04:05")
+	node.MetaData.UID = uuid.NewV4().String()
+	netConfigStore.Name2Node[name] = node
 	fmt.Println("new node added")
-	fmt.Println(*netConfigStore)
-	return newNode, nil
+	return node, nil
 }
 
 func DeleteNode(physicalIp string) (*object.Node, error) {
@@ -81,7 +76,7 @@ func DeleteNode(physicalIp string) (*object.Node, error) {
 	}
 	var del *object.Node
 	for k, v := range netConfigStore.Name2Node {
-		if v.Spec.PhysicalIp == physicalIp {
+		if v.Spec.DynamicIp == physicalIp {
 			del = v
 			delete(netConfigStore.Name2Node, k)
 			return del, nil
@@ -93,7 +88,7 @@ func DeleteNode(physicalIp string) (*object.Node, error) {
 
 func (netConfigStore *NetConfigStore) checkIfExist(physicalIp string) bool {
 	for _, v := range netConfigStore.Name2Node {
-		if v.Spec.PhysicalIp == physicalIp {
+		if v.Spec.DynamicIp == physicalIp {
 			return true
 		}
 	}
