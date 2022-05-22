@@ -1,6 +1,8 @@
 package tools
 
 import (
+	"fmt"
+	"minik8s/pkg/kubeNetSupport/netconfig"
 	"net"
 	"strings"
 )
@@ -23,7 +25,7 @@ func LocalIPv4s() ([]string, error) {
 }
 
 //比如, name可以为 ens33
-func GetIPv4ByInterface(name string) ([]string, error) {
+func getIPv4ByInterface(name string) ([]string, error) {
 	var ips []string
 
 	iface, err := net.InterfaceByName(name)
@@ -43,6 +45,16 @@ func GetIPv4ByInterface(name string) ([]string, error) {
 	}
 
 	return ips, nil
+}
+func GetEns3IPv4Addr() string {
+	val, _ := getIPv4ByInterface(netconfig.ETH_NAME)
+	return val[0]
+}
+func GetDynamicIp() string {
+	ips, _ := getIPv4ByInterface(netconfig.ETH_NAME)
+	fmt.Println(ips)
+	fmt.Println(netconfig.GlobalIpMap)
+	return netconfig.GlobalIpMap[ips[0]]
 }
 func GetBasicIpAndMask(ipAndMask string) string {
 	index := strings.Index(ipAndMask, ".")

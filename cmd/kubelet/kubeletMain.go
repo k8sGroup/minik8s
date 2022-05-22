@@ -8,17 +8,18 @@ import (
 )
 
 var (
-	LOCAL  = "127.0.0.1"
-	REMOTE = "192.168.1.7"
-	MASTER = "192.168.1.4"
+	LOCAL       = "127.0.0.1"
+	REMOTE      = "192.168.1.7"
+	QIAN_REMOTE = "192.168.1.4"
 )
 
 func main() {
 	// host is the address of master node
-	clientConfig := client.Config{Host: MASTER + ":8080"}
+	clientConfig := client.Config{Host: QIAN_REMOTE + ":8080"}
 	//kube := kubelet.NewKubelet(listerwatcher.GetLsConfig("192.168.1.7"), clientConfig)
-	kube := kubelet.NewKubelet(listerwatcher.GetLsConfig(MASTER), clientConfig)
+	kube := kubelet.NewKubelet(listerwatcher.GetLsConfig(QIAN_REMOTE), clientConfig)
 	kube.Run()
+	fmt.Printf("kube run emd...\n")
 	//data, err := ioutil.ReadFile("./test/pod/example.yaml")
 	//if err != nil {
 	//	fmt.Println(err)
@@ -37,7 +38,6 @@ func main() {
 	}
 }
 
-//
 //func main() {
 //	sysType := runtime.GOOS
 //

@@ -1,8 +1,9 @@
 package client
 
 import (
-	"github.com/google/uuid"
 	"minik8s/pkg/apiserver/config"
+
+	"github.com/google/uuid"
 
 	"bytes"
 	"context"
@@ -42,22 +43,24 @@ func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) erro
 	podRaw, _ := json.Marshal(pod)
 	reqBody := bytes.NewBuffer(podRaw)
 
+	// put config
 	req, _ := http.NewRequest("PUT", r.Base+attachURL, reqBody)
 	resp, _ := http.DefaultClient.Do(req)
+
+	if resp.StatusCode != object.SUCCESS {
+		return errors.New("create pod config fail")
+	}
+
+	// put runtime
+	attachURL = "/registry/pod/default/" + rs.Spec.Template.Name + podUID
+	req, _ = http.NewRequest("PUT", r.Base+attachURL, reqBody)
+	resp, _ = http.DefaultClient.Do(req)
 
 	if resp.StatusCode != object.SUCCESS {
 		return errors.New("create pod fail")
 	}
 
-	result := &object.Pod{}
-	body, _ := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
-
-	err := json.Unmarshal(body, result)
-	if err != nil {
-		klog.Infof("[CreatePods] Body Pods Unmarshal fail\n")
-	}
-	return err
+	return nil
 }
 
 func (r RESTClient) UpdateRuntimePod(pod *object.Pod) error {
@@ -113,8 +116,8 @@ func GetPodFromRS(rs *object.ReplicaSet) (*object.Pod, error) {
 	return pod, nil
 }
 
-func (r RESTClient) GetRuntimePod(name string, podUID string) (*object.Pod, error) {
-	attachUrl := "/registry/pod/default/" + name + podUID
+func (r RESTClient) GetRuntimePod(name string) (*object.Pod, error) {
+	attachUrl := "/registry/pod/default/" + name
 	resp, err := Get(r.Base + attachUrl)
 	if err != nil {
 		return nil, err
@@ -129,12 +132,12 @@ func (r RESTClient) GetRuntimePod(name string, podUID string) (*object.Pod, erro
 
 /********************************RS*****************************/
 
-func GetRS(ls *listerwatcher.ListerWatcher, name string, UID string) (*object.ReplicaSet, error) {
-	attachURL := "/registry/rs/default/" + name + UID
+func GetRuntimeRS(ls *listerwatcher.ListerWatcher, name string) (*object.ReplicaSet, error) {
+	attachURL := "/registry/rs/default/" + name
 
 	raw, err := ls.List(attachURL)
 	if err != nil {
-		fmt.Printf("[GetNodes] fail to get nodes\n")
+		fmt.Printf("[GetRS] fail to get nodes\n")
 	}
 
 	if len(raw) == 0 {
@@ -146,14 +149,14 @@ func GetRS(ls *listerwatcher.ListerWatcher, name string, UID string) (*object.Re
 	err = json.Unmarshal(raw[0].ValueBytes, result)
 
 	if err != nil {
-		fmt.Printf("[GetNodes] unmarshal fail\n")
+		fmt.Printf("[GetRS] unmarshal fail\n")
 	}
-	fmt.Printf("[GetNodes] rs:%+v\n", result)
+	fmt.Printf("[GetRS] rs:%+v\n", result)
 	return result, nil
 }
 
 func GetRSPods(ls *listerwatcher.ListerWatcher, name string, UID string) ([]*object.Pod, error) {
-	raw, err := ls.List(config.PodConfigPREFIX)
+	raw, err := ls.List("/registry/pod/default")
 
 	var pods []*object.Pod
 
@@ -178,8 +181,8 @@ func GetRSPods(ls *listerwatcher.ListerWatcher, name string, UID string) ([]*obj
 
 }
 
-func (r RESTClient) DeleteRS(rsName string, UID string) error {
-	attachURL := "/registry/rs/default/" + rsName + UID
+func (r RESTClient) DeleteRS(rsName string) error {
+	attachURL := "/registry/rs/default/" + rsName
 	fmt.Printf("delete rs:" + attachURL + "\n")
 	err := Del(r.Base + attachURL)
 	return err

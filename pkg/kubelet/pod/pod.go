@@ -1,6 +1,7 @@
 package pod
 
 import (
+	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/satori/go.uuid"
 	"minik8s/object"
@@ -89,7 +90,7 @@ func NewPodfromConfig(config *object.Pod) *Pod {
 	newPod.name = config.ObjectMeta.Name
 	newPod.uid = config.UID
 	newPod.ctime = time.Now().String()
-	newPod.canProbeWork = true
+	newPod.canProbeWork = false
 	newPod.Label = config.ObjectMeta.Labels
 	var rwLock sync.RWMutex
 	newPod.rwLock = rwLock
@@ -182,6 +183,7 @@ func NewPodfromConfig(config *object.Pod) *Pod {
 func (p *Pod) StartPod() {
 	go p.podWorker.SyncLoop(p.commandChan, p.responseChan)
 	go p.listeningResponse()
+	p.canProbeWork = true
 	p.StartProbe()
 }
 
@@ -373,7 +375,7 @@ func (p *Pod) StartProbe() {
 			case <-p.timer.C:
 				p.rwLock.Lock()
 				//这几种情况下不进行检查
-				if p.canProbeWork && p.status != POD_PENDING_STATUS && p.status != POD_FAILED_STATUS && p.status != POD_DELETED_STATUS {
+				if p.canProbeWork && p.status != POD_PENDING_STATUS && p.status != POD_FAILED_STATUS && p.status != POD_DELETED_STATUS && p.status != POD_EXITED_STATUS {
 					command := &message.CommandWithContainerIds{}
 					command.CommandType = message.COMMAND_PROBE_CONTAINER
 					var group []string
