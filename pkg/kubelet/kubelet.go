@@ -14,6 +14,9 @@ import (
 	"minik8s/pkg/kubelet/types"
 	"minik8s/pkg/listerwatcher"
 	"minik8s/pkg/netSupport"
+	"minik8s/pkg/tools"
+	"os"
+	"path"
 	"time"
 
 	"golang.org/x/net/context"
@@ -68,7 +71,13 @@ func (kl *Kubelet) Run() {
 	go kl.syncLoop(updates, kl)
 	go kl.DoMonitor(context.Background())
 	go kl.ls.Watch(config.PodConfigPREFIX, kl.watchPod, kl.stopChannel)
-	go kl.ls.Watch(config.SharedDataPrefix, kl.watchFile, kl.stopChannel)
+	go func() {
+		err := kl.ls.Watch(config.SharedDataPrefix, kl.watchSharedData, kl.stopChannel)
+		if err == nil {
+			return
+		}
+		time.Sleep(10 * time.Second)
+	}()
 }
 
 func (kl *Kubelet) syncLoop(updates <-chan types.PodUpdate, handler SyncHandler) {
@@ -178,9 +187,7 @@ func (kl *Kubelet) watchPod(res etcdstore.WatchRes) {
 	}
 	return
 }
-func (kl *Kubelet) watchFile(res etcdstore.WatchRes) {
 
-}
 func (kl *Kubelet) HandlePodAdditions(pods []*object.Pod) {
 	for _, pod := range pods {
 		fmt.Printf("[Kubelet] Prepare add pod:%s\npod:%+v\n", pod.Name, pod)
@@ -231,5 +238,46 @@ func (kl *Kubelet) DoMonitor(ctx context.Context) {
 			kl.podMonitor.MetricDockerStat(ctx, pod)
 		}
 		time.Sleep(time.Second * 2)
+	}
+}
+
+func (kl *Kubelet) watchSharedData(res etcdstore.WatchRes) {
+	switch res.ResType {
+	case etcdstore.PUT:
+		jobZipFile := object.JobZipFile{}
+		err := json.Unmarshal(res.ValueBytes, &jobZipFile)
+		if err != nil {
+			klog.Errorf("%s\n", err.Error())
+			return
+		}
+		zipName := jobZipFile.Key + ".zip"
+		unzippedDir := path.Join(config.SharedDataDirectory, jobZipFile.Key)
+		err = tools.Bytes2File(jobZipFile.Zip, zipName, config.SharedDataDirectory)
+		if err != nil {
+			klog.Errorf("%s\n", err.Error())
+			return
+		}
+		err = tools.Unzip(path.Join(config.SharedDataDirectory, zipName), unzippedDir)
+		if err != nil {
+			klog.Errorf("%s\n", err.Error())
+			return
+		}
+		err = tools.Bytes2File(jobZipFile.Slurm, "sbatch.slurm", unzippedDir)
+		if err != nil {
+			klog.Errorf("%s\n", err.Error())
+			return
+		}
+		break
+	case etcdstore.DELETE:
+		jobKey := path.Base(res.Key)
+		err := tools.RemoveAll(path.Join(config.SharedDataDirectory, jobKey))
+		if err != nil {
+			klog.Errorf("%s\n", err.Error())
+		}
+		err = os.Remove(path.Join(config.SharedDataDirectory, jobKey+".zip"))
+		if err != nil {
+			klog.Errorf("%s\n", err.Error())
+		}
+		break
 	}
 }
