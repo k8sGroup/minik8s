@@ -48,7 +48,9 @@ func (j *GPUJob) GenerateSlurmScript() []byte {
 	if config.Nodes > 0 {
 		model = append(model, fmt.Sprintf("#SBATCH --nodes=%d", config.Nodes))
 	}
-	model = append(model, fmt.Sprintf("#SBATCH -n %d", config.NTasks))
+	if config.NTasks > 0 {
+		model = append(model, fmt.Sprintf("#SBATCH -n %d", config.NTasks))
+	}
 	if config.NTasksPerNode > 0 {
 		model = append(model, fmt.Sprintf("#SBATCH --ntasks-per-node=%d", config.NTasksPerNode))
 	}

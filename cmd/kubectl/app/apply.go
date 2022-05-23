@@ -63,23 +63,31 @@ func analyzeFile(path string) {
 	}
 	err = viper.ReadConfig(bytes.NewReader(file))
 	if err != nil {
-		fmt.Printf("Error reading file %s\n", path)
+		fmt.Printf("Error analyzing file %s\n", path)
 		return
 	}
-	kind := viper.GetString("Kind")
+	kind := viper.GetString("kind")
 
 	switch kind {
 	case Deployment:
-		CaseDeployment(file, path, unmarshal)
+		if err := CaseDeployment(file, path, unmarshal); err != nil {
+			return
+		}
 		break
 	case Replicaset:
-		CaseReplicaset(file, path, unmarshal)
+		if err := CaseReplicaset(file, path, unmarshal); err != nil {
+			return
+		}
 		break
 	case HorizontalPodAutoscaler:
-		CaseHPA(file, path, unmarshal)
+		if err := CaseHPA(file, path, unmarshal); err != nil {
+			return
+		}
 		break
 	case GpuJob:
-		CaseGpuJob(file, path, unmarshal)
+		if err := CaseGpuJob(file, path, unmarshal); err != nil {
+			return
+		}
 		break
 	case Test:
 		err = client.Put(baseUrl+"/registry/test/default/test1", "{test:\"test\"}")
@@ -97,63 +105,66 @@ func analyzeFile(path string) {
 	fmt.Println("Applied!")
 }
 
-func CaseDeployment(file []byte, path string, unmarshal func([]byte, any) error) {
+func CaseDeployment(file []byte, path string, unmarshal func([]byte, any) error) error {
 	deployment := object.Deployment{}
 	err := unmarshal(file, &deployment)
 	if err != nil {
 		fmt.Printf("Error unmarshaling file %s, %s\n", path, err.Error())
-		return
+		return err
 	}
 	deployment.Complete()
 	fmt.Printf("%+v\n", deployment)
 	err = client.Put(baseUrl+"/registry/deployment/default/"+deployment.Metadata.Name, deployment)
 	if err != nil {
 		fmt.Printf("Error applying `file %s`.\n%s\n", path, err.Error())
-		return
+		return err
 	}
+	return nil
 }
 
-func CaseReplicaset(file []byte, path string, unmarshal func([]byte, any) error) {
+func CaseReplicaset(file []byte, path string, unmarshal func([]byte, any) error) error {
 	replicaset := object.ReplicaSet{}
 	err := unmarshal(file, &replicaset)
 	if err != nil {
 		fmt.Printf("Error unmarshaling file %s\n", path)
-		return
+		return err
 	}
 	err = client.Put(baseUrl+"/registry/rs/default/"+replicaset.ObjectMeta.Name, replicaset)
 	if err != nil {
 		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
-		return
+		return err
 	}
+	return nil
 }
 
-func CaseHPA(file []byte, path string, unmarshal func([]byte, any) error) {
+func CaseHPA(file []byte, path string, unmarshal func([]byte, any) error) error {
 	hpa := object.Autoscaler{}
 	err := unmarshal(file, &hpa)
 	if err != nil {
 		fmt.Printf("Error unmarshaling file %s\n", path)
-		return
+		return err
 	}
 	err = client.Put(baseUrl+"/registry/autoscaler/default/"+hpa.Metadata.Name, hpa)
 	if err != nil {
 		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
-		return
+		return err
 	}
+	return nil
 }
 
-func CaseGpuJob(file []byte, path string, unmarshal func([]byte, any) error) {
+func CaseGpuJob(file []byte, path string, unmarshal func([]byte, any) error) error {
 	uid := uuid.New().String()
 	gpuJob := object.GPUJob{}
 	err := unmarshal(file, &gpuJob)
 	if err != nil {
 		fmt.Printf("Error unmarshaling file %s\n", path)
-		return
+		return err
 	}
 	gpuJob.Metadata.UID = uid
 	zip, err := os.ReadFile(gpuJob.Spec.ZipPath)
 	if err != nil {
 		fmt.Printf("Error reading zip file `%s`\n.%s\n", gpuJob.Spec.ZipPath, err.Error())
-		return
+		return err
 	}
 	jobKey := "job-" + uid
 	jobZip := object.JobZipFile{
@@ -161,14 +172,16 @@ func CaseGpuJob(file []byte, path string, unmarshal func([]byte, any) error) {
 		Slurm: gpuJob.GenerateSlurmScript(),
 		Zip:   zip,
 	}
+	fmt.Println(string(jobZip.Slurm))
 	err = client.Put(baseUrl+config.SharedDataPrefix+"/"+jobKey, jobZip)
 	if err != nil {
 		fmt.Printf("Error uploading file `%s`\n.%s\n", gpuJob.Spec.ZipPath, err.Error())
-		return
+		return err
 	}
 	err = client.Put(baseUrl+"/registry/job/default/"+jobKey, gpuJob)
 	if err != nil {
 		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
-		return
+		return err
 	}
+	return nil
 }
