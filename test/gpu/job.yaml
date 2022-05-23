@@ -1,0 +1,18 @@
+kind: GpuJob
+metadata:
+  name: cublashello
+spec:
+  slurmConfig:
+    jobName: cublashello
+    partition: dgx2
+    output: "%j.out"
+    error: "%j.err"
+    nodes: 1
+    nTasksPerNode: 1
+    cpusPerTask: 6
+    gres: gpu:1
+  commands:
+    - "module load gcc/8.3.0 cuda/10.2"
+    - "nvcc cublashello.cu -o cublashello -lcublas"
+    - "./cublashello"
+  zipPath: "/home/jobzip/test.zip"

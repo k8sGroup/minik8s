@@ -3,6 +3,7 @@ package jobcontroller
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
 	"minik8s/cmd/kube-controller-manager/util"
 	"minik8s/object"
@@ -92,19 +93,18 @@ func (jc *JobController) putJob(res etcdstore.WatchRes) {
 		klog.Errorf("%s\n", err.Error())
 		return
 	}
-	podUID := uuid.New().String()
 	pod := object.PodTemplate{
 		ObjectMeta: object.ObjectMeta{
-			Name:   "JobPod",
-			Labels: nil,
-			UID:    podUID,
+			Name:   fmt.Sprintf("Job-%s-Pod", job.Metadata.UID),
+			Labels: map[string]string{"kind": "gpu"},
+			UID:    uuid.New().String(),
 		},
 		Spec: object.PodSpec{
 			Volumes: []object.Volume{
 				{
 					Name: "gpuPath",
 					Type: "hostPath",
-					Path: path.Join(config.SharedDataDirectory, res.Key),
+					Path: path.Join(config.SharedDataDirectory, path.Base(res.Key)),
 				},
 			},
 			Containers: []object.Container{
@@ -113,12 +113,12 @@ func (jc *JobController) putJob(res etcdstore.WatchRes) {
 					Image:   "chn1234wanghaotian/remote-runner:latest",
 					Command: nil,
 					Args: []string{
-						"/usr/bin/remote_runner",
+						"/root/remote_runner",
 						account.GetUsername(),
 						account.GetPassword(),
 						account.GetHost(),
 						"/home/job",
-						path.Join(account.GetRemoteBasePath(), res.Key),
+						path.Join(account.GetRemoteBasePath(), path.Base(res.Key)),
 					},
 					VolumeMounts: []object.VolumeMount{
 						{
@@ -134,10 +134,13 @@ func (jc *JobController) putJob(res etcdstore.WatchRes) {
 			NodeName: "",
 		},
 	}
-	err = client.Put(jc.apiServerBase+config.PodConfigPREFIX+"/JobPod"+podUID, pod)
-	if err != nil {
-		klog.Errorf("%s\n", err.Error())
-	}
+	go func() {
+		time.Sleep(time.Second * 3)
+		err = client.Put(jc.apiServerBase+config.PodConfigPREFIX+"/"+pod.Name, pod)
+		if err != nil {
+			klog.Errorf("%s\n", err.Error())
+		}
+	}()
 }
 
 func (jc *JobController) delJob(res etcdstore.WatchRes) {
