@@ -31,6 +31,8 @@ apiServer 的路径是 /registry/{resource}/{namespace}/{resource_name}
 /registry/serviceaccounts/default/default
 */
 
+const SharedDataDirectory = "/home/SharedData"
+
 const Path = "/registry/:resource/:namespace/:resourceName"
 const PrefixPath = "/registry/:resource/:namespace"
 const ParamResource = "resource"
@@ -64,8 +66,7 @@ const (
 	SharedDataPrefix = "/registry/sharedData/default"
 )
 
-var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler",
-	"podConfig", "sharedData", "service", "serviceConfig", "rsConfig"}
+var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler", "podConfig", "sharedData", "service", "job", "serviceConfig", "rsConfig"}
 
 type ServerConfig struct {
 	HttpPort       int

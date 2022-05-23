@@ -12,8 +12,7 @@ var output io.Writer
 
 var debug = true
 
-//var pathName = "./klog.log"
-var pathName = ""
+var pathName = "/home/klog.log"
 
 const prefixFmt string = "[%s]\t%s - %d %s "
 

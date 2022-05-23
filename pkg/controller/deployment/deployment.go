@@ -54,6 +54,8 @@ func (dc *DeploymentController) register() {
 			err := dc.ls.Watch("/registry/rs/default", dc.watchReplicaset, dc.stopChannel)
 			if err != nil {
 				klog.Errorf("Error watching /registry/rs\n")
+			} else {
+				return
 			}
 			time.Sleep(5 * time.Second)
 		}
@@ -64,6 +66,8 @@ func (dc *DeploymentController) register() {
 			err := dc.ls.Watch("/registry/deployment/default", dc.putDeployment, dc.stopChannel)
 			if err != nil {
 				klog.Errorf("Error watching /registry/deployment : %s\n", err.Error())
+			} else {
+				return
 			}
 			time.Sleep(5 * time.Second)
 		}
@@ -74,6 +78,8 @@ func (dc *DeploymentController) register() {
 			err := dc.ls.Watch("/registry/deployment/default", dc.deleteDeployment, dc.stopChannel)
 			if err != nil {
 				klog.Errorf("Error watching /registry/deployment : %s\n", err.Error())
+			} else {
+				return
 			}
 			time.Sleep(5 * time.Second)
 		}

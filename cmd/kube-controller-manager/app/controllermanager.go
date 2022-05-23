@@ -62,6 +62,7 @@ func NewControllerInitializers() map[string]InitFunc {
 	controller["replicaset"] = startReplicaSetController
 	controller["deployment"] = startDeploymentController
 	controller["autoscaler"] = startAutoscalerController
+	controller["job"] = startJobController
 	return controller
 }
 
