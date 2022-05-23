@@ -138,7 +138,7 @@ func (kl *Kubelet) watchPod(res etcdstore.WatchRes) {
 			//pod本地不存在且和本节点无关
 			return
 		}
-		if pod.Status.Phase != object.PodDelete {
+		if pod.Status.Phase != object.Delete {
 			//分配给自己的pod,且Phase不为Delete
 			podUp := types.PodUpdate{
 				Pods: pods,
@@ -152,7 +152,7 @@ func (kl *Kubelet) watchPod(res etcdstore.WatchRes) {
 	} else {
 		//已经存在该pod
 		if pod.Spec.NodeName == kl.getNodeName() {
-			if pod.Status.Phase == object.PodDelete {
+			if pod.Status.Phase == object.Delete {
 				//需要删除pod
 				podUp := types.PodUpdate{
 					Pods: pods,

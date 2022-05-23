@@ -56,7 +56,7 @@ func main() {
 			if err2 != nil {
 				fmt.Println(err2)
 			} else {
-				value.Status.Phase = object.PodDelete
+				value.Status.Phase = object.Delete
 				err2 = restClient.UpdateConfigPod(value)
 				if err2 != nil {
 					fmt.Println(err2)

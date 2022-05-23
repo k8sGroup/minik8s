@@ -45,10 +45,11 @@ const UserRSPath = "/user/registry/rs/:namespace/:resourceName"
 
 // path for kube client
 const (
-	RS          = "/registry/rs/default/:resourceName"
-	POD         = "/registry/pod/default/:resourceName"
-	NODE        = "/registry/node/default/:resourceName"
-	NODE_PREFIX = "/registry/node/default"
+	RS               = "/registry/rs/default/:resourceName"
+	PodRuntime       = "/registry/pod/default/:resourceName"
+	PodRuntimePrefix = "/registry/pod/default"
+	NODE             = "/registry/node/default/:resourceName"
+	NODE_PREFIX      = "/registry/node/default"
 
 	PodCONFIG       = "/registry/podConfig/default/:resourceName"
 	PodConfigPREFIX = "/registry/podConfig/default"
@@ -57,7 +58,7 @@ const (
 	ServiceConfigPrefix = "/registry/serviceConfig/default"
 	Service             = "registry/service/default/:resourceName"
 	ServicePrefix       = "registry/service/default"
-	RSConfigPrefix = "/registry/rsConfig/default"
+	RSConfigPrefix      = "/registry/rsConfig/default"
 
 	SharedData       = "/registry/sharedData/default/:resourceName"
 	SharedDataPrefix = "/registry/sharedData/default"

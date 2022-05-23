@@ -240,22 +240,30 @@ func GetNodes(ls *listerwatcher.ListerWatcher) ([]*object.Node, error) {
 	return nodes, nil
 }
 
-//func (r RESTClient) RegisterNode(node *object.Node) error {
-//	if node.Name == "" {
-//		return errors.New("invalid node name")
-//	}
-//	attachURL := "/registry/node/default/" + node.Name
-//	body, err := json.Marshal(node)
-//	reqBody := bytes.NewBuffer(body)
-//
-//	req, _ := http.NewRequest("PUT", r.Base+attachURL, reqBody)
-//	resp, _ := http.DefaultClient.Do(req)
-//
-//	if err != nil || resp.StatusCode != 200 {
-//		fmt.Printf("[RegisterNode] unmarshal fail\n")
-//	}
-//	return nil
-//}
+/*******************************Service**********************************/
+func (r RESTClient) UpdateRuntimeService(service *object.Service) error {
+	attachUrl := config.ServicePrefix + "/" + service.MetaData.Name
+	err := Put(attachUrl, service)
+	return err
+}
+func (r RESTClient) GetRuntimeService(name string) (*object.Service, error) {
+	attachUrl := config.ServicePrefix + "/" + name
+	resp, err := Get(r.Base + attachUrl)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp) == 0 {
+		return nil, nil
+	}
+	result := &object.Service{}
+	err = json.Unmarshal(resp[0].ValueBytes, result)
+	return result, err
+}
+func (r RESTClient) DeleteRuntimeService(name string) error {
+	attachUrl := config.ServicePrefix + "/" + name
+	err := Del(r.Base + attachUrl)
+	return err
+}
 
 /********************************watch*****************************/
 

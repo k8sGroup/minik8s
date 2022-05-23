@@ -101,6 +101,9 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 		engine.PUT(config.UserPodPath, s.userAddPod)
 		engine.PUT(config.UserRSPath, s.userAddRS)
 	}
+	{
+		engine.PUT(config.ServiceConfig)
+	}
 
 	go s.daemon(watcherChan)
 
