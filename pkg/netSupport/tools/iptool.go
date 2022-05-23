@@ -1,8 +1,7 @@
 package tools
 
 import (
-	"fmt"
-	"minik8s/pkg/kubeNetSupport/netconfig"
+	"minik8s/pkg/netSupport/netconfig"
 	"net"
 	"strings"
 )
@@ -47,15 +46,20 @@ func getIPv4ByInterface(name string) ([]string, error) {
 	return ips, nil
 }
 func GetEns3IPv4Addr() string {
-	val, _ := getIPv4ByInterface(netconfig.ETH_NAME)
+	val, _ := getIPv4ByInterface(netconfig.BasicEthName)
 	return val[0]
 }
+func GetDocker0IpAndMask() string {
+	val, _ := getIPv4ByInterface(netconfig.DockerEthName)
+	a, b, c, _ := GetFourField(val[0])
+	res := a + "." + b + "." + c + ".1/24"
+	return res
+}
 func GetDynamicIp() string {
-	ips, _ := getIPv4ByInterface(netconfig.ETH_NAME)
-	fmt.Println(ips)
-	fmt.Println(netconfig.GlobalIpMap)
+	ips, _ := getIPv4ByInterface(netconfig.BasicEthName)
 	return netconfig.GlobalIpMap[ips[0]]
 }
+
 func GetBasicIpAndMask(ipAndMask string) string {
 	index := strings.Index(ipAndMask, ".")
 	a := ipAndMask[:index]
@@ -63,4 +67,30 @@ func GetBasicIpAndMask(ipAndMask string) string {
 	index = strings.Index(ipAndMask, ".")
 	b := ipAndMask[:index]
 	return a + "." + b + ".0.0/16"
+}
+
+func GetFourField(ipV4 string) (string, string, string, string) {
+	index := strings.Index(ipV4, ".")
+	a := ipV4[:index]
+	ipV4 = ipV4[index+1:]
+	index = strings.Index(ipV4, ".")
+	b := ipV4[:index]
+	ipV4 = ipV4[index+1:]
+	index = strings.Index(ipV4, ".")
+	c := ipV4[:index]
+	//ipV4 = ipV4[index+1:]
+	//index = strings.Index(ipV4, "/")
+	d := ipV4[index+1:]
+	return a, b, c, d
+}
+
+//默认格式正确，不进行错误处理
+func getIp(ipAndMask string) string {
+	index := strings.Index(ipAndMask, "/")
+	return ipAndMask[:index]
+}
+
+func getMask(ipAndMask string) string {
+	index := strings.Index(ipAndMask, "/")
+	return ipAndMask[index+1:]
 }

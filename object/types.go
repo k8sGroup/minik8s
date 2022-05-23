@@ -151,11 +151,42 @@ type NodeList struct {
 }
 
 type NodeSpec struct {
-	//物理ip地址
-	PhysicalIp string `json:"physicalIp" yaml:"physicalIp""`
+	//浮动ip地址
+	DynamicIp string `json:"physicalIp" yaml:"physicalIp""`
 	//为该节点分配的pod网段
 	NodeIpAndMask string `json:"nodeIpAndMask" yaml:"nodeIpAndMask"`
 }
 
 type NodeStatus struct {
+}
+
+/****************Service****************************/
+type Service struct {
+	MetaData ObjectMeta    `json:"metadata" yaml:"metadata"`
+	Spec     ServiceSpec   `json:"spec" yaml:"spec"`
+	Status   ServiceStatus `json:"status" yaml:"status"`
+}
+type ServiceSpec struct {
+	//service 的类型， 有clusterIp和 NodePort类型,默认为ClusterIp
+	Type string `json:"type" yaml:"type"`
+	//虚拟服务Ip地址， 可以手工指定或者由系统进行分配
+	ClusterIp string `json:"clusterIp" yaml:"clusterIp"`
+	//service需要暴露的端口列表
+	Ports []ServicePort `json:"ports" yaml:"ports"`
+	//selector
+	Selector map[string]string `json:"selector" yaml:"selector"`
+}
+type ServicePort struct {
+	//端口的名称
+	Name string `json:"name" yaml:"name"`
+	//端口协议, 支持TCP和UDP, 默认TCP
+	Protocol string `json:"protocol" yaml:"protocol"`
+	//服务监听的端口号
+	Port string `json:"port" yaml:"port"`
+	//需要转发到后端Pod的端口号
+	TargetPort string `json:"target" yaml:"targetPort"`
+	//当service类型为NodePort时，指定映射到物理机的端口号
+	NodePort string `json:"nodePort" yaml:"nodePort"`
+}
+type ServiceStatus struct {
 }

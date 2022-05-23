@@ -1,7 +1,6 @@
 package pod
 
 import (
-	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/satori/go.uuid"
 	"minik8s/object"
