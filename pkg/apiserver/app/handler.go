@@ -31,14 +31,14 @@ func (s *Server) deletePod(ctx *gin.Context) {
 		return
 	}
 	// if already zero just delete
-	if pod.Status.Phase == object.PodFailed {
+	if pod.Status.Phase == object.Failed {
 		err = s.store.Del(key)
 		ctx.Status(http.StatusOK)
 		return
 	}
 
 	// update pod phases to failed
-	pod.Status.Phase = object.PodFailed
+	pod.Status.Phase = object.Failed
 	raw, _ := json.Marshal(pod)
 	err = s.store.Put(key, raw)
 	if err != nil {
@@ -117,4 +117,34 @@ func (s *Server) userAddRS(ctx *gin.Context) {
 	}
 	body, _ = json.Marshal(rs)
 	err = s.store.Put(config.RSConfigPrefix+"/"+rs.Name, body)
+}
+
+//service part
+func (s *Server) AddService(ctx *gin.Context) {
+	//做service缺省值的填充处理
+	body, err := ioutil.ReadAll(ctx.Request.Body)
+	service := &object.Service{}
+	err = json.Unmarshal(body, service)
+	if err != nil {
+		fmt.Println("[AddService] service unmarshal fail")
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	uid := uuid.New().String()
+	service.MetaData.UID = uid
+	if service.Spec.Type == "" {
+		service.Spec.Type = object.ClusterIp
+	}
+	for _, v := range service.Spec.Ports {
+		if v.Protocol == "" {
+			v.Protocol = "TCP"
+		}
+	}
+	body, _ = json.Marshal(service)
+	err = s.store.Put(config.ServiceConfigPrefix+"/"+service.MetaData.Name, body)
+	if err != nil {
+		fmt.Println("[AddService] etcd put fail")
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
 }

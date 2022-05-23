@@ -1,10 +1,5 @@
 package main
 
-import (
-	"fmt"
-	"minik8s/pkg/etcdstore/nodeConfigStore"
-)
-
 func main() {
 	//ip, err := tools.GetIPv4ByInterface("ens33")
 	//fmt.Println(ip)
@@ -12,7 +7,7 @@ func main() {
 	//res, err := ipManager.GetRouteInfo()
 	//fmt.Println(res)
 	//fmt.Println(err)
-	fmt.Println(nodeConfigStore.GetNodeNameWithIpAndMask())
-	fmt.Println(nodeConfigStore.GetNodeNameWithIpAndMask())
-	fmt.Println(nodeConfigStore.GetNodeNameWithIpAndMask())
+	//fmt.Println(nodeConfigStore.GetNodeNameWithIpAndMask())
+	//fmt.Println(nodeConfigStore.GetNodeNameWithIpAndMask())
+	//fmt.Println(nodeConfigStore.GetNodeNameWithIpAndMask())
 }

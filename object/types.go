@@ -2,11 +2,11 @@ package object
 
 const (
 	PodPending   string = "Pending"
-	PodRunning   string = "Running"
+	Running      string = "Running"
 	PodSucceeded string = "Succeeded"
-	PodFailed    string = "Failed"
+	Failed       string = "Failed"
 	PodUnknown   string = "Unknown"
-	PodDelete    string = "Delete"
+	Delete       string = "Delete"
 
 	// SUCCESS http status code
 	SUCCESS int = 200
@@ -81,7 +81,7 @@ type PodStatus struct {
 	// IP address allocated to the pod. Routable at least within the cluster
 	PodIP string `json:"podIP" yaml:"podIP"`
 	//error message
-	Err string
+	Err string `json:"err" yaml:"err"`
 }
 
 type PodTemplate struct {
@@ -161,13 +161,18 @@ type NodeStatus struct {
 }
 
 /****************Service****************************/
+const (
+	ClusterIp string = "ClusterIp"
+	NodePort  string = "NodePort"
+)
+
 type Service struct {
 	MetaData ObjectMeta    `json:"metadata" yaml:"metadata"`
 	Spec     ServiceSpec   `json:"spec" yaml:"spec"`
 	Status   ServiceStatus `json:"status" yaml:"status"`
 }
 type ServiceSpec struct {
-	//service 的类型， 有clusterIp和 NodePort类型,默认为ClusterIp
+	//service 的类型， 有ClusterIp和 NodePort类型,默认为ClusterIp
 	Type string `json:"type" yaml:"type"`
 	//虚拟服务Ip地址， 可以手工指定或者由系统进行分配
 	ClusterIp string `json:"clusterIp" yaml:"clusterIp"`
@@ -175,6 +180,8 @@ type ServiceSpec struct {
 	Ports []ServicePort `json:"ports" yaml:"ports"`
 	//selector
 	Selector map[string]string `json:"selector" yaml:"selector"`
+	//选取的podsIp
+	PodNameAndIps []PodNameAndIp `json:"podNameAndIps"`
 }
 type ServicePort struct {
 	//端口的名称
@@ -188,5 +195,14 @@ type ServicePort struct {
 	//当service类型为NodePort时，指定映射到物理机的端口号
 	NodePort string `json:"nodePort" yaml:"nodePort"`
 }
+type PodNameAndIp struct {
+	Name string `json:"name"`
+	Ip   string `json:"ip"`
+}
 type ServiceStatus struct {
+	//runtime
+	Err string `json:"err" yaml:"err"`
+	//pod name到 podIp:port的映射
+	Pods2IpAndPort map[string]string `json:"pods2IpAndPort" yaml:"pods2IpAndPort"`
+	Phase          string            `json:"phase" yaml:"phase"`
 }
