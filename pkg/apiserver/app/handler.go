@@ -13,10 +13,10 @@ import (
 )
 
 // do not delete pod in etcd directly, just modify the status
-// TODO: real deletion by kubelet !
+//对pod的删除通过修改pod配置文件里的phase为DELETED进行
 func (s *Server) deletePod(ctx *gin.Context) {
 	name := ctx.Param(config.ParamResourceName)
-	key := "/registry/pod/default/" + name
+	key := config.PodConfigPREFIX + "/" + name
 	resList, err := s.store.Get(key)
 	if err != nil || len(resList) == 0 {
 		fmt.Printf("[deletePod] pod not exist:%s\n", name)
@@ -30,16 +30,34 @@ func (s *Server) deletePod(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	// if already zero just delete
-	if pod.Status.Phase == object.Failed {
-		err = s.store.Del(key)
-		ctx.Status(http.StatusOK)
+	pod.Status.Phase = object.Delete
+	raw, _ := json.Marshal(pod)
+	err = s.store.Put(key, raw)
+	if err != nil {
+		ctx.AbortWithStatus(http.StatusBadRequest)
+	}
+	ctx.Status(http.StatusOK)
+}
+
+//同上述对pod的删除
+func (s *Server) deleteService(ctx *gin.Context) {
+	name := ctx.Param(config.ParamResourceName)
+	key := config.ServiceConfigPrefix + "/" + name
+	resList, err := s.store.Get(key)
+	if err != nil || len(resList) == 0 {
+		fmt.Printf("[deleteService] service not exist:%s\n", name)
+		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-
-	// update pod phases to failed
-	pod.Status.Phase = object.Failed
-	raw, _ := json.Marshal(pod)
+	service := &object.Service{}
+	err = json.Unmarshal(resList[0].ValueBytes, service)
+	if err != nil {
+		fmt.Println("[deleteService] service unmarshall fail")
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	service.Status.Phase = object.Delete
+	raw, _ := json.Marshal(service)
 	err = s.store.Put(key, raw)
 	if err != nil {
 		ctx.AbortWithStatus(http.StatusBadRequest)
