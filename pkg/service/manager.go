@@ -35,11 +35,12 @@ func NewManager(lsConfig *listerwatcher.Config, clientConfig client.Config) *Man
 	manager.ls = ls
 	manager.lsConfig = lsConfig
 	manager.clientConfig = clientConfig
+	manager.register()
 	return manager
 }
 
 func (manager *Manager) register() {
-	watchServiceConfig := func() {
+	watchService := func() {
 		for {
 			err := manager.ls.Watch(config.ServiceConfigPrefix, manager.watchServiceConfig, manager.stopChannel)
 			if err != nil {
@@ -51,7 +52,7 @@ func (manager *Manager) register() {
 		}
 
 	}
-	go watchServiceConfig()
+	go watchService()
 }
 func (manager *Manager) watchServiceConfig(res etcdstore.WatchRes) {
 	if res.ResType == etcdstore.DELETE {

@@ -41,7 +41,7 @@ func main() {
 	//if err != nil {
 	//	fmt.Println(err)
 	//}
-	err = ipt.Delete("nat", "HONG-SEP", "-s", "0/0", "-d", "0/0", "-p", "tcp", "-j", "DNAT", "--to-destination", "10.119.11.159:11111")
+	err = ipt.Append("nat", "HONG-SEP", "-s", "0/0", "-d", "0/0", "-p", "tcp", "-j", "DNAT", "--to-destination", "172.16.16.2:80")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -55,7 +55,6 @@ func main() {
 	//if err != nil {
 	//	fmt.Println(err)
 	//}
-	//err = ipt.NewChain("nat", "HONG-NODE-PORT")
 
 	//create HONG-SERVICE chain
 	//err = ipt.NewChain("nat", "HONG-SERVICE")
@@ -66,7 +65,7 @@ func main() {
 	//if err != nil {
 	//	fmt.Println(err)
 	//}
-	////add into OUTPUT chain
+	//////add into OUTPUT chain
 	//err = ipt.Insert("nat", "PREROUTING", 1, "-j", "HONG-SERVICE", "-s", "0/0", "-d", "0/0", "-p", "all")
 	//err = ipt.Insert("nat", "OUTPUT", 1, "-j", "HONG-SERVICE", "-s", "0/0", "-d", "0/0", "-p", "all")
 	//if err != nil {

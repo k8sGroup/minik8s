@@ -172,7 +172,7 @@ type Service struct {
 	Status   ServiceStatus `json:"status" yaml:"status"`
 }
 type ServiceSpec struct {
-	//service 的类型， 有ClusterIp和 NodePort类型,默认为ClusterIp
+	//service 的类型， 有ClusterIp和 NodePort类型,默认为ClusterIp,暂时只支持ClusterIp
 	Type string `json:"type" yaml:"type"`
 	//虚拟服务Ip地址， 可以手工指定或者由系统进行分配
 	ClusterIp string `json:"clusterIp" yaml:"clusterIp"`
