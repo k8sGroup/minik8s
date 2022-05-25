@@ -241,9 +241,14 @@ func GetNodes(ls *listerwatcher.ListerWatcher) ([]*object.Node, error) {
 }
 
 /*******************************Service**********************************/
+func (r RESTClient) UpdateService(service *object.Service) error {
+	attachUrl := config.ServiceConfigPrefix + "/" + service.MetaData.Name
+	err := Put(r.Base+attachUrl, service)
+	return err
+}
 func (r RESTClient) UpdateRuntimeService(service *object.Service) error {
 	attachUrl := config.ServicePrefix + "/" + service.MetaData.Name
-	err := Put(attachUrl, service)
+	err := Put(r.Base+attachUrl, service)
 	return err
 }
 func (r RESTClient) GetRuntimeService(name string) (*object.Service, error) {
