@@ -38,6 +38,14 @@ type command struct {
 }
 
 //------------------------------------tools------------------------------------------//
+func isExist(target string, from []string) bool {
+	for _, val := range from {
+		if target == val {
+			return true
+		}
+	}
+	return false
+}
 func (service *RuntimeService) selectPods(isInit bool) error {
 	selector := service.serviceConfig.Spec.Selector
 	res, err := service.ls.List(config.PodRuntimePrefix)
@@ -56,14 +64,21 @@ func (service *RuntimeService) selectPods(isInit bool) error {
 		if val.Status.Phase != object.Running {
 			continue
 		}
+		//考虑label，端口没开放是用户自己的问题，这里不管
+		canChoose := true
 		for k, v := range selector {
 			podV, ok := val.Labels[k]
 			if !ok {
-				continue
+				canChoose = false
+				break
 			}
-			if v == podV {
-				filter = append(filter, val)
+			if v != podV {
+				canChoose = false
+				break
 			}
+		}
+		if canChoose {
+			filter = append(filter, val)
 		}
 	}
 	//先把service里的坏的给去掉
@@ -80,11 +95,16 @@ func (service *RuntimeService) selectPods(isInit bool) error {
 			//最多三个
 			break
 		}
+		isExist := false
 		for _, sPod := range service.pods {
 			//已经存在
 			if val.Name == sPod.Name {
+				isExist = true
 				break
 			}
+		}
+		if isExist {
+			continue
 		}
 		//不存在该pod，直接加入
 		service.pods = append(service.pods, val)

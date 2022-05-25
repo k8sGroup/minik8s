@@ -53,7 +53,7 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 	if err != nil {
 		fmt.Printf("[NewKubelet] new kubeNetSupport fail")
 	}
-	//kubelet.kubeProxy = kubeproxy.NewKubeProxy(lsConfig, clientConfig)
+	kubelet.kubeProxy = kubeproxy.NewKubeProxy(lsConfig, clientConfig)
 	// initialize pod podConfig
 	kubelet.PodConfig = podConfig.NewPodConfig()
 
@@ -69,7 +69,7 @@ func (k *Kubelet) getNodeName() string {
 func (kl *Kubelet) Run() {
 	kl.kubeNetSupport.StartKubeNetSupport()
 	kl.podManager.StartPodManager()
-	//kl.kubeProxy.StartKubeProxy()
+	kl.kubeProxy.StartKubeProxy()
 	updates := kl.PodConfig.GetUpdates()
 	go kl.podMonitor.Listener()
 	go kl.syncLoop(updates, kl)

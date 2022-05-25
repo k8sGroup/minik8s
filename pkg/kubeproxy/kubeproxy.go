@@ -74,7 +74,10 @@ func (proxy *KubeProxy) watchRuntimeService(res etcdstore.WatchRes) {
 		}
 		svcS, ok := proxy.ServiceName2SvcChain[res.Key]
 		if !ok {
-			//创建service
+			//先判断下service的state,决定是否创建service
+			if serviceRuntime.Status.Phase == object.Failed {
+				return
+			}
 			svcS = make(map[string]*SvcChain)
 			for _, val := range serviceRuntime.Spec.Ports {
 				var units []PodUnit
