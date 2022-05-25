@@ -10,7 +10,6 @@ import (
 	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
-	"minik8s/pkg/etcdstore/nodeConfigStore"
 	"minik8s/pkg/listerwatcher"
 	"minik8s/util/queue"
 	"time"
@@ -78,16 +77,8 @@ func (sched *Scheduler) schedulePod(ctx context.Context, pod *object.Pod) error 
 		fmt.Printf(err.Error())
 		return err
 	}
-	//去除master节点
-	var filter []object.Node
-	for _, val := range nodes {
-		if val.MetaData.Name == nodeConfigStore.MasterNodeName {
-			continue
-		}
-		filter = append(filter, val)
-	}
 	// select a host for the pod
-	nodeName, _ := selectHost(filter)
+	nodeName, _ := selectHost(nodes)
 	fmt.Printf("the nodeName choice is:%s\n", nodeName)
 	fmt.Printf("[schedulePod]assign pod to node:%s\n", nodeName)
 	// modify pod host

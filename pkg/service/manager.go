@@ -60,6 +60,7 @@ func (manager *Manager) watchServiceConfig(res etcdstore.WatchRes) {
 		return
 	}
 	service := &object.Service{}
+	fmt.Println("[service manager]Watch receive")
 	err := json.Unmarshal(res.ValueBytes, service)
 	if err != nil {
 		fmt.Println("[ServiceManager] Unmarshall error")

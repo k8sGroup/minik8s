@@ -19,7 +19,7 @@ type KubeProxy struct {
 	stopChannel          <-chan struct{}
 }
 
-func NewKubeProxy(lsConfig *listerwatcher.Config, clientConfig *client.Config) *KubeProxy {
+func NewKubeProxy(lsConfig *listerwatcher.Config, clientConfig client.Config) *KubeProxy {
 	res := &KubeProxy{}
 	ls, err := listerwatcher.NewListerWatcher(lsConfig)
 	if err != nil {
@@ -32,11 +32,12 @@ func NewKubeProxy(lsConfig *listerwatcher.Config, clientConfig *client.Config) *
 	}
 	res.stopChannel = make(chan struct{})
 	res.ServiceName2SvcChain = make(map[string]map[string]*SvcChain)
-	Boot()
-	res.registry()
 	return res
 }
-
+func (proxy *KubeProxy) StartKubeProxy() {
+	Boot()
+	proxy.registry()
+}
 func (proxy *KubeProxy) registry() {
 	//挂上watch， watch runtimeService
 	watchService := func() {

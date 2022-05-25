@@ -1,0 +1,13 @@
+kind: Service
+metadata:
+  name: example
+spec:
+  type: ClusterIp
+  clusterIp: 10.23.34.56
+  ports: 
+    - port: 8070
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    key: test
