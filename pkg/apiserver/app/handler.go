@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"minik8s/object"
 	"minik8s/pkg/apiserver/config"
+	"minik8s/pkg/etcdstore/serviceConfigStore"
 	"net/http"
 	"strings"
 )
@@ -153,6 +154,13 @@ func (s *Server) AddService(ctx *gin.Context) {
 	if service.Spec.Type == "" {
 		service.Spec.Type = object.ClusterIp
 	}
+	ok, ip := serviceConfigStore.JudgeAndAllocClusterIp(service.MetaData.Name, service.Spec.ClusterIp)
+	if !ok {
+		fmt.Println("[AddService] ClusterIp illegal")
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	service.Spec.ClusterIp = ip
 	for _, v := range service.Spec.Ports {
 		if v.Protocol == "" {
 			v.Protocol = "TCP"
@@ -160,6 +168,28 @@ func (s *Server) AddService(ctx *gin.Context) {
 	}
 	body, _ = json.Marshal(service)
 	err = s.store.Put(config.ServiceConfigPrefix+"/"+service.MetaData.Name, body)
+	if err != nil {
+		fmt.Println("[AddService] etcd put fail")
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+}
+
+func (s *Server) AddPod(ctx *gin.Context) {
+	body, err := ioutil.ReadAll(ctx.Request.Body)
+	pod := &object.Pod{}
+	err = json.Unmarshal(body, pod)
+	if err != nil {
+		fmt.Println("[AddService] service unmarshal fail")
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	if pod.UID == "" {
+		pod.UID = uuid.New().String()
+	}
+
+	body, _ = json.Marshal(pod)
+	err = s.store.Put(config.PodConfigPREFIX+"/"+pod.Name, body)
 	if err != nil {
 		fmt.Println("[AddService] etcd put fail")
 		ctx.AbortWithStatus(http.StatusBadRequest)
