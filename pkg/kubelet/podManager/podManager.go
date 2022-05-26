@@ -63,7 +63,6 @@ func (p *PodManager) startTimer() {
 			case <-p.timer.C:
 				p.rwLock.Lock()
 				//对于每个pod调用GetSnapShoot更新信息
-				fmt.Println("[PodManager] timer reached")
 				for k, v := range p.name2uuid {
 					pod := p.uid2pod[v]
 					newPodSnapShoot := pod.GetPodSnapShoot()

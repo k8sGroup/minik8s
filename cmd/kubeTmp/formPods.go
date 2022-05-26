@@ -21,6 +21,7 @@ func main() {
 	restClient := client.RESTClient{
 		Base: "http://" + clientConfig.Host,
 	}
+	pod.Name = "example2222"
 	pod.UID = uuid.NewV4().String()
 	restClient.UpdateConfigPod(pod)
 }
