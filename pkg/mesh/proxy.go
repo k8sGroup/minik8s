@@ -1,28 +1,69 @@
-package main
+package mesh
 
 import (
-	"errors"
 	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"net"
+	"strconv"
 	"syscall"
 )
 
-func main() {
+var (
+	BasePort  int64 = 16001
+	RangePort int64 = 100
+)
 
-	lnaddr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:16001")
-	if err != nil {
-		panic(err)
+type Proxy struct {
+	PodIP   string
+	Address string
+	server  *net.TCPListener
+}
+
+func NewProxy(podIP string) *Proxy {
+	return &Proxy{
+		PodIP: podIP,
+	}
+}
+
+// select a spare port
+
+// check & add iptables rules
+func (p *Proxy) natRedirect() {
+
+}
+
+func (p *Proxy) Init() {
+	var lnaddr *net.TCPAddr
+	var server *net.TCPListener
+	var err error
+
+	for i := BasePort; i < BasePort+RangePort; i++ {
+		lnaddr, err = net.ResolveTCPAddr("tcp", "127.0.0.1:"+strconv.Itoa(int(i)))
+		if err != nil {
+			continue
+		}
+
+		server, err = net.ListenTCP("tcp", lnaddr)
+		if err == nil {
+			p.Address = "127.0.0.1:" + strconv.Itoa(int(i))
+			break
+		}
 	}
 
-	server, err := net.ListenTCP("tcp", lnaddr)
-	if err != nil {
-		panic(err)
+	if err != nil || server == nil {
+		fmt.Println("[Proxy] No port available")
+		return
 	}
-	defer server.Close()
+}
+
+func (p *Proxy) Run() {
+	if p.server == nil {
+		fmt.Println("[Proxy Run] No server available")
+	}
 
 	for {
-		conn, err := server.AcceptTCP()
+		conn, err := p.server.AcceptTCP()
 		if err != nil {
 			continue
 		}
