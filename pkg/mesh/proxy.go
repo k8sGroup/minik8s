@@ -47,12 +47,21 @@ func (p *Proxy) Init() {
 		server, err = net.ListenTCP("tcp", lnaddr)
 		if err == nil {
 			p.Address = "127.0.0.1:" + strconv.Itoa(int(i))
+			p.server = server
 			break
 		}
 	}
 
 	if err != nil || server == nil {
 		fmt.Println("[Proxy] No port available")
+		return
+	}
+
+	fmt.Printf("[Proxy] listening to:%v\n", p.Address)
+
+	err = p.initChain()
+	if err != nil {
+		fmt.Printf("[FATAL] init iptables chain fail...\n")
 		return
 	}
 }
@@ -62,13 +71,18 @@ func (p *Proxy) Run() {
 		fmt.Println("[Proxy Run] No server available")
 	}
 
-	for {
-		conn, err := p.server.AcceptTCP()
-		if err != nil {
-			continue
+	func(p *Proxy) {
+		defer p.finalizeChain()
+
+		for {
+			conn, err := p.server.AcceptTCP()
+			if err != nil {
+				continue
+			}
+			go handleConn(conn)
 		}
-		go handleConn(conn)
-	}
+	}(p)
+
 }
 
 func handleConn(clientConn *net.TCPConn) {
