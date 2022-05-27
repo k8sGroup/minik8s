@@ -86,7 +86,6 @@ func getOriginalDst(clientConn *net.TCPConn) (ipv4 string, port uint16, newTCPCo
 	if err != nil {
 		return
 	}
-
 	if _, ok := newConn.(*net.TCPConn); ok {
 		newTCPConn = newConn.(*net.TCPConn)
 		clientConnFile.Close()
