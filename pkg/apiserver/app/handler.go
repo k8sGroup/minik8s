@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"minik8s/object"
 	"minik8s/pkg/apiserver/config"
+	"minik8s/pkg/client"
+	"minik8s/pkg/controller"
 	"minik8s/pkg/etcdstore/serviceConfigStore"
 	"net/http"
 	"strings"
@@ -216,4 +218,60 @@ func (s *Server) AddPod(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
+}
+
+func (s *Server) getActivePods(ctx *gin.Context) {
+	rsName := ctx.Query("rsName")
+	if rsName == "" {
+		fmt.Println("[getActivePods] rsName exist")
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+
+	uid := ctx.Query("uid")
+	if uid == "" {
+		fmt.Println("[getActivePods] uid not exist")
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+
+	var expect int
+	var actual int
+
+	listRes, err := s.store.Get("/registry/pod/default")
+	if err != nil {
+		fmt.Printf("[getActivePods] list fail\n")
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+	allPods, _ := client.MakePods(listRes, rsName, uid)
+	activePods := controller.FilterActivePods(allPods)
+	actual = len(activePods)
+
+	key := "/registry/rs/default/" + rsName
+	raw, err := s.store.Get(key)
+	if err != nil {
+		fmt.Printf("[getActivePods] fail to get nodes\n")
+	}
+	if len(raw) == 0 {
+		fmt.Printf("[getActivePods] list fail\n")
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+	result := &object.ReplicaSet{}
+
+	err = json.Unmarshal(raw[0].ValueBytes, result)
+
+	if err != nil {
+		fmt.Printf("[getActivePods] unmarshal fail\n")
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+
+	expect = int(result.Spec.Replicas)
+
+	ctx.JSON(200, gin.H{
+		"expect": expect,
+		"actual": actual,
+	})
 }
