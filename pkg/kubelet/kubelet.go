@@ -68,13 +68,20 @@ func (k *Kubelet) getNodeName() string {
 
 func (kl *Kubelet) Run() {
 	kl.kubeNetSupport.StartKubeNetSupport()
-	kl.podManager.StartPodManager()
 	kl.kubeProxy.StartKubeProxy()
 	updates := kl.PodConfig.GetUpdates()
 	go kl.podMonitor.Listener()
 	go kl.syncLoop(updates, kl)
 	go kl.DoMonitor(context.Background())
-	go kl.ls.Watch(config.PodConfigPREFIX, kl.watchPod, kl.stopChannel)
+	go func() {
+		err := kl.ls.Watch(config.PodConfigPREFIX, kl.watchPod, kl.stopChannel)
+		if err != nil {
+			fmt.Printf("[kubelet] watch podConfig error" + err.Error())
+		} else {
+			return
+		}
+		time.Sleep(10 * time.Second)
+	}()
 	go func() {
 		err := kl.ls.Watch(config.SharedDataPrefix, kl.watchSharedData, kl.stopChannel)
 		if err == nil {
@@ -92,9 +99,6 @@ func (kl *Kubelet) syncLoop(updates <-chan types.PodUpdate, handler SyncHandler)
 
 func (k *Kubelet) AddPod(pod *object.Pod) error {
 	return k.podManager.AddPod(pod)
-}
-func (k *Kubelet) GetPodInfo(podName string) ([]byte, error) {
-	return k.podManager.GetPodInfo(podName)
 }
 func (k *Kubelet) DeletePod(podName string) error {
 	return k.podManager.DeletePod(podName)
@@ -144,8 +148,8 @@ func (kl *Kubelet) watchPod(res etcdstore.WatchRes) {
 	}
 	fmt.Printf("[watchPod] New message...\n")
 	pods := []*object.Pod{pod}
-	_, err2 := kl.podManager.GetPodSnapShootByUid(pod.UID)
-	if err2 != nil {
+	ok := kl.podManager.CheckIfPodExist(pod.Name)
+	if !ok {
 		//pod 不存在,
 		if pod.Spec.NodeName != kl.getNodeName() {
 			//pod本地不存在且和本节点无关
@@ -197,6 +201,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*object.Pod) {
 		fmt.Printf("[Kubelet] Prepare add pod:%s\npod:%+v\n", pod.Name, pod)
 		err := kl.podManager.AddPod(pod)
 		if err != nil {
+			fmt.Println("[kubelet]AddPod error" + err.Error())
 			kl.Err = err
 		}
 	}
@@ -227,7 +232,6 @@ func (kl *Kubelet) HandlePodRemoves(pods []*object.Pod) {
 	for _, pod := range pods {
 		fmt.Printf("[Kubelet] Prepare delete pod:%+v\n", pod)
 		err := kl.podManager.DeletePod(pod.Name)
-		// already modify pod status to failed in api server
 		if err != nil {
 			fmt.Printf("[Kubelet] Delete pod fail...\n")
 		}
@@ -237,7 +241,7 @@ func (kl *Kubelet) HandlePodRemoves(pods []*object.Pod) {
 func (kl *Kubelet) DoMonitor(ctx context.Context) {
 	for {
 		// fmt.Printf("[DoMonitor] New round monitoring...\n")
-		podMap := kl.podManager.CopyUid2pod()
+		podMap := kl.podManager.CopyName2pod()
 		for _, pod := range podMap {
 			kl.podMonitor.MetricDockerStat(ctx, pod)
 		}

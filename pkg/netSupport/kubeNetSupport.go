@@ -12,6 +12,7 @@ import (
 	"minik8s/pkg/netSupport/boot"
 	"minik8s/pkg/netSupport/tools"
 	"sync"
+	"time"
 )
 
 //------------------------------------------//
@@ -70,9 +71,23 @@ func (k *KubeNetSupport) StartKubeNetSupport() error {
 	fmt.Println("start register")
 	return k.registerNode()
 }
+func (k *KubeNetSupport) registry() {
+	netSupportRegister := func() {
+		for {
+			err := k.ls.Watch(config.NODE_PREFIX, k.watchRegister, k.stopChannel)
+			if err != nil {
+				fmt.Println("[kubeNetSupport] watch register error" + err.Error())
+				time.Sleep(5 * time.Second)
+			} else {
+				return
+			}
+		}
+	}
+	go netSupportRegister()
+}
 func (k *KubeNetSupport) registerNode() error {
 	//先挂上watch
-	go k.ls.Watch(config.NODE_PREFIX, k.watchRegister, k.stopChannel)
+	k.registry()
 	fmt.Println("start init flannel, please wait")
 	boot.BootFlannel()
 	//发起注册的http请求

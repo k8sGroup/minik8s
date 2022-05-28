@@ -76,8 +76,6 @@ type PodSpec struct {
 
 type PodStatus struct {
 	Phase string `json:"phase" yaml:"phase"`
-	// IP address when the pod is assigned
-	HostIP string `json:"hostIP" yaml:"hostIP"`
 	// IP address allocated to the pod. Routable at least within the cluster
 	PodIP string `json:"podIP" yaml:"podIP"`
 	//error message
@@ -131,6 +129,9 @@ type Limit struct {
 
 type Port struct {
 	ContainerPort string `json:"containerPort" yaml:"containerPort"`
+	//类型有三种 tcp, udp, all
+	//默认为tcp, all的话两种都开
+	Protocol string `json:"protocol" yaml:"protocol"`
 }
 
 type EnvEntry struct {

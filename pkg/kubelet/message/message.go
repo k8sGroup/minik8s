@@ -70,11 +70,9 @@ type ResponseWithProbeInfos struct {
 
 type PodCommand struct {
 	ContainerCommand *Command
-	PodUid           string
 	PodCommandType   int
 }
 type PodResponse struct {
 	ContainerResponse *Response
-	PodUid            string
 	PodResponseType   int
 }

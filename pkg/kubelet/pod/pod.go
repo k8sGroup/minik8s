@@ -1,10 +1,11 @@
 package pod
 
 import (
+	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/satori/go.uuid"
 	"minik8s/object"
-	"minik8s/pkg/klog"
+	"minik8s/pkg/client"
 	"minik8s/pkg/kubelet/message"
 	"minik8s/pkg/kubelet/podWorker"
 	"os"
@@ -21,10 +22,12 @@ const hostPath = "hostPath"
 
 //pod的状态
 const POD_PENDING_STATUS = "Pending"
+
 const POD_FAILED_STATUS = "Failed"
 const POD_RUNNING_STATUS = "Running"
 const POD_EXITED_STATUS = "Exited"
 const POD_DELETED_STATUS = "deleted"
+const POD_CREATEED_STATUS = "created"
 
 //container 的状态
 const CONTAINER_EXITED_STATUS = "exited"
@@ -35,18 +38,11 @@ const CONTAINER_CREATED_STATUS = "created"
 const PROBE_INTERVAL = 60 //探针间隔，单位为秒
 
 type Pod struct {
-	name  string
-	Label map[string]string
-	uid   string
-	//create time
-	ctime       string
+	configPod   *object.Pod
 	containers  []object.ContainerMeta
 	tmpDirMap   map[string]string
 	hostDirMap  map[string]string
 	hostFileMap map[string]string
-	status      string
-	//如果有错的错误信息
-	err error
 	//读写锁，更小粒度
 	rwLock       sync.RWMutex
 	commandChan  chan message.PodCommand
@@ -56,9 +52,7 @@ type Pod struct {
 	timer        *time.Ticker
 	canProbeWork bool
 	stopChan     chan bool
-	//存一份snapshot
-	podSnapShoot PodSnapShoot
-	podNetWork   PodNetWork
+	client       client.RESTClient
 }
 
 type PodNetWork struct {
@@ -68,31 +62,59 @@ type PodNetWork struct {
 
 }
 
-//获取pod的信息快照
-type PodSnapShoot struct {
-	Name        string
-	Uid         string
-	Ctime       string
-	Label       map[string]string
-	Containers  []object.ContainerMeta
-	TmpDirMap   map[string]string
-	HostDirMap  map[string]string
-	HostFileMap map[string]string
-	PodNetWork  PodNetWork
-	Status      string
-	Err         string
+//--------------tool function--------------------------------//
+func (p *Pod) GetName() string {
+	return p.configPod.Name
+}
+func (p *Pod) GetLabel() map[string]string{
+	return p.configPod.Labels
+}
+func (p *Pod) GetUid() string {
+	return p.configPod.UID
+}
+func (p *Pod) GetContainers() []object.ContainerMeta {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	deepContainers := p.containers
+	return deepContainers
+}
+//修改了status返回true
+func (p *Pod) compareAndSetStatus(status string) bool {
+	oldStatus := p.getStatus()
+	if oldStatus == status {
+		return false
+	}
+	p.configPod.Status.Phase = status
+	return true
+}
+func (p *Pod) getStatus() string {
+	return p.configPod.Status.Phase
+}
+func (p *Pod) setError(err error) {
+	p.configPod.Status.Err = err.Error()
 }
 
+func (p *Pod) uploadPod() {
+	err := p.client.UpdateRuntimePod(p.configPod)
+	if err != nil {
+		fmt.Println("[pod] updateRuntimePod error" + err.Error())
+	}
+}
+
+//--------------------------------------------------------------//
+
 //------初始化相关函数--------//
-func NewPodfromConfig(config *object.Pod) *Pod {
+func NewPodfromConfig(config *object.Pod, clientConfig client.Config) *Pod {
 	newPod := &Pod{}
-	newPod.name = config.ObjectMeta.Name
-	newPod.uid = config.UID
-	newPod.ctime = time.Now().String()
+	newPod.configPod = config
+	newPod.configPod.Ctime = time.Now().String()
 	newPod.canProbeWork = false
-	newPod.Label = config.ObjectMeta.Labels
 	var rwLock sync.RWMutex
 	newPod.rwLock = rwLock
+	restClient := client.RESTClient{
+		Base: "http://" + clientConfig.Host,
+	}
+	newPod.client = restClient
 	newPod.commandChan = make(chan message.PodCommand, 100)
 	newPod.responseChan = make(chan message.PodResponse, 100)
 	newPod.podWorker = &podWorker.PodWorker{}
@@ -104,7 +126,7 @@ func NewPodfromConfig(config *object.Pod) *Pod {
 	})
 	pauseRealName := "pause"
 	for index, value := range config.Spec.Containers {
-		realName := newPod.name + "_" + value.Name
+		realName := config.Name + "_" + value.Name
 		newPod.containers = append(newPod.containers, object.ContainerMeta{
 			OriginName: value.Name,
 			RealName:   realName,
@@ -115,34 +137,13 @@ func NewPodfromConfig(config *object.Pod) *Pod {
 	newPod.containers[0].RealName = pauseRealName
 	err := newPod.AddVolumes(config.Spec.Volumes)
 	if err != nil {
-		newPod.err = err
-		newPod.status = POD_FAILED_STATUS
+		newPod.setError(err)
+		newPod.compareAndSetStatus(POD_FAILED_STATUS)
 	} else {
-		newPod.status = POD_PENDING_STATUS //此时还未部署,设置状态为Pending
-	}
-	//生成snapShoot
-	errMsg := ""
-	if newPod.err != nil {
-		errMsg = newPod.err.Error()
-	}
-	newPod.podSnapShoot = PodSnapShoot{
-		Name:        newPod.name,
-		Uid:         newPod.uid,
-		Ctime:       newPod.ctime,
-		Label:       newPod.Label,
-		Containers:  newPod.containers,
-		TmpDirMap:   newPod.tmpDirMap,
-		HostFileMap: newPod.hostFileMap,
-		HostDirMap:  newPod.hostDirMap,
-		Status:      newPod.status,
-		Err:         errMsg,
-		PodNetWork:  newPod.podNetWork,
+		newPod.compareAndSetStatus(POD_PENDING_STATUS)
 	}
 	//启动pod
 	newPod.StartPod()
-	if newPod.err != nil {
-		return newPod
-	}
 	//生成command
 	commandWithConfig := &message.CommandWithConfig{}
 	commandWithConfig.CommandType = message.COMMAND_BUILD_CONTAINERS_OF_POD
@@ -166,16 +167,17 @@ func NewPodfromConfig(config *object.Pod) *Pod {
 					value.VolumeMounts[index].Name = path
 					continue
 				}
-				klog.Errorf("container Mount path didn't exist")
+				fmt.Println("[pod] error:container Mount path didn't exist")
 			}
 		}
 	}
 	podCommand := message.PodCommand{
 		ContainerCommand: &(commandWithConfig.Command),
-		PodUid:           newPod.uid,
 		PodCommandType:   message.ADD_POD,
 	}
 	newPod.commandChan <- podCommand
+	//提交pod
+	newPod.uploadPod()
 	return newPod
 }
 
@@ -200,37 +202,45 @@ func (p *Pod) listeningResponse() {
 				//判断是否成功
 				p.rwLock.Lock()
 				responseWithContainIds := (*message.ResponseWithContainIds)(unsafe.Pointer(response.ContainerResponse))
+				fmt.Printf("[pod] receive AddPod responce")
+				fmt.Println(*responseWithContainIds)
+				fmt.Println(*responseWithContainIds.NetWorkInfos)
 				if responseWithContainIds.Err != nil {
 					//出错了
-					p.SetStatusAndErr(POD_FAILED_STATUS, responseWithContainIds.Err)
-					klog.Errorf(responseWithContainIds.Err.Error())
+					if p.SetStatusAndErr(POD_FAILED_STATUS, responseWithContainIds.Err) {
+						p.uploadPod()
+					}
+					fmt.Println(responseWithContainIds.Err.Error())
 				} else {
 					//设置containersId
-					p.SetContainers(responseWithContainIds.Containers, POD_RUNNING_STATUS)
-					p.setNetWorkSettings(responseWithContainIds.NetWorkInfos)
+					p.SetContainersAndStatus(responseWithContainIds.Containers, POD_RUNNING_STATUS)
+					p.setIpAddress(responseWithContainIds.NetWorkInfos)
+					p.uploadPod()
 				}
 				p.rwLock.Unlock()
 			case message.PROBE_POD:
 				p.rwLock.Lock()
-				if p.status == POD_DELETED_STATUS {
-					p.canProbeWork = true
+				if p.getStatus() == POD_DELETED_STATUS {
+					p.canProbeWork = false
 					p.rwLock.Unlock()
 				} else {
 					responseWithProbeInfos := (*message.ResponseWithProbeInfos)(unsafe.Pointer(response.ContainerResponse))
 					if responseWithProbeInfos.Err != nil {
-						p.err = responseWithProbeInfos.Err
-						p.status = POD_FAILED_STATUS
+						p.SetStatusAndErr(POD_FAILED_STATUS, responseWithProbeInfos.Err)
 					} else {
-						p.status = POD_RUNNING_STATUS
+						status := POD_RUNNING_STATUS
 						for _, value := range responseWithProbeInfos.ProbeInfos {
 							if value == CONTAINER_CREATED_STATUS {
-								p.status = POD_PENDING_STATUS
+								status = POD_CREATEED_STATUS
 								break
 							}
 							if value == CONTAINER_EXITED_STATUS {
-								p.status = POD_EXITED_STATUS
+								status = POD_EXITED_STATUS
 								break
 							}
+						}
+						if p.compareAndSetStatus(status) {
+							p.uploadPod()
 						}
 					}
 					p.canProbeWork = true
@@ -291,11 +301,11 @@ func GetCurrentAbPathByCaller() string {
 //----------------初始化相关函数结束------------------------//
 
 //----------------辅助函数--------------------------------//
-func (p *Pod) SetStatusAndErr(status string, err error) {
-	p.status = status
-	p.err = err
+func (p *Pod) SetStatusAndErr(status string, err error) bool {
+	p.configPod.Status.Err = err.Error()
+	return p.compareAndSetStatus(status)
 }
-func (p *Pod) SetContainers(containers []object.ContainerMeta, status string) {
+func (p *Pod) SetContainersAndStatus(containers []object.ContainerMeta, status string) bool {
 	for _, value := range containers {
 		for index, it := range p.containers {
 			if it.RealName == value.RealName {
@@ -303,17 +313,10 @@ func (p *Pod) SetContainers(containers []object.ContainerMeta, status string) {
 			}
 		}
 	}
-	p.status = status
+	return p.compareAndSetStatus(status)
 }
-func (p *Pod) setNetWorkSettings(settings *types.NetworkSettings) {
-	p.podNetWork.GateWay = settings.Gateway
-	p.podNetWork.Ipaddress = settings.IPAddress
-	var middle []string
-	portmap := settings.Ports
-	for k, _ := range portmap {
-		middle = append(p.podNetWork.OpenPortSet, string(k))
-	}
-	p.podNetWork.OpenPortSet = filterChars(middle)
+func (p *Pod) setIpAddress(settings *types.NetworkSettings) {
+	p.configPod.Status.PodIP = settings.IPAddress
 }
 func filterSingle(input string) string {
 	index := strings.Index(input, "/tcp")
@@ -327,43 +330,6 @@ func filterChars(input []string) []string {
 	return result
 }
 
-//-------------------------------------------------------//
-
-//-----------------读取pod信息，需要读锁------------------------//
-// TODO: why use try lock
-func (p *Pod) GetPodSnapShoot() PodSnapShoot {
-	//p.rwLock.TryRLock()
-	//defer p.rwLock.RUnlock()
-	//只有获取到锁的情况下才会更新 podSnapshoot并返回新值，否者返回旧缓存
-	if p.rwLock.TryRLock() {
-		errMsg := ""
-		if p.err != nil {
-			errMsg = p.err.Error()
-		}
-		p.podSnapShoot = PodSnapShoot{
-			Name:        p.name,
-			Uid:         p.uid,
-			Ctime:       p.ctime,
-			Containers:  p.containers,
-			Label:       p.Label,
-			TmpDirMap:   p.tmpDirMap,
-			HostFileMap: p.hostFileMap,
-			HostDirMap:  p.hostDirMap,
-			Status:      p.status,
-			Err:         errMsg,
-			PodNetWork:  p.podNetWork,
-		}
-		p.rwLock.RUnlock()
-		return p.podSnapShoot
-	} else {
-		return p.podSnapShoot
-	}
-
-}
-
-//-----------------------------------------------------------//
-
-//--------------写pod信息，需要写锁------------------------------//
 func (p *Pod) StartProbe() {
 	p.timer = time.NewTicker(PROBE_INTERVAL * time.Second)
 	p.stopChan = make(chan bool)
@@ -374,7 +340,7 @@ func (p *Pod) StartProbe() {
 			case <-p.timer.C:
 				p.rwLock.Lock()
 				//这几种情况下不进行检查
-				if p.canProbeWork && p.status != POD_PENDING_STATUS && p.status != POD_FAILED_STATUS && p.status != POD_DELETED_STATUS && p.status != POD_EXITED_STATUS {
+				if p.canProbeWork && p.getStatus() != POD_PENDING_STATUS && p.getStatus() != POD_FAILED_STATUS && p.getStatus() != POD_DELETED_STATUS && p.getStatus() != POD_EXITED_STATUS {
 					command := &message.CommandWithContainerIds{}
 					command.CommandType = message.COMMAND_PROBE_CONTAINER
 					var group []string
@@ -383,7 +349,6 @@ func (p *Pod) StartProbe() {
 					}
 					command.ContainerIds = group
 					podCommand := message.PodCommand{
-						PodUid:           p.uid,
 						PodCommandType:   message.PROBE_POD,
 						ContainerCommand: &(command.Command),
 					}
@@ -402,7 +367,7 @@ func (p *Pod) StartProbe() {
 
 func (p *Pod) DeletePod() {
 	p.rwLock.Lock()
-	p.status = POD_DELETED_STATUS
+	p.compareAndSetStatus(POD_DELETED_STATUS)
 	command := &message.CommandWithContainerIds{}
 	command.CommandType = message.COMMAND_DELETE_CONTAINER
 	var group []string
@@ -411,11 +376,11 @@ func (p *Pod) DeletePod() {
 	}
 	command.ContainerIds = group
 	podCommand := message.PodCommand{
-		PodUid:           p.uid,
 		PodCommandType:   message.DELETE_POD,
 		ContainerCommand: &(command.Command),
 	}
 	p.commandChan <- podCommand
+	p.client.DeleteRuntimePod(p.GetName())
 	p.rwLock.Unlock()
 }
 
@@ -428,36 +393,4 @@ func (p *Pod) releaseResource() {
 	close(p.commandChan)
 	close(p.responseChan)
 	p.rwLock.Unlock()
-}
-
-//-----------------------------------------------------------//
-
-func (p *Pod) GetContainers() []object.ContainerMeta {
-	p.rwLock.RLock()
-	defer p.rwLock.RUnlock()
-	deepContainers := p.containers
-	return deepContainers
-}
-
-func (p *Pod) GetName() string {
-	p.rwLock.RLock()
-	defer p.rwLock.RUnlock()
-	deepName := p.name
-	return deepName
-}
-
-func (p *Pod) GetUID() string {
-	p.rwLock.RLock()
-	defer p.rwLock.RUnlock()
-	return p.uid
-}
-
-func (p *Pod) GetLabels() map[string]string {
-	p.rwLock.RLock()
-	defer p.rwLock.RUnlock()
-	deepLabel := make(map[string]string)
-	for key, val := range p.Label {
-		deepLabel[key] = val
-	}
-	return deepLabel
 }

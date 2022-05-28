@@ -185,10 +185,31 @@ func (s *Server) AddPod(ctx *gin.Context) {
 		return
 	}
 	if pod.UID == "" {
-		pod.UID = uuid.New().String()
+		//这种情况下，可能etcd里边存的旧的有UID, 取出来填上，或者就是新的，需要分配
+		//从etcd里取,看以前是否有过
+		res, err2 := s.store.Get(config.PodConfigPREFIX + "/" + pod.Name)
+		if err2 != nil {
+			ctx.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+		if len(res) != 0 {
+			oldPod := &object.Pod{}
+			err = json.Unmarshal(res[0].ValueBytes, oldPod)
+			if err != nil {
+				fmt.Println("[AddService] service unmarshal fail")
+				ctx.AbortWithStatus(http.StatusBadRequest)
+				return
+			}
+			pod.UID = oldPod.UID
+			if oldPod.Spec.NodeName != "" {
+				pod.Spec.NodeName = oldPod.Spec.NodeName
+			}
+		} else {
+			pod.UID = uuid.New().String()
+		}
 	}
-
 	body, _ = json.Marshal(pod)
+
 	err = s.store.Put(config.PodConfigPREFIX+"/"+pod.Name, body)
 	if err != nil {
 		fmt.Println("[AddService] etcd put fail")

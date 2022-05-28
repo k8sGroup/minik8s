@@ -19,7 +19,6 @@ func (podWorker *PodWorker) SyncLoop(commands <-chan message.PodCommand, respons
 			res := dockerClient.HandleCommand(command.ContainerCommand)
 			result := message.PodResponse{
 				ContainerResponse: res,
-				PodUid:            command.PodUid,
 				PodResponseType:   command.PodCommandType,
 			}
 			responses <- result

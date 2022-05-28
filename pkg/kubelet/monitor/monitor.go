@@ -74,8 +74,8 @@ func (m *DockerMonitor) MetricDockerStat(ctx context.Context, pod *pod.Pod) {
 
 		fmt.Printf("[MetricDockerStat] cpu:%f%%  mem:%f%%\n", cpuPercent, memPercent)
 
-		serviceTag := selectorAppTag(pod.Label)
-		MakeMetricRecord(pod.GetName(), pod.GetUID(), serviceTag, memPercent, cpuPercent)
+		serviceTag := selectorAppTag(pod.GetLabel())
+		MakeMetricRecord(pod.GetName(), pod.GetUid(), serviceTag, memPercent, cpuPercent)
 	}
 }
 
