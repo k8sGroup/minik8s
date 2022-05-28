@@ -171,11 +171,20 @@ func createPause(ports []object.Port, name string) (container.ContainerCreateCre
 	var exports nat.PortSet
 	exports = make(nat.PortSet, len(ports))
 	for _, port := range ports {
-		p, err := nat.NewPort("tcp", port.ContainerPort)
-		if err != nil {
-			return container.ContainerCreateCreatedBody{}, err
+		if port.Protocol == "" || port.Protocol == "tcp" || port.Protocol == "all" {
+			p, err := nat.NewPort("tcp", port.ContainerPort)
+			if err != nil {
+				return container.ContainerCreateCreatedBody{}, err
+			}
+			exports[p] = struct{}{}
 		}
-		exports[p] = struct{}{}
+		if port.Protocol == "udp" || port.Protocol == "all" {
+			p, err := nat.NewPort("udp", port.ContainerPort)
+			if err != nil {
+				return container.ContainerCreateCreatedBody{}, err
+			}
+			exports[p] = struct{}{}
+		}
 	}
 
 	resp, err := cli.ContainerCreate(context.Background(), &container.Config{
@@ -183,14 +192,6 @@ func createPause(ports []object.Port, name string) (container.ContainerCreateCre
 		ExposedPorts: exports,
 	}, &container.HostConfig{
 		IpcMode: container.IpcMode("shareable"),
-		//PortBindings: nat.PortMap{
-		//	"80/tcp": []nat.PortBinding{
-		//		{
-		//			HostIP:   "0.0.0.0",
-		//			HostPort: "8080",
-		//		},
-		//	},
-		//},
 	}, nil, nil, name)
 	return resp, err
 }

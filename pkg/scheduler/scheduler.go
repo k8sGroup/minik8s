@@ -111,13 +111,9 @@ func selectHost(nodes []object.Node) (string, error) {
 		return "", errors.New("empty nodes")
 	}
 	num := len(nodes)
-	var idx int
-	if num == 1 {
-		idx = 0
-	} else {
-		rand.Seed(time.Now().UnixNano())
-		idx = rand.Intn(num - 1)
-	}
+	fmt.Printf("there are %d nodes in totle", num)
+	rand.Seed(time.Now().Unix())
+	idx := rand.Intn(num)
 	return nodes[idx].MetaData.Name, nil
 }
 

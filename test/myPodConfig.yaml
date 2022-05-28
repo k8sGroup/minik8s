@@ -28,4 +28,5 @@ spec:  #Pod 的详细定义
           value: string
       ports: #容器开放的端口
         - containerPort: string
+          protocol: string #开放的端口接收的协议 有三种， tcp, udp, all 默认为tcp
 

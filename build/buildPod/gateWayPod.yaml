@@ -1,0 +1,18 @@
+kind: Pod
+metadata:
+  name: gateway
+  labels:
+    function: gateway
+spec:
+  volumes:
+    - name: config
+      type: hostPath
+      path: /root/nginx
+  containers:
+    - name: gatewayContainer
+      image: nginx
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: config
+          mountPath: /etc/nginx
