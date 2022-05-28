@@ -2,11 +2,12 @@ package mesh
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"net"
 	"strconv"
 	"syscall"
+
+	"github.com/pkg/errors"
 )
 
 var (
