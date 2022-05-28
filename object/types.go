@@ -7,6 +7,7 @@ const (
 	Failed       string = "Failed"
 	PodUnknown   string = "Unknown"
 	Delete       string = "Delete"
+	PodExit      string = "Exited"
 
 	// SUCCESS http status code
 	SUCCESS int = 200

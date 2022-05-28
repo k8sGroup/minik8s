@@ -8,8 +8,8 @@ import (
 	"io/ioutil"
 	"minik8s/object"
 	"minik8s/pkg/apiserver/config"
-	"minik8s/pkg/client"
 	"minik8s/pkg/controller"
+	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/etcdstore/serviceConfigStore"
 	"net/http"
 	"strings"
@@ -132,7 +132,6 @@ func (s *Server) userAddRS(ctx *gin.Context) {
 	err = json.Unmarshal(body, &rs)
 	rs.UID = uid
 	if err != nil {
-		fmt.Printf("[deletePod] pod unmarshal fail\n")
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
@@ -244,7 +243,8 @@ func (s *Server) getActivePods(ctx *gin.Context) {
 		ctx.Status(http.StatusBadRequest)
 		return
 	}
-	allPods, _ := client.MakePods(listRes, rsName, uid)
+	fmt.Println(listRes)
+	allPods, _ := makePods(listRes, rsName, uid)
 	activePods := controller.FilterActivePods(allPods)
 	actual = len(activePods)
 
@@ -274,4 +274,36 @@ func (s *Server) getActivePods(ctx *gin.Context) {
 		"expect": expect,
 		"actual": actual,
 	})
+}
+
+func makePods(raw []etcdstore.ListRes, name string, UID string) ([]*object.Pod, error) {
+	var pods []*object.Pod
+
+	if len(raw) == 0 {
+		return pods, nil
+	}
+
+	// unmarshal and filter by ownership
+	for _, rawPod := range raw {
+		pod := &object.Pod{}
+		err := json.Unmarshal(rawPod.ValueBytes, &pod)
+		if err != nil {
+			fmt.Printf("[GetRSPods] unmarshal fail\n")
+			return nil, err
+		}
+		if ownBy(pod.OwnerReferences, name, UID) {
+			pods = append(pods, pod)
+		}
+	}
+
+	return pods, nil
+}
+
+func ownBy(ownerReferences []object.OwnerReference, owner string, UID string) bool {
+	for _, ref := range ownerReferences {
+		if ref.Name == owner && ref.UID == UID {
+			return true
+		}
+	}
+	return false
 }
