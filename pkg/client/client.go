@@ -2,6 +2,7 @@ package client
 
 import (
 	"minik8s/pkg/apiserver/config"
+	"minik8s/pkg/etcdstore"
 
 	"github.com/google/uuid"
 
@@ -157,7 +158,14 @@ func GetRuntimeRS(ls *listerwatcher.ListerWatcher, name string) (*object.Replica
 
 func GetRSPods(ls *listerwatcher.ListerWatcher, name string, UID string) ([]*object.Pod, error) {
 	raw, err := ls.List("/registry/pod/default")
+	if err != nil {
+		fmt.Printf("[GetRSPods] list fail\n")
+		return nil, err
+	}
+	return MakePods(raw, name, UID)
+}
 
+func MakePods(raw []etcdstore.ListRes, name string, UID string) ([]*object.Pod, error) {
 	var pods []*object.Pod
 
 	if len(raw) == 0 {
@@ -167,18 +175,17 @@ func GetRSPods(ls *listerwatcher.ListerWatcher, name string, UID string) ([]*obj
 	// unmarshal and filter by ownership
 	for _, rawPod := range raw {
 		pod := &object.Pod{}
-		err = json.Unmarshal(rawPod.ValueBytes, &pod)
+		err := json.Unmarshal(rawPod.ValueBytes, &pod)
+		if err != nil {
+			fmt.Printf("[GetRSPods] unmarshal fail\n")
+			return nil, err
+		}
 		if ownBy(pod.OwnerReferences, name, UID) {
 			pods = append(pods, pod)
 		}
 	}
 
-	if err != nil {
-		fmt.Printf("[GetRSPods] unmarshal fail\n")
-	}
-
 	return pods, nil
-
 }
 
 func (r RESTClient) DeleteRS(rsName string) error {

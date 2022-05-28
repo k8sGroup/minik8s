@@ -109,6 +109,9 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 		engine.PUT(config.ServiceConfig, s.AddService)
 		engine.DELETE(config.ServiceConfig, s.deleteService)
 	}
+	{
+		engine.GET(config.RS_POD, s.getActivePods)
+	}
 
 	go s.daemon(watcherChan)
 
