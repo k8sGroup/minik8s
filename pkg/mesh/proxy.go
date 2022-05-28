@@ -87,8 +87,7 @@ func (p *Proxy) Run() {
 
 func handleConn(clientConn *net.TCPConn) {
 
-	fmt.Println("connect...")
-	fmt.Println(clientConn.RemoteAddr().String())
+	fmt.Printf("connection from:%v...\n", clientConn.RemoteAddr().String())
 
 	if clientConn == nil {
 		return
@@ -191,12 +190,13 @@ func copy(dst io.ReadWriteCloser, src io.ReadWriteCloser) {
 		fmt.Println("[copy] null src/dst")
 		return
 	}
+
+	defer dst.Close()
+	defer src.Close()
+
 	_, err := io.Copy(dst, src)
 	if err != nil {
 		fmt.Println("[copy] error")
 		return
 	}
-
-	dst.Close()
-	src.Close()
 }
