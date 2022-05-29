@@ -228,8 +228,6 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 				},
 			}
 
-			//dc.dm2rs.Put(res.Key, rsKeyNew)
-
 			for true {
 				fmt.Printf("[delta loop]\n")
 				fmt.Printf("[new rs] %s - %d\n", rsNameNew, rsNew.Spec.Replicas)
@@ -266,15 +264,12 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 						}
 						dc.replicasetMap.Put(rsKeyOld, rsOld)
 					} else if rsOld.Spec.Replicas == 0 {
-						err = client.Put(dc.apiServerBase+rsKeyOld, rsOld)
+						err = client.Del(dc.apiServerBase + rsKeyOld)
 						if err != nil {
 							fmt.Printf("[error] send old rs %s %s\n", rsNameOld, err.Error())
 							rsOld.Spec.Replicas = stash
 							goto LoopErr
 						}
-						dc.replicasetMap.Put(rsKeyOld, rsOld)
-						decreaseOldDone = true
-					} else {
 						decreaseOldDone = true
 					}
 				}
@@ -284,43 +279,6 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 					fmt.Printf("[new rs increased] %s\n", rsNameNew)
 					break
 				}
-
-				//for true {
-				//	var status RsPodStatus
-				//	time.Sleep(time.Second)
-				//	if !syncNew && !increaseNewDone {
-				//		data, err := client.GetWithParams(dc.apiServerBase+config.RS_POD, map[string]string{"rsName": rsNameNew, "uid": rsUidNew})
-				//		if err != nil {
-				//			continue
-				//		}
-				//		err = json.Unmarshal(data, &status)
-				//		if err != nil {
-				//			continue
-				//		}
-				//		fmt.Printf("[new rs status] rs %s actual %d expected %d\n", rsNameNew, status.Actual, status.Expect)
-				//		if status.Actual == status.Expect {
-				//			syncNew = true
-				//		}
-				//	}
-				//	if !syncOld && !decreaseOldDone {
-				//		data, err := client.GetWithParams(dc.apiServerBase+config.RS_POD, map[string]string{"rsName": rsNameOld, "uid": rsUidOld})
-				//		if err != nil {
-				//			continue
-				//		}
-				//		err = json.Unmarshal(data, &status)
-				//		if err != nil {
-				//			continue
-				//		}
-				//		fmt.Printf("[old rs status] rs %s actual %d expected %d\n", rsNameOld, status.Actual, status.Expect)
-				//		if status.Actual == status.Expect {
-				//			syncOld = true
-				//		}
-				//	}
-				//	if syncNew && syncOld {
-				//		fmt.Println("[status check] actual==expected, next loop")
-				//		goto NextLoop
-				//	}
-				//}
 			LoopErr:
 				time.Sleep(7 * time.Second)
 			}
