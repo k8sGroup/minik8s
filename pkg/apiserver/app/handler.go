@@ -245,7 +245,6 @@ func (s *Server) getActivePods(ctx *gin.Context) {
 		ctx.Status(http.StatusBadRequest)
 		return
 	}
-	fmt.Println(listRes)
 	allPods, _ := makePods(listRes, rsName, uid)
 	activePods := controller.FilterActivePods(allPods)
 	actual = len(activePods)
