@@ -9,42 +9,17 @@ import (
 )
 
 func main() {
-	data, err := ioutil.ReadFile("/home/minik8s/test/service/dnsService.yaml")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	service := &object.Service{}
-	err = yaml.Unmarshal([]byte(data), service)
-	fmt.Println(*service)
 	clientConfig := client.Config{Host: "127.0.0.1" + ":8080"}
 	restClient := client.RESTClient{
 		Base: "http://" + clientConfig.Host,
 	}
-	err = restClient.UpdateService(service)
+	data, err := ioutil.ReadFile("/home/minik8s/test/service/ghostService.yaml")
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	data, err = ioutil.ReadFile("/home/minik8s/test/service/gateWayService.yaml")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	service = &object.Service{}
-	err = yaml.Unmarshal([]byte(data), service)
-	fmt.Println(*service)
-	err = restClient.UpdateService(service)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	data, err = ioutil.ReadFile("/home/minik8s/test/service/ghostService.yaml")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	service = &object.Service{}
+	//fmt.Print(data)
+	service := &object.Service{}
 	err = yaml.Unmarshal([]byte(data), service)
 	fmt.Println(*service)
 	err = restClient.UpdateService(service)

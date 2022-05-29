@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	data, err := ioutil.ReadFile("/home/minik8s/build/buildPod/coreDnsPod.yaml")
+	data, err := ioutil.ReadFile("/home/minik8s/build/buildPod/example.yaml")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -27,14 +27,14 @@ func main() {
 		Base: "http://" + clientConfig.Host,
 	}
 	restClient.UpdateConfigPod(pod)
-	var m int
-	for {
-		fmt.Println("input m, 1 means delete")
-		fmt.Scanln(&m)
-		if m == 1 {
-			restClient.DeleteConfigPod(pod.Name)
-		}
-	}
+	//var m int
+	//for {
+	//	fmt.Println("input m, 1 means delete")
+	//	fmt.Scanln(&m)
+	//	if m == 1 {
+	//		restClient.DeleteConfigPod(pod.Name)
+	//	}
+	//}
 	//data, err = ioutil.ReadFile("/home/minik8s/build/buildPod/gateWayPod.yaml")
 	//if err != nil {
 	//	fmt.Println(err)
