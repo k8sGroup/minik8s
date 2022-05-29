@@ -9,9 +9,10 @@ import (
 )
 
 func main() {
-	data, err := ioutil.ReadFile("/home/minik8s/test/service/example.yaml")
+	data, err := ioutil.ReadFile("/home/minik8s/test/service/dnsService.yaml")
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 	service := &object.Service{}
 	err = yaml.Unmarshal([]byte(data), service)
@@ -23,5 +24,32 @@ func main() {
 	err = restClient.UpdateService(service)
 	if err != nil {
 		fmt.Println(err)
+		return
+	}
+	data, err = ioutil.ReadFile("/home/minik8s/test/service/gateWayService.yaml")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	service = &object.Service{}
+	err = yaml.Unmarshal([]byte(data), service)
+	fmt.Println(*service)
+	err = restClient.UpdateService(service)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	data, err = ioutil.ReadFile("/home/minik8s/test/service/ghostService.yaml")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	service = &object.Service{}
+	err = yaml.Unmarshal([]byte(data), service)
+	fmt.Println(*service)
+	err = restClient.UpdateService(service)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 }

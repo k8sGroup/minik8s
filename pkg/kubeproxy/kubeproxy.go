@@ -12,8 +12,9 @@ import (
 )
 
 type KubeProxy struct {
-	ls     *listerwatcher.ListerWatcher
-	Client client.RESTClient
+	ls              *listerwatcher.ListerWatcher
+	Client          client.RESTClient
+	dnsConfigWriter *DnsConfigWriter
 	//etcd key到Svc Chain的映射, 一个service每个port对应一个svcChain
 	ServiceName2SvcChain map[string]map[string]*SvcChain
 	stopChannel          <-chan struct{}
@@ -32,6 +33,7 @@ func NewKubeProxy(lsConfig *listerwatcher.Config, clientConfig client.Config) *K
 	}
 	res.stopChannel = make(chan struct{})
 	res.ServiceName2SvcChain = make(map[string]map[string]*SvcChain)
+	res.dnsConfigWriter = NewDnsConfigWriter(lsConfig, clientConfig)
 	return res
 }
 func (proxy *KubeProxy) StartKubeProxy() {

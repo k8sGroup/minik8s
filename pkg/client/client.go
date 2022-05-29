@@ -270,6 +270,13 @@ func (r RESTClient) DeleteRuntimeService(name string) error {
 	return err
 }
 
+/***************************DnsAndTrans************************************/
+func (r RESTClient) UpdateDnsAndTrans(trans *object.DnsAndTrans) error {
+	attachUrl := config.DnsAndTransPrefix + "/" + trans.MetaData.Name
+	err := Put(r.Base+attachUrl, trans)
+	return err
+}
+
 /********************************watch*****************************/
 
 // WatchRegister get ticket for message queue

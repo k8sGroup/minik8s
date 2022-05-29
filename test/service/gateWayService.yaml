@@ -1,13 +1,13 @@
 kind: Service
 metadata:
-  name: example
+  name: gateWayService
 spec:
   type: ClusterIp
-  clusterIp: 10.23.34.56
+  clusterIp: 10.10.10.12
   ports: 
-    - port: 8070
+    - port: 80
       targetPort: 80
       protocol: TCP
       name: http
   selector:
-    key: test
+    function: gateway

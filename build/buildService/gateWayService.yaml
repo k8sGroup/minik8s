@@ -1,0 +1,14 @@
+kind: Service
+metadata:
+  name: gateWayService #gateWayService + DnsAndTransName
+  labels:
+    gateWayService: name #DnsAndTransName
+spec:
+  type: ClusterIp
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    belong: name #DnsAndTransName

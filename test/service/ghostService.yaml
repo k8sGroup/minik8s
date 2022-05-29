@@ -1,0 +1,13 @@
+kind: Service
+metadata:
+  name: ghostService
+spec:
+  type: ClusterIp
+  clusterIp: 10.10.10.15
+  ports:
+    - port: 80
+      tragetPort: 80
+      protocol: TCP
+      name: example
+  selector:
+    key: test

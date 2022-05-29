@@ -32,7 +32,7 @@ func getAllContainers() ([]types.Container, error) {
 	}
 	return cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
 }
-func getRunningContainers() ([]types.Container, error) {
+func GetRunningContainers() ([]types.Container, error) {
 	cli, err := getNewClient()
 	if err != nil {
 		return nil, err
@@ -372,7 +372,7 @@ func HandleCommand(command *message.Command) *message.Response {
 		result.Containers = containers
 		return &(result.Response)
 	case message.COMMAND_GET_RUNNING_CONTAINER:
-		containers, err := getRunningContainers()
+		containers, err := GetRunningContainers()
 		var result message.ResponseWithContainInfo
 		result.Response.CommandType = message.COMMAND_GET_RUNNING_CONTAINER
 		result.Response.Err = err

@@ -149,8 +149,6 @@ func (s *Server) AddService(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	uid := uuid.New().String()
-	service.MetaData.UID = uid
 	if service.Spec.Type == "" {
 		service.Spec.Type = object.ClusterIp
 	}
@@ -216,4 +214,78 @@ func (s *Server) AddPod(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
+}
+func (s *Server) AddDnsAndTrans(ctx *gin.Context) {
+	body, err := ioutil.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.AbortWithStatus(http.StatusBadRequest)
+	}
+	dnsAndTrans := &object.DnsAndTrans{}
+	err = json.Unmarshal(body, dnsAndTrans)
+	if err != nil {
+		fmt.Println("[AddDnsAndTrans] Unmarshal fail " + err.Error())
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	if dnsAndTrans.Status.Phase == "" {
+		//用户文件发来，此刻需要取出phase以及gateWayIp
+		old, err3 := s.store.Get(config.DnsAndTransPrefix + "/" + dnsAndTrans.MetaData.Name)
+		if err3 != nil {
+			fmt.Println("[AddDnsAndTrans] add fail " + err3.Error())
+			ctx.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+		if len(old) != 0 {
+			oldTrans := &object.DnsAndTrans{}
+			json.Unmarshal(old[0].ValueBytes, oldTrans)
+			if oldTrans.Status.Phase != object.Delete {
+				dnsAndTrans.Status.Phase = oldTrans.Status.Phase
+				dnsAndTrans.Spec.GateWayIp = oldTrans.Spec.GateWayIp
+			}
+		}
+	}
+	//获取所有的service进行, 从而回填ip
+	res2, err2 := s.store.PrefixGet(config.ServicePrefix)
+	if err2 != nil {
+		fmt.Println("[AddDnsAndTrans] add fail " + err2.Error())
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	var services []*object.Service
+	for _, v := range res2 {
+		s := &object.Service{}
+		err = json.Unmarshal(v.ValueBytes, s)
+		if err != nil {
+			fmt.Println("[AddDnsAndTrans] add fail " + err.Error())
+			ctx.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+		services = append(services, s)
+	}
+	for k, v := range dnsAndTrans.Spec.Paths {
+		exist := false
+		for _, s := range services {
+			if v.Name == s.MetaData.Name {
+				dnsAndTrans.Spec.Paths[k].Ip = s.Spec.ClusterIp
+				exist = true
+				break
+			}
+		}
+		if exist {
+			continue
+		} else {
+			//不存在对应的服务，应当报错
+			fmt.Println("[AddDnsAndTrans] service not exist ")
+			ctx.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+	}
+	body, _ = json.Marshal(dnsAndTrans)
+	err = s.store.Put(config.DnsAndTransPrefix+"/"+dnsAndTrans.MetaData.Name, body)
+	if err != nil {
+		fmt.Println("[AddDnsAndTrans] etcd put fail")
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	return
 }

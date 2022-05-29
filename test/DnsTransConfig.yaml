@@ -1,0 +1,12 @@
+#Dns与转发配置模板
+kind: DNS
+metadata:
+  name: string  #名称
+  labels:
+    key: val
+spec:
+  host: string   #域名主路径
+  paths:
+    - name: string   #子路径名
+      service: string #对应的服务
+      port: string  #对应的端口
