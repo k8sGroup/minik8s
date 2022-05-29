@@ -196,10 +196,6 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 			if err != nil {
 				klog.Errorf("delete pod config fail Name:%s uid:%s\n", pod.Name, pod.UID)
 			}
-			err = rsc.Client.DeleteRuntimePod(pod.Name)
-			if err != nil {
-				klog.Errorf("delete runtime pod fail Name:%s uid:%s\n", pod.Name, pod.UID)
-			}
 		}
 	}
 	return nil
