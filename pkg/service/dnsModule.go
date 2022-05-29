@@ -2,7 +2,7 @@ package service
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v2"
+	"github.com/go-yaml/yaml"
 	"io/ioutil"
 	"minik8s/object"
 	"minik8s/pkg/netSupport/netconfig"
@@ -20,7 +20,9 @@ func getGateWayRsModule() *object.ReplicaSet {
 			fmt.Println("[dnsModule] getGateWayRsModule fail" + err.Error())
 			return nil
 		}
-		err = yaml.Unmarshal([]byte(data), gateWayRsModule)
+		tmp := &object.ReplicaSet{}
+		err = yaml.Unmarshal([]byte(data), tmp)
+		gateWayRsModule = tmp
 		if err != nil {
 			fmt.Println("[dnsModule] getGateWayRsModule fail" + err.Error())
 			return nil
@@ -37,7 +39,9 @@ func getCoreDnsRsModule() *object.ReplicaSet {
 			fmt.Println("[dnsModule] GetCoreDnsRsModule fail" + err.Error())
 			return nil
 		}
-		err = yaml.Unmarshal([]byte(data), coreDnsRsModule)
+		tmp := &object.ReplicaSet{}
+		err = yaml.Unmarshal([]byte(data), tmp)
+		coreDnsRsModule = tmp
 		if err != nil {
 			fmt.Println("[dnsModule] GetCoreDnsRsModule fail" + err.Error())
 			return nil
@@ -54,7 +58,9 @@ func getGateWayServiceModule() *object.Service {
 			fmt.Println("[dnsModule] getGateWayServiceModule fail" + err.Error())
 			return nil
 		}
-		err = yaml.Unmarshal([]byte(data), gateWayServiceModule)
+		tmp := &object.Service{}
+		err = yaml.Unmarshal([]byte(data), tmp)
+		gateWayServiceModule = tmp
 		if err != nil {
 			fmt.Println("[dnsModule] getGateWayServiceModule fail" + err.Error())
 			return nil
@@ -71,7 +77,9 @@ func getCoreDnsServiceModule() *object.Service {
 			fmt.Println("[dnsModule] getCoreDnsServiceModule fail" + err.Error())
 			return nil
 		}
-		err = yaml.Unmarshal([]byte(data), coreDnsServiceModule)
+		tmp := &object.Service{}
+		err = yaml.Unmarshal([]byte(data), tmp)
+		coreDnsServiceModule = tmp
 		if err != nil {
 			fmt.Println("[dnsModule] getCoreDnsServiceModule fail" + err.Error())
 			return nil

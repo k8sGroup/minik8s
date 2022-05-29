@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"minik8s/object"
 	"minik8s/pkg/kubelet/message"
+	"minik8s/pkg/netSupport/netconfig"
 	"unsafe"
 
 	"github.com/docker/docker/api/types"
@@ -192,6 +193,7 @@ func createPause(ports []object.Port, name string) (container.ContainerCreateCre
 		ExposedPorts: exports,
 	}, &container.HostConfig{
 		IpcMode: container.IpcMode("shareable"),
+		DNS:     []string{netconfig.ServiceDns},
 	}, nil, nil, name)
 	return resp, err
 }

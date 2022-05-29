@@ -7,11 +7,11 @@ metadata:
 spec:
   replicas: 3
   template:
-    spec:
-      metadata:
+    metadata:
         name: coreDnsPod
         labels:
           function: DNS
+    spec:
       volumes:
         - name: coredns
           type: hostPath

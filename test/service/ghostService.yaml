@@ -6,7 +6,7 @@ spec:
   clusterIp: 10.10.10.15
   ports:
     - port: 80
-      tragetPort: 80
+      targetPort: 80
       protocol: TCP
       name: example
   selector:

@@ -291,7 +291,7 @@ func (s *Server) AddDnsAndTrans(ctx *gin.Context) {
 		return
 	}
 	return
-
+}
 func (s *Server) getActivePods(ctx *gin.Context) {
 	rsName := ctx.Query("rsName")
 	if rsName == "" {

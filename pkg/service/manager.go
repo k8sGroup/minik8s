@@ -8,6 +8,7 @@ import (
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/listerwatcher"
+	"minik8s/pkg/netSupport/netconfig"
 	"time"
 )
 
@@ -36,15 +37,30 @@ func NewManager(lsConfig *listerwatcher.Config, clientConfig client.Config) *Man
 	manager.lsConfig = lsConfig
 	manager.clientConfig = clientConfig
 	manager.register()
+	time.Sleep(3 * time.Second)
+	manager.boot()
 	return manager
 }
-
+func (manager *Manager) boot() {
+	//生成coreDns service
+	err := manager.client.AddConfigRs(GetCoreDnsRsModule())
+	if err != nil {
+		fmt.Println("[ServiceManager] boot fail" + err.Error())
+		return
+	}
+	time.Sleep(1 * time.Second)
+	err = manager.client.UpdateService(GetCoreDnsServiceModule())
+	if err != nil {
+		fmt.Println("[ServiceManager] boot fail" + err.Error())
+		return
+	}
+}
 func (manager *Manager) register() {
 	watchService := func() {
 		for {
 			err := manager.ls.Watch(config.ServiceConfigPrefix, manager.watchServiceConfig, manager.stopChannel)
 			if err != nil {
-				fmt.Println("[Service Manager] error" + err.Error())
+				fmt.Println("[Service Manager] register error" + err.Error())
 				time.Sleep(5 * time.Second)
 			} else {
 				return
@@ -52,7 +68,96 @@ func (manager *Manager) register() {
 		}
 
 	}
+	watchDns := func() {
+		for {
+			err := manager.ls.Watch(config.DnsAndTransPrefix, manager.watchDnsAndTrans, manager.stopChannel)
+			if err != nil {
+				fmt.Println("[Server Manager] register error" + err.Error())
+				time.Sleep(5 * time.Second)
+			} else {
+				return
+			}
+		}
+	}
 	go watchService()
+	go watchDns()
+}
+func (manager *Manager) watchDnsAndTrans(res etcdstore.WatchRes) {
+	if res.ResType == etcdstore.DELETE {
+		return
+	}
+	DnsAndTrans := &object.DnsAndTrans{}
+	fmt.Println("[ServiceManager]watch Dns")
+	err := json.Unmarshal(res.ValueBytes, DnsAndTrans)
+	if err != nil {
+		fmt.Println("[ServiceManager] Unmarshall error")
+		return
+	}
+	if DnsAndTrans.Status.Phase == object.Delete {
+		err = manager.client.DeleteService(netconfig.GateWayServicePrefix + DnsAndTrans.MetaData.Name)
+		if err != nil {
+			fmt.Println("[ServiceManager] watchDns: deleteService fail")
+			fmt.Println(err)
+			return
+		}
+		err = manager.client.DeleteConfigRs(netconfig.GateWayServicePrefix + DnsAndTrans.MetaData.Name)
+		if err != nil {
+			fmt.Println("[ServiceManager] watchDns: deleteRs fail")
+			fmt.Println(err)
+			return
+		}
+	} else if DnsAndTrans.Status.Phase == object.FileCreated {
+		//需要生成rs以及service
+		err = manager.client.AddConfigRs(GetGateWayRsModule(DnsAndTrans.MetaData.Name))
+		if err != nil {
+			fmt.Println("[ServiceManager] watchDns: addRs fail")
+			fmt.Println(err)
+			return
+		}
+		err = manager.client.UpdateService(GetGateWayServiceModule(DnsAndTrans.MetaData.Name))
+		if err != nil {
+			fmt.Println("[ServiceManager] watchDns: updateService fail")
+			fmt.Println(err)
+			return
+		}
+		//等待service部署
+		wait := 0
+		for {
+			time.Sleep(1 * time.Second)
+			resp, err2 := manager.client.GetRuntimeService(netconfig.GateWayServicePrefix + DnsAndTrans.MetaData.Name)
+			if err2 != nil {
+				fmt.Println("[serviceManager] wait for service deploy error" + err2.Error())
+				break
+			}
+			if resp == nil {
+				continue
+			}
+			if resp.Status.Phase == object.Running {
+				DnsAndTrans.Status.Phase = object.ServiceCreated
+				DnsAndTrans.Spec.GateWayIp = resp.Spec.ClusterIp
+				err = manager.client.UpdateDnsAndTrans(DnsAndTrans)
+				if err != nil {
+					fmt.Println("[ServiceManager] updateDns fail" + err.Error())
+				}
+				break
+			} else if resp.Status.Phase == "" {
+				wait++
+				if wait > 10 {
+					fmt.Println("[serviceManager] fail to deploy gateway service")
+					break
+				}
+				continue
+			} else {
+				fmt.Println("[serviceManager] fail to deploy gateway service")
+				break
+			}
+		}
+	} else {
+		//不用管这个
+		//gateWay的更新通常是配置的更新，所以这里不用管, 用户端会更新配置文件
+		return
+	}
+
 }
 func (manager *Manager) watchServiceConfig(res etcdstore.WatchRes) {
 	if res.ResType == etcdstore.DELETE {

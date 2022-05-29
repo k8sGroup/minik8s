@@ -188,7 +188,16 @@ func MakePods(raw []etcdstore.ListRes, name string, UID string) ([]*object.Pod, 
 
 	return pods, nil
 }
-
+func (r RESTClient) AddConfigRs(rs *object.ReplicaSet) error {
+	attachUrl := config.RSConfigPrefix + "/" + rs.Name
+	err := Put(r.Base+attachUrl, rs)
+	return err
+}
+func (r RESTClient) DeleteConfigRs(rsName string) error {
+	attachUrl := config.RSConfigPrefix + "/" + rsName
+	err := Del(r.Base + attachUrl)
+	return err
+}
 func (r RESTClient) DeleteRS(rsName string) error {
 	attachURL := "/registry/rs/default/" + rsName
 	fmt.Printf("delete rs:" + attachURL + "\n")
@@ -271,6 +280,11 @@ func (r RESTClient) GetRuntimeService(name string) (*object.Service, error) {
 	result := &object.Service{}
 	err = json.Unmarshal(resp[0].ValueBytes, result)
 	return result, err
+}
+func (r RESTClient) DeleteService(name string) error {
+	attachUrl := config.ServiceConfigPrefix + "/" + name
+	err := Del(r.Base + attachUrl)
+	return err
 }
 func (r RESTClient) DeleteRuntimeService(name string) error {
 	attachUrl := config.ServicePrefix + "/" + name

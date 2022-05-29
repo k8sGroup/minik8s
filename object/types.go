@@ -85,7 +85,7 @@ type PodStatus struct {
 
 type PodTemplate struct {
 	ObjectMeta `json:"metadata" yaml:"metadata"`
-	Spec       PodSpec
+	Spec       PodSpec `json:"spec" yaml:"spec"`
 }
 
 // PodList is a list of Pods.
@@ -193,7 +193,7 @@ type ServicePort struct {
 	//服务监听的端口号
 	Port string `json:"port" yaml:"port"`
 	//需要转发到后端Pod的端口号
-	TargetPort string `json:"target" yaml:"targetPort"`
+	TargetPort string `json:"targetPort" yaml:"targetPort"`
 	//当service类型为NodePort时，指定映射到物理机的端口号
 	NodePort string `json:"nodePort" yaml:"nodePort"`
 }

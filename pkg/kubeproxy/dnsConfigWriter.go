@@ -44,11 +44,6 @@ func NewDnsConfigWriter(lsConfig *listerwatcher.Config, clientConfig client.Conf
 	return res
 }
 
-//test used
-func (d *DnsConfigWriter) AddDnsAndTrans(key string, trans *object.DnsAndTrans) {
-	d.key2DnsAnsTrans[key] = trans
-}
-
 func (d *DnsConfigWriter) register() {
 	watchFunc := func() {
 		for {
@@ -189,15 +184,13 @@ func reloadNginxConf(DnsAndTransName string) {
 	if err != nil {
 		fmt.Println("[dnsConfigWriter] reloadNginx error" + err.Error())
 	}
-	containerId := ""
+	var containerIds []string
 	for _, val := range res {
 		if strings.Contains(val.Names[0], netconfig.GateWayContainerPrefix+DnsAndTransName) {
-			containerId = val.ID
-			break
+			containerIds = append(containerIds, val.ID)
 		}
 	}
-	if containerId != "" {
-		//需要进行reload操作
+	for _, containerId := range containerIds {
 		args := fmt.Sprintf("exec %s nginx -s reload", containerId)
 		res, err := execCmdWithOutput("docker", args)
 		if err != nil {
