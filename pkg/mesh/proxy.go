@@ -16,24 +16,17 @@ var (
 )
 
 type Proxy struct {
-	PodIP      string
-	Address    string
-	server     *net.TCPListener
-	dispatcher *Dispatcher
+	PodIP   string
+	Address string
+	server  *net.TCPListener
+	router  *Router
 }
 
 func NewProxy(podIP string) *Proxy {
 	return &Proxy{
-		PodIP:      podIP,
-		dispatcher: NewDispatcher(),
+		PodIP:  podIP,
+		router: NewRouter(),
 	}
-}
-
-// select a spare port
-
-// check & add iptables rules
-func (p *Proxy) natRedirect() {
-
 }
 
 func (p *Proxy) Init() {
@@ -67,6 +60,8 @@ func (p *Proxy) Init() {
 		fmt.Printf("[FATAL] init iptables chain fail...\n")
 		return
 	}
+
+	go p.router.Run()
 }
 
 func (p *Proxy) Run() {
@@ -105,7 +100,7 @@ func (p *Proxy) handleConn(clientConn *net.TCPConn) {
 	fmt.Printf("To %v:%v", ipv4, port)
 
 	// clusterIP to a endpoint
-	endpointIP, err := p.dispatcher.GetEndPoint(ipv4)
+	endpointIP, err := p.router.GetEndPoint(ipv4)
 	if err != nil || endpointIP == nil {
 		fmt.Printf("[handleConn] no endpoints for %v err:%v", ipv4, endpointIP)
 		return
