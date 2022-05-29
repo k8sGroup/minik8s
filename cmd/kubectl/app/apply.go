@@ -12,6 +12,7 @@ import (
 	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/client"
 	"os"
+	path2 "path"
 	"strings"
 )
 
@@ -129,7 +130,7 @@ func CaseReplicaset(file []byte, path string, unmarshal func([]byte, any) error)
 		fmt.Printf("Error unmarshaling file %s\n", path)
 		return err
 	}
-	err = client.Put(baseUrl+"/registry/rs/default/"+replicaset.ObjectMeta.Name, replicaset)
+	err = client.Put(baseUrl+path2.Join(config.RSConfigPrefix, replicaset.ObjectMeta.Name), replicaset)
 	if err != nil {
 		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
 		return err

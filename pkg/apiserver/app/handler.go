@@ -237,13 +237,12 @@ func (s *Server) getActivePods(ctx *gin.Context) {
 	var expect int
 	var actual int
 
-	listRes, err := s.store.Get("/registry/pod/default")
+	listRes, err := s.store.PrefixGet("/registry/pod/default")
 	if err != nil {
 		fmt.Printf("[getActivePods] list fail\n")
 		ctx.Status(http.StatusBadRequest)
 		return
 	}
-	fmt.Println(listRes)
 	allPods, _ := makePods(listRes, rsName, uid)
 	activePods := controller.FilterActivePods(allPods)
 	actual = len(activePods)
