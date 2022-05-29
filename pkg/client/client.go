@@ -52,14 +52,14 @@ func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) erro
 		return errors.New("create pod config fail")
 	}
 
-	// put runtime
-	attachURL = "/registry/pod/default/" + rs.Spec.Template.Name + podUID
-	req, _ = http.NewRequest("PUT", r.Base+attachURL, reqBody)
-	resp, _ = http.DefaultClient.Do(req)
+	//// put runtime
+	//attachURL = "/registry/pod/default/" + rs.Spec.Template.Name + podUID
+	//req, _ = http.NewRequest("PUT", r.Base+attachURL, reqBody)
+	//resp, _ = http.DefaultClient.Do(req)
 
-	if resp.StatusCode != object.SUCCESS {
-		return errors.New("create pod fail")
-	}
+	//if resp.StatusCode != object.SUCCESS {
+	//	return errors.New("create pod fail")
+	//}
 
 	return nil
 }
@@ -88,6 +88,7 @@ func (r RESTClient) DeleteConfigPod(podName string) error {
 	err := Del(r.Base + attachURL)
 	return err
 }
+
 func (r RESTClient) GetConfigPod(name string) (*object.Pod, error) {
 	attachUrl := config.PodConfigPREFIX + "/" + name
 	resp, err := Get(r.Base + attachUrl)

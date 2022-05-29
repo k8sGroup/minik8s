@@ -60,7 +60,9 @@ const (
 	ServiceConfigPrefix = "/registry/serviceConfig/default"
 	Service             = "/registry/service/default/:resourceName"
 	ServicePrefix       = "/registry/service/default"
-	RSConfigPrefix      = "/registry/rsConfig/default"
+
+	RSConfig       = "/registry/rsConfig/default/:resourceName"
+	RSConfigPrefix = "/registry/rsConfig/default"
 
 	SharedData       = "/registry/sharedData/default/:resourceName"
 	SharedDataPrefix = "/registry/sharedData/default"

@@ -72,7 +72,7 @@ func (s *Server) deleteService(ctx *gin.Context) {
 // TODO: real deletion by replica set controller !
 func (s *Server) deleteRS(ctx *gin.Context) {
 	name := ctx.Param(config.ParamResourceName)
-	key := "/registry/rs/default/" + name
+	key := config.RSConfigPrefix + "/" + name
 	resList, err := s.store.Get(key)
 	if err != nil || len(resList) == 0 {
 		fmt.Printf("[deleteRS] rs not exist:%s\n", name)
@@ -89,6 +89,7 @@ func (s *Server) deleteRS(ctx *gin.Context) {
 
 	// if already zero just delete
 	if rs.Spec.Replicas == 0 {
+		fmt.Printf("[deleteRS] real del key %v\n", key)
 		err = s.store.Del(key)
 		ctx.Status(http.StatusOK)
 		return
@@ -97,6 +98,7 @@ func (s *Server) deleteRS(ctx *gin.Context) {
 	// set spec replicas to zero
 	rs.Spec.Replicas = 0
 	raw, _ := json.Marshal(rs)
+	fmt.Printf("[deleteRS] put key %v\n", key)
 	err = s.store.Put(key, raw)
 	if err != nil {
 		ctx.AbortWithStatus(http.StatusBadRequest)
