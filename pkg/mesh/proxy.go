@@ -16,14 +16,16 @@ var (
 )
 
 type Proxy struct {
-	PodIP   string
-	Address string
-	server  *net.TCPListener
+	PodIP      string
+	Address    string
+	server     *net.TCPListener
+	dispatcher *Dispatcher
 }
 
 func NewProxy(podIP string) *Proxy {
 	return &Proxy{
-		PodIP: podIP,
+		PodIP:      podIP,
+		dispatcher: NewDispatcher(),
 	}
 }
 
@@ -80,13 +82,13 @@ func (p *Proxy) Run() {
 			if err != nil {
 				continue
 			}
-			go handleConn(conn)
+			go p.handleConn(conn)
 		}
 	}(p)
 
 }
 
-func handleConn(clientConn *net.TCPConn) {
+func (p *Proxy) handleConn(clientConn *net.TCPConn) {
 
 	fmt.Printf("connection from:%v...\n", clientConn.RemoteAddr().String())
 
@@ -102,10 +104,14 @@ func handleConn(clientConn *net.TCPConn) {
 
 	fmt.Printf("To %v:%v", ipv4, port)
 
-	// TODO: clusterIP to a endpoint
-	// by ip or by regex
+	// clusterIP to a endpoint
+	endpointIP, err := p.dispatcher.GetEndPoint(ipv4)
+	if err != nil || endpointIP == nil {
+		fmt.Printf("[handleConn] no endpoints for %v err:%v", ipv4, endpointIP)
+		return
+	}
 
-	directConn, err := dial(ipv4, int(port))
+	directConn, err := dial(*endpointIP, int(port))
 	if err != nil {
 		fmt.Printf("Could not connect, giving up: %v", err)
 		return

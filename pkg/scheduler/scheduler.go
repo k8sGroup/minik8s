@@ -125,11 +125,13 @@ func (sched *Scheduler) watchNewPod(res etcdstore.WatchRes) {
 		fmt.Printf("watchNewPod bad message pod:%+v\n", pod)
 		return
 	}
-	// check whether scheduled
-	fmt.Printf("watch new Config Pod with name:%s\n", pod.Name)
+
 	if pod.Spec.NodeName != "" {
 		return
 	}
+
+	// check whether scheduled
+	fmt.Printf("watch new Config Pod with name:%s\n", pod.Name)
 
 	fmt.Printf("[watchNewPod] new message from watcher...\n")
 	sched.queue.Enqueue(pod)
