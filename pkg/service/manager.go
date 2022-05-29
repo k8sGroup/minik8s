@@ -86,5 +86,4 @@ func (manager *Manager) watchServiceConfig(res etcdstore.WatchRes) {
 			manager.serviceMap[service.MetaData.Name] = NewRuntimeService(service, manager.lsConfig, manager.clientConfig)
 		}
 	}
-
 }

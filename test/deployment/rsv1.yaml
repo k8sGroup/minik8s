@@ -1,0 +1,16 @@
+kind: Replicaset
+metadata:
+  name: nginx-rs-v1
+  labels:
+    version: v1
+    key: test
+spec:
+  replicas: 3
+  template:
+    metadata:
+      name: nginx-pod-v1
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+

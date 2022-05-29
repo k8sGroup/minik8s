@@ -7,18 +7,25 @@ import (
 	"github.com/google/uuid"
 	"minik8s/cmd/kube-controller-manager/util"
 	"minik8s/object"
+	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/listerwatcher"
 	concurrentmap "minik8s/util/map"
+	"path"
 	"time"
 )
+
+type RsPodStatus struct {
+	Actual int32 `json:"actual" yaml:"actual"`
+	Expect int32 `json:"expect" yaml:"expect"`
+}
 
 type DeploymentController struct {
 	ls             *listerwatcher.ListerWatcher
 	deploymentMap  *concurrentmap.ConcurrentMapTrait[string, object.VersionedDeployment]
-	replicasetMap  *concurrentmap.ConcurrentMapTrait[string, object.VersionedReplicaset]
+	replicasetMap  *concurrentmap.ConcurrentMapTrait[string, object.ReplicaSet]
 	dm2rs          *concurrentmap.ConcurrentMapTrait[string, string] // dm2rs mapping from Deployment key in etcdstore to Replicaset key in etcdstore
 	resyncInterval time.Duration
 	stopChannel    chan struct{}
@@ -29,7 +36,7 @@ func NewDeploymentController(ctx context.Context, controllerCtx util.ControllerC
 	dc := &DeploymentController{
 		ls:             controllerCtx.Ls,
 		deploymentMap:  concurrentmap.NewConcurrentMapTrait[string, object.VersionedDeployment](),
-		replicasetMap:  concurrentmap.NewConcurrentMapTrait[string, object.VersionedReplicaset](),
+		replicasetMap:  concurrentmap.NewConcurrentMapTrait[string, object.ReplicaSet](),
 		dm2rs:          concurrentmap.NewConcurrentMapTrait[string, string](),
 		stopChannel:    make(chan struct{}),
 		resyncInterval: time.Duration(controllerCtx.Config.ResyncIntervals) * time.Second,
@@ -49,17 +56,17 @@ func (dc *DeploymentController) Run(ctx context.Context) {
 }
 
 func (dc *DeploymentController) register() {
-	registerWatchReplicaset := func() {
-		for {
-			err := dc.ls.Watch("/registry/rs/default", dc.watchReplicaset, dc.stopChannel)
-			if err != nil {
-				klog.Errorf("Error watching /registry/rs\n")
-			} else {
-				return
-			}
-			time.Sleep(5 * time.Second)
-		}
-	}
+	//registerWatchReplicaset := func() {
+	//	for {
+	//		err := dc.ls.Watch(config.RSConfigPrefix, dc.watchReplicaset, dc.stopChannel)
+	//		if err != nil {
+	//			klog.Errorf("Error watching %s\n", config.RSConfigPrefix)
+	//		} else {
+	//			return
+	//		}
+	//		time.Sleep(5 * time.Second)
+	//	}
+	//}
 
 	registerAddDeployment := func() {
 		for {
@@ -87,20 +94,20 @@ func (dc *DeploymentController) register() {
 
 	registerResyncLoop := func() {
 		for {
-			{
-				resList, err := dc.ls.List("/registry/rs/default")
-				if err != nil {
-					klog.Errorf("Error synchronizing!\n")
-					goto failed
-				}
-				newMap := make(map[string]object.VersionedReplicaset)
-				for _, res := range resList {
-					versionedRS := object.VersionedReplicaset{Version: res.ResourceVersion}
-					_ = json.Unmarshal(res.ValueBytes, &versionedRS.Replicaset)
-					newMap[res.Key] = versionedRS
-				}
-				dc.replicasetMap.UpdateAll(newMap, object.SelectNewerReplicaset)
-			}
+			//{
+			//	resList, err := dc.ls.List(config.RSConfigPrefix)
+			//	if err != nil {
+			//		klog.Errorf("Error synchronizing!\n")
+			//		goto failed
+			//	}
+			//	newMap := make(map[string]object.VersionedReplicaset)
+			//	for _, res := range resList {
+			//		versionedRS := object.VersionedReplicaset{Version: res.ResourceVersion}
+			//		_ = json.Unmarshal(res.ValueBytes, &versionedRS.Replicaset)
+			//		newMap[res.Key] = versionedRS
+			//	}
+			//	dc.replicasetMap.UpdateAll(newMap, object.SelectNewerReplicaset)
+			//}
 			{
 				resList, err := dc.ls.List("/registry/deployment/default")
 				if err != nil {
@@ -123,7 +130,6 @@ func (dc *DeploymentController) register() {
 	go registerResyncLoop()
 	go registerAddDeployment()
 	go registerDeleteDeployment()
-	go registerWatchReplicaset()
 }
 
 func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
@@ -137,11 +143,14 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 		return
 	}
 	if res.IsCreate {
-		rsKeyNew := "/registry/rs/default/" + deployment.Metadata.Name + uuid.New().String()
+		rsUidNew := uuid.New().String()
+		rsNameNew := deployment.Metadata.Name + rsUidNew
+		rsKeyNew := path.Join(config.RSConfigPrefix, rsNameNew)
 		rs := object.ReplicaSet{
 			ObjectMeta: object.ObjectMeta{
-				Name:   deployment.Metadata.Name,
+				Name:   rsNameNew,
 				Labels: deployment.Metadata.Labels,
+				UID:    rsUidNew,
 				OwnerReferences: []object.OwnerReference{{
 					Kind:       "Deployment",
 					Name:       deployment.Metadata.Name,
@@ -153,29 +162,34 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 				Replicas: deployment.Spec.Replicas,
 				Template: deployment.Spec.Template,
 			},
-			Status: object.ReplicaSetStatus{Replicas: 0},
 		}
 		dc.dm2rs.Put(res.Key, rsKeyNew)
+
 		err = client.Put(dc.apiServerBase+rsKeyNew, rs)
 		if err != nil {
 			klog.Errorf("Error send new rs to etcd\n")
 		}
+		dc.replicasetMap.Put(rsKeyNew, rs)
 	} else if res.IsModify {
 		update := func() {
-			rsKeyNew := "/registry/rs/default/" + deployment.Metadata.Name + uuid.New().String()
+			fmt.Println("go update")
+			rsUidNew := uuid.New().String()
+			rsNameNew := deployment.Metadata.Name + rsUidNew
+			//rsUidOld := ""
+			rsNameOld := ""
+			rsKeyNew := path.Join(config.RSConfigPrefix, rsNameNew)
 			rsKeyOld, _ := dc.dm2rs.Get(res.Key)
 			fmt.Println(deployment)
 			surge := *deployment.Spec.Strategy.RollingUpdate.MaxSurge
 			replicas := deployment.Spec.Replicas
-			vs, isOldRSExist := dc.replicasetMap.Get(rsKeyOld)
+			rsOld, isOldRSExist := dc.replicasetMap.Get(rsKeyOld)
 			var decreaseOldDone, increaseNewDone bool
 			increaseNewDone = false
-			var rsOld object.ReplicaSet
 			if !isOldRSExist {
 				// old replicaset doesn't exist
 				decreaseOldDone = true
 			} else {
-				rsOld = vs.Replicaset
+				rsNameOld = rsOld.Name
 				decreaseOldDone = rsOld.Spec.Replicas <= 0
 			}
 
@@ -186,12 +200,14 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 				if err != nil {
 					klog.Errorf("%s\n", err.Error())
 				}
+				dc.replicasetMap.Put(rsKeyOld, rsOld)
 			}
 
 			// create new replicaset and set its owner
 			rsNew := object.ReplicaSet{
 				ObjectMeta: object.ObjectMeta{
-					Name:   deployment.Metadata.Name,
+					Name:   rsNameNew,
+					UID:    rsUidNew,
 					Labels: deployment.Metadata.Labels,
 					OwnerReferences: []object.OwnerReference{{
 						Kind:       "Deployment",
@@ -210,57 +226,61 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 					}(),
 					Template: deployment.Spec.Template,
 				},
-				Status: object.ReplicaSetStatus{Replicas: 0},
 			}
-			err = client.Put(dc.apiServerBase+rsKeyNew, rsNew)
-			if err != nil {
-				klog.Errorf("%s\n", err.Error())
-			}
-
-			dc.dm2rs.Put(res.Key, rsKeyNew)
-			increaseNewDone = rsNew.Spec.Replicas == replicas
-			decreaseOldDone = rsOld.Spec.Replicas == 0
 
 			for true {
+				fmt.Printf("[delta loop]\n")
+				fmt.Printf("[new rs] %s - %d\n", rsNameNew, rsNew.Spec.Replicas)
+				fmt.Printf("[old rs] %s - %d\n", rsNameOld, rsOld.Spec.Replicas)
+
 				if !increaseNewDone {
 					stash := rsNew.Spec.Replicas
+					fmt.Printf("[send new rs] %s - %d\n", rsNameNew, rsNew.Spec.Replicas)
+					err = client.Put(dc.apiServerBase+rsKeyNew, rsNew)
+					if err != nil {
+						rsNew.Spec.Replicas = stash
+						fmt.Printf("[error] send new rs %s %s\n", rsNameNew, err.Error())
+						goto LoopErr
+					}
+					dc.replicasetMap.Put(rsKeyNew, rsNew)
 					rsNew.Spec.Replicas += 1
 					if rsNew.Spec.Replicas > replicas {
 						increaseNewDone = true
-					} else {
-						err = client.Put(dc.apiServerBase+rsKeyNew, rsNew)
-						if err != nil {
-							rsNew.Spec.Replicas = stash
-							klog.Errorf("%s\n", err.Error())
-							goto LoopErr
-						}
 					}
 				}
+
+				time.Sleep(7 * time.Second)
+
 				if !decreaseOldDone {
 					stash := rsOld.Spec.Replicas
 					rsOld.Spec.Replicas -= 1
+					fmt.Printf("[send old rs] %s - %d\n", rsNameOld, rsOld.Spec.Replicas)
 					if rsOld.Spec.Replicas > 0 {
 						err = client.Put(dc.apiServerBase+rsKeyOld, rsOld)
 						if err != nil {
-							klog.Errorf("%s\n", err.Error())
+							fmt.Printf("[error] send old rs %s %s\n", rsNameOld, err.Error())
 							rsOld.Spec.Replicas = stash
 							goto LoopErr
 						}
-					} else {
+						dc.replicasetMap.Put(rsKeyOld, rsOld)
+					} else if rsOld.Spec.Replicas == 0 {
 						err = client.Del(dc.apiServerBase + rsKeyOld)
-						decreaseOldDone = true
 						if err != nil {
-							klog.Errorf("%s\n", err.Error())
+							fmt.Printf("[error] send old rs %s %s\n", rsNameOld, err.Error())
 							rsOld.Spec.Replicas = stash
 							goto LoopErr
 						}
+						decreaseOldDone = true
 					}
 				}
+
 				if decreaseOldDone && increaseNewDone {
+					fmt.Printf("[old rs decreased] %s\n", rsNameOld)
+					fmt.Printf("[new rs increased] %s\n", rsNameNew)
 					break
 				}
 			LoopErr:
-				time.Sleep(15 * time.Second)
+				time.Sleep(7 * time.Second)
 			}
 			dc.dm2rs.Put(res.Key, rsKeyNew)
 		}
@@ -268,30 +288,30 @@ func (dc *DeploymentController) putDeployment(res etcdstore.WatchRes) {
 	}
 }
 
-func (dc *DeploymentController) watchReplicaset(res etcdstore.WatchRes) {
-	switch res.ResType {
-	case etcdstore.PUT:
-		rs := object.ReplicaSet{}
-		err := json.Unmarshal(res.ValueBytes, &rs)
-		if err != nil {
-			klog.Errorf("%s\n", err.Error())
-			return
-		}
-		if rs.Spec.Replicas == 0 {
-			dc.replicasetMap.Del(res.Key)
-		} else {
-			vrs := object.VersionedReplicaset{
-				Version:    res.ResourceVersion,
-				Replicaset: rs,
-			}
-			dc.replicasetMap.Put(res.Key, vrs)
-		}
-		break
-	case etcdstore.DELETE:
-		dc.replicasetMap.Del(res.Key)
-		break
-	}
-}
+//func (dc *DeploymentController) watchReplicaset(res etcdstore.WatchRes) {
+//	switch res.ResType {
+//	case etcdstore.PUT:
+//		rs := object.ReplicaSet{}
+//		err := json.Unmarshal(res.ValueBytes, &rs)
+//		if err != nil {
+//			klog.Errorf("%s\n", err.Error())
+//			return
+//		}
+//		if rs.Spec.Replicas == 0 {
+//			dc.replicasetMap.Del(res.Key)
+//		} else {
+//			vrs := object.VersionedReplicaset{
+//				Version:    res.ResourceVersion,
+//				Replicaset: rs,
+//			}
+//			dc.replicasetMap.Put(res.Key, vrs)
+//		}
+//		break
+//	case etcdstore.DELETE:
+//		dc.replicasetMap.Del(res.Key)
+//		break
+//	}
+//}
 
 func (dc *DeploymentController) deleteDeployment(res etcdstore.WatchRes) {
 	if res.ResType != etcdstore.DELETE {

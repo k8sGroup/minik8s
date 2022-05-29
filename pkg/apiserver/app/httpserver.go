@@ -83,7 +83,7 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 	}
 
 	{
-		engine.DELETE(config.RS, s.deleteRS)
+		engine.DELETE(config.RSConfig, s.deleteRS)
 
 	}
 	{
@@ -111,6 +111,7 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 	}
 	{
 		engine.PUT(config.DnsAndTrans, s.AddDnsAndTrans)
+		engine.GET(config.RS_POD, s.getActivePods)
 	}
 
 	go s.daemon(watcherChan)

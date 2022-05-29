@@ -60,13 +60,16 @@ const (
 	ServiceConfigPrefix = "/registry/serviceConfig/default"
 	Service             = "/registry/service/default/:resourceName"
 	ServicePrefix       = "/registry/service/default"
-	RSConfigPrefix      = "/registry/rsConfig/default"
+
+	RSConfig       = "/registry/rsConfig/default/:resourceName"
+	RSConfigPrefix = "/registry/rsConfig/default"
 
 	SharedData       = "/registry/sharedData/default/:resourceName"
 	SharedDataPrefix = "/registry/sharedData/default"
 
 	DnsAndTrans       = "/registry/dnsAndTrans/default/:resourceName"
 	DnsAndTransPrefix = "/registry/dnsAndTrans/default"
+	RS_POD = "/rs/pod"
 )
 
 var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler", "podConfig", "sharedData", "service", "job", "serviceConfig", "rsConfig", "dnsAndTrans"}

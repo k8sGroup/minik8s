@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"minik8s/object"
 	"minik8s/pkg/apiserver/config"
+	"minik8s/pkg/controller"
+	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/etcdstore/serviceConfigStore"
 	"net/http"
 	"strings"
@@ -70,7 +72,7 @@ func (s *Server) deleteService(ctx *gin.Context) {
 // TODO: real deletion by replica set controller !
 func (s *Server) deleteRS(ctx *gin.Context) {
 	name := ctx.Param(config.ParamResourceName)
-	key := "/registry/rs/default/" + name
+	key := config.RSConfigPrefix + "/" + name
 	resList, err := s.store.Get(key)
 	if err != nil || len(resList) == 0 {
 		fmt.Printf("[deleteRS] rs not exist:%s\n", name)
@@ -87,6 +89,7 @@ func (s *Server) deleteRS(ctx *gin.Context) {
 
 	// if already zero just delete
 	if rs.Spec.Replicas == 0 {
+		fmt.Printf("[deleteRS] real del key %v\n", key)
 		err = s.store.Del(key)
 		ctx.Status(http.StatusOK)
 		return
@@ -95,6 +98,7 @@ func (s *Server) deleteRS(ctx *gin.Context) {
 	// set spec replicas to zero
 	rs.Spec.Replicas = 0
 	raw, _ := json.Marshal(rs)
+	fmt.Printf("[deleteRS] put key %v\n", key)
 	err = s.store.Put(key, raw)
 	if err != nil {
 		ctx.AbortWithStatus(http.StatusBadRequest)
@@ -130,7 +134,6 @@ func (s *Server) userAddRS(ctx *gin.Context) {
 	err = json.Unmarshal(body, &rs)
 	rs.UID = uid
 	if err != nil {
-		fmt.Printf("[deletePod] pod unmarshal fail\n")
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
@@ -288,4 +291,91 @@ func (s *Server) AddDnsAndTrans(ctx *gin.Context) {
 		return
 	}
 	return
+
+func (s *Server) getActivePods(ctx *gin.Context) {
+	rsName := ctx.Query("rsName")
+	if rsName == "" {
+		fmt.Println("[getActivePods] rsName exist")
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+
+	uid := ctx.Query("uid")
+	if uid == "" {
+		fmt.Println("[getActivePods] uid not exist")
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+
+	var expect int
+	var actual int
+
+	listRes, err := s.store.PrefixGet("/registry/pod/default")
+	if err != nil {
+		fmt.Printf("[getActivePods] list fail\n")
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+	allPods, _ := makePods(listRes, rsName, uid)
+	activePods := controller.FilterActivePods(allPods)
+	actual = len(activePods)
+
+	key := "/registry/rs/default/" + rsName
+	raw, err := s.store.Get(key)
+	if err != nil {
+		fmt.Printf("[getActivePods] fail to get nodes\n")
+	}
+	if len(raw) == 0 {
+		fmt.Printf("[getActivePods] list fail\n")
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+	result := &object.ReplicaSet{}
+
+	err = json.Unmarshal(raw[0].ValueBytes, result)
+
+	if err != nil {
+		fmt.Printf("[getActivePods] unmarshal fail\n")
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+
+	expect = int(result.Spec.Replicas)
+
+	ctx.JSON(200, gin.H{
+		"expect": expect,
+		"actual": actual,
+	})
+}
+
+func makePods(raw []etcdstore.ListRes, name string, UID string) ([]*object.Pod, error) {
+	var pods []*object.Pod
+
+	if len(raw) == 0 {
+		return pods, nil
+	}
+
+	// unmarshal and filter by ownership
+	for _, rawPod := range raw {
+		pod := &object.Pod{}
+		err := json.Unmarshal(rawPod.ValueBytes, &pod)
+		if err != nil {
+			fmt.Printf("[GetRSPods] unmarshal fail\n")
+			return nil, err
+		}
+		if ownBy(pod.OwnerReferences, name, UID) {
+			pods = append(pods, pod)
+		}
+	}
+
+	return pods, nil
+}
+
+func ownBy(ownerReferences []object.OwnerReference, owner string, UID string) bool {
+	for _, ref := range ownerReferences {
+		if ref.Name == owner && ref.UID == UID {
+			return true
+		}
+	}
+	return false
 }

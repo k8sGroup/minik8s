@@ -2,6 +2,7 @@ package client
 
 import (
 	"minik8s/pkg/apiserver/config"
+	"minik8s/pkg/etcdstore"
 
 	"github.com/google/uuid"
 
@@ -51,14 +52,14 @@ func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) erro
 		return errors.New("create pod config fail")
 	}
 
-	// put runtime
-	attachURL = "/registry/pod/default/" + rs.Spec.Template.Name + podUID
-	req, _ = http.NewRequest("PUT", r.Base+attachURL, reqBody)
-	resp, _ = http.DefaultClient.Do(req)
+	//// put runtime
+	//attachURL = "/registry/pod/default/" + rs.Spec.Template.Name + podUID
+	//req, _ = http.NewRequest("PUT", r.Base+attachURL, reqBody)
+	//resp, _ = http.DefaultClient.Do(req)
 
-	if resp.StatusCode != object.SUCCESS {
-		return errors.New("create pod fail")
-	}
+	//if resp.StatusCode != object.SUCCESS {
+	//	return errors.New("create pod fail")
+	//}
 
 	return nil
 }
@@ -87,6 +88,7 @@ func (r RESTClient) DeleteConfigPod(podName string) error {
 	err := Del(r.Base + attachURL)
 	return err
 }
+
 func (r RESTClient) GetConfigPod(name string) (*object.Pod, error) {
 	attachUrl := config.PodConfigPREFIX + "/" + name
 	resp, err := Get(r.Base + attachUrl)
@@ -157,7 +159,14 @@ func GetRuntimeRS(ls *listerwatcher.ListerWatcher, name string) (*object.Replica
 
 func GetRSPods(ls *listerwatcher.ListerWatcher, name string, UID string) ([]*object.Pod, error) {
 	raw, err := ls.List("/registry/pod/default")
+	if err != nil {
+		fmt.Printf("[GetRSPods] list fail\n")
+		return nil, err
+	}
+	return MakePods(raw, name, UID)
+}
 
+func MakePods(raw []etcdstore.ListRes, name string, UID string) ([]*object.Pod, error) {
 	var pods []*object.Pod
 
 	if len(raw) == 0 {
@@ -167,18 +176,17 @@ func GetRSPods(ls *listerwatcher.ListerWatcher, name string, UID string) ([]*obj
 	// unmarshal and filter by ownership
 	for _, rawPod := range raw {
 		pod := &object.Pod{}
-		err = json.Unmarshal(rawPod.ValueBytes, &pod)
+		err := json.Unmarshal(rawPod.ValueBytes, &pod)
+		if err != nil {
+			fmt.Printf("[GetRSPods] unmarshal fail\n")
+			return nil, err
+		}
 		if ownBy(pod.OwnerReferences, name, UID) {
 			pods = append(pods, pod)
 		}
 	}
 
-	if err != nil {
-		fmt.Printf("[GetRSPods] unmarshal fail\n")
-	}
-
 	return pods, nil
-
 }
 
 func (r RESTClient) DeleteRS(rsName string) error {

@@ -3,9 +3,10 @@ metadata:
   name: nginx-test
   labels:
     version: v1
+    key: test
     type: deployment
 spec:
-  replicas: 5
+  replicas: 3
   strategy:
     type: rollingUpdate
     rollingUpdate:
@@ -13,9 +14,8 @@ spec:
       maxUnavailable: 1
   template:
     metadata:
-      name: nginx
+      name: nginx-pod-v1
     spec:
-      nodeName: apollo
       containers:
       - name: nginx
         image: nginx:latest

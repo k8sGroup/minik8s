@@ -7,6 +7,7 @@ import (
 	"io"
 	"minik8s/pkg/etcdstore"
 	"net/http"
+	url2 "net/url"
 )
 
 func Get(url string) ([]etcdstore.ListRes, error) {
@@ -33,6 +34,32 @@ func Get(url string) ([]etcdstore.ListRes, error) {
 		return nil, err
 	}
 	return resList, nil
+}
+
+func GetWithParams(url string, params map[string]string) ([]byte, error) {
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	values := url2.Values{}
+	for key, val := range params {
+		values.Add(key, val)
+	}
+	request.URL.RawQuery = values.Encode()
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode != http.StatusOK {
+		return nil, errors.New("StatusCode not 200")
+	}
+	reader := response.Body
+	defer reader.Close()
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func Del(url string) error {
