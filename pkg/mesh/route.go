@@ -106,6 +106,9 @@ func (d *Router) watchRuntimeService(res etcdstore.WatchRes) {
 }
 
 func (d *Router) watchVirtualService(res etcdstore.WatchRes) {
+	d.mtx.Lock()
+	defer d.mtx.Unlock()
+
 	vs := &object.VirtualService{}
 	err := json.Unmarshal(res.ValueBytes, vs)
 	if err != nil {
@@ -127,14 +130,19 @@ func (d *Router) watchVirtualService(res etcdstore.WatchRes) {
 		return
 	}
 
-	//for _, route := range routes {
-	//	route.
-	//}
+	if len(vdest) != 0 {
+
+	} else if len(pdest) != 0 {
+		for _, pod := range pdest {
+			podIP := pod.PodIP
+			weight := pod.Weight
+			d.UpsertEndpoints(clusterIP, podIP, int(weight))
+		}
+	}
+
 }
 
 func (d *Router) UpsertEndpoints(clusterIP string, podIP string, weight int) {
-	d.mtx.Lock()
-	defer d.mtx.Unlock()
 
 	endpoints, ok := d.m[clusterIP]
 
