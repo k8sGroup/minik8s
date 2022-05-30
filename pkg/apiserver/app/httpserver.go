@@ -113,6 +113,9 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 		engine.PUT(config.DnsAndTrans, s.AddDnsAndTrans)
 		engine.GET(config.RS_POD, s.getActivePods)
 	}
+	{
+		engine.PUT(config.VirtualSvc, s.addVirtualSvc)
+	}
 
 	go s.daemon(watcherChan)
 
