@@ -15,6 +15,7 @@ import (
 	"minik8s/pkg/klog"
 	"minik8s/pkg/listerwatcher"
 	concurrentmap "minik8s/util/map"
+	"minik8s/util/queue"
 	"path"
 	"sync"
 	"time"
@@ -390,6 +391,8 @@ func (acc *AutoscalerController) monitoringDeploymentLoop(stopCh <-chan struct{}
 
 func (acc *AutoscalerController) monitoringReplicasetLoop(stopCh <-chan struct{}, replicasetKey string, calculateFuncMap map[string]metricHandler, maxReplicas int32, minReplicas int32, interval int32) {
 	fmt.Println("monitoring replicaset loop")
+	memRingQ := queue.NewRingQueue[memoryPercentage](5)
+	cpuRingQ := queue.NewRingQueue[cpuPercentage](5)
 	for {
 		select {
 		case <-stopCh:
@@ -415,21 +418,32 @@ func (acc *AutoscalerController) monitoringReplicasetLoop(stopCh <-chan struct{}
 			var handler metricHandler
 
 			if handler, cpuMetric = calculateFuncMap[object.MetricCPU]; cpuMetric {
-				cpu, _ = handler.calculateFunc(podStatusList)
+				tmp, _ := handler.calculateFunc(podStatusList)
+				cpuRingQ.Push(tmp)
+				cpu = 0
+				for _, i := range cpuRingQ.GetElements() {
+					cpu = cpuPercentage(math.Max(float64(cpu), float64(i)))
+				}
 				cpuBound = cpuPercentage(handler.bound)
 			}
 			if handler, memoryMetric = calculateFuncMap[object.MetricMemory]; memoryMetric {
-				_, memory = handler.calculateFunc(podStatusList)
+				_, tmp := handler.calculateFunc(podStatusList)
+				memRingQ.Push(tmp)
+				memory = 0
+				for _, i := range memRingQ.GetElements() {
+					memory = memoryPercentage(math.Max(float64(memory), float64(i)))
+				}
 				memoryBound = memoryPercentage(handler.bound)
 			}
+
+			fmt.Printf("[CPU BOUND] %5.2f [CPU] %5.2f [MEM BOUND] %5.2f [MEM] %5.2f\n", cpuBound, cpu, memoryBound, memory)
+			fmt.Printf("check cpu ? %t\tcheck mem ? %t\n", cpuMetric, memoryMetric)
 
 			mtx := acc.lockMap.PutIfNotExist(replicasetKey, sync.Mutex{})
 
 			func() {
 				if mtx.TryLock() {
 					defer mtx.Unlock()
-					fmt.Printf("[CPU BOUND] %5.2f [CPU] %5.2f [MEM BOUND] %5.2f [MEM] %5.2f\n", cpuBound, cpu, memoryBound, memory)
-					fmt.Printf("check cpu ? %t\tcheck mem ? %t\n", cpuMetric, memoryMetric)
 					if (cpuMetric && cpu > cpuBound) || (memoryMetric && memory > memoryBound) {
 						fmt.Println("increase replicas")
 						for vrs.Replicaset.Spec.Replicas < maxReplicas {
@@ -455,7 +469,7 @@ func (acc *AutoscalerController) monitoringReplicasetLoop(stopCh <-chan struct{}
 			}()
 		}
 	StepEnd:
-		time.Sleep(time.Second)
+		time.Sleep(2 * time.Second)
 	}
 }
 
