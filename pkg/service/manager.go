@@ -37,9 +37,26 @@ func NewManager(lsConfig *listerwatcher.Config, clientConfig client.Config) *Man
 	manager.lsConfig = lsConfig
 	manager.clientConfig = clientConfig
 	manager.register()
-	time.Sleep(3 * time.Second)
-	manager.boot()
+	go manager.checkAndBoot()
 	return manager
+}
+
+//没隔一段时间查看一下有无节点注册， 如果有注册的调用boot
+func (manager *Manager) checkAndBoot() {
+	for {
+		time.Sleep(5 * time.Second)
+		res, err := manager.ls.List(config.NODE_PREFIX)
+		if err != nil {
+			fmt.Println("[ServiceManager] checkAndBoot error" + err.Error())
+			continue
+		}
+		if len(res) == 0 {
+			continue
+		} else {
+			manager.boot()
+			break
+		}
+	}
 }
 func (manager *Manager) boot() {
 	//生成coreDns service

@@ -107,6 +107,7 @@ func (r RESTClient) GetConfigPod(name string) (*object.Pod, error) {
 func GetPodFromRS(rs *object.ReplicaSet) (*object.Pod, error) {
 	pod := &object.Pod{}
 	pod.Spec = rs.Spec.Template.Spec
+	pod.Labels = rs.Spec.Template.Labels
 	// add ownership
 	owner := object.OwnerReference{
 		Kind:       object.ReplicaSetKind,
