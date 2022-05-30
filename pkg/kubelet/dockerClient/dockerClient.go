@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"minik8s/object"
 	"minik8s/pkg/kubelet/message"
+	"minik8s/pkg/netSupport/netconfig"
 	"unsafe"
 
 	"github.com/docker/docker/api/types"
@@ -25,14 +26,15 @@ func getNewClient() (*client.Client, error) {
 }
 
 //获取所有容器,docker ps -a
-func getAllContainers() ([]types.Container, error) {
+
+func GetAllContainers() ([]types.Container, error) {
 	cli, err := getNewClient()
 	if err != nil {
 		return nil, err
 	}
 	return cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
 }
-func getRunningContainers() ([]types.Container, error) {
+func GetRunningContainers() ([]types.Container, error) {
 	cli, err := getNewClient()
 	if err != nil {
 		return nil, err
@@ -192,6 +194,7 @@ func createPause(ports []object.Port, name string) (container.ContainerCreateCre
 		ExposedPorts: exports,
 	}, &container.HostConfig{
 		IpcMode: container.IpcMode("shareable"),
+		DNS:     []string{netconfig.ServiceDns},
 	}, nil, nil, name)
 	return resp, err
 }
@@ -365,14 +368,14 @@ func HandleCommand(command *message.Command) *message.Response {
 
 	switch command.CommandType {
 	case message.COMMAND_GET_ALL_CONTAINER:
-		containers, err := getAllContainers()
+		containers, err := GetAllContainers()
 		var result message.ResponseWithContainInfo
 		result.Response.CommandType = message.COMMAND_GET_ALL_CONTAINER
 		result.Response.Err = err
 		result.Containers = containers
 		return &(result.Response)
 	case message.COMMAND_GET_RUNNING_CONTAINER:
-		containers, err := getRunningContainers()
+		containers, err := GetRunningContainers()
 		var result message.ResponseWithContainInfo
 		result.Response.CommandType = message.COMMAND_GET_RUNNING_CONTAINER
 		result.Response.Err = err

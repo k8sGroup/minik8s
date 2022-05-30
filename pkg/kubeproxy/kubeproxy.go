@@ -12,8 +12,9 @@ import (
 )
 
 type KubeProxy struct {
-	ls     *listerwatcher.ListerWatcher
-	Client client.RESTClient
+	ls              *listerwatcher.ListerWatcher
+	Client          client.RESTClient
+	dnsConfigWriter *DnsConfigWriter
 	//etcd key到Svc Chain的映射, 一个service每个port对应一个svcChain
 	ServiceName2SvcChain map[string]map[string]*SvcChain
 	stopChannel          <-chan struct{}
@@ -32,6 +33,7 @@ func NewKubeProxy(lsConfig *listerwatcher.Config, clientConfig client.Config) *K
 	}
 	res.stopChannel = make(chan struct{})
 	res.ServiceName2SvcChain = make(map[string]map[string]*SvcChain)
+	res.dnsConfigWriter = NewDnsConfigWriter(lsConfig, clientConfig)
 	return res
 }
 func (proxy *KubeProxy) StartKubeProxy() {
@@ -67,6 +69,7 @@ func (proxy *KubeProxy) watchRuntimeService(res etcdstore.WatchRes) {
 	} else {
 		serviceRuntime := &object.Service{}
 		err := json.Unmarshal(res.ValueBytes, serviceRuntime)
+		fmt.Println(serviceRuntime)
 		if err != nil {
 			fmt.Println("[kubeProxy] Unmarshall fail")
 			fmt.Println(err)
@@ -88,6 +91,7 @@ func (proxy *KubeProxy) watchRuntimeService(res etcdstore.WatchRes) {
 						PodPort: val.TargetPort,
 					})
 				}
+				fmt.Println(units)
 				tmp := NewSvcChain(serviceRuntime.MetaData.Name, NatTable, GeneralServiceChain, serviceRuntime.Spec.ClusterIp, val.Port, val.Protocol, units)
 				tmp.ApplyRule()
 				svcS[tmp.Name] = tmp
@@ -110,6 +114,7 @@ func (proxy *KubeProxy) watchRuntimeService(res etcdstore.WatchRes) {
 					fmt.Println("[kubeProxy] Error, svc not found")
 					return
 				}
+				fmt.Println(units)
 				target.UpdateRule(units)
 			}
 		}

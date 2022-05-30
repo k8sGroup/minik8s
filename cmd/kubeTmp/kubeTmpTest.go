@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"minik8s/pkg/client"
+	"github.com/go-yaml/yaml"
+	"io/ioutil"
+	"minik8s/object"
+	"minik8s/pkg/netSupport/netconfig"
+	"os"
 	"time"
 )
 
@@ -18,17 +23,54 @@ func Test() {
 	}()
 
 }
-func main() {
-	config := &client.Config{Host: "127.17.0.1" + ":8080"}
-	restClient := client.RESTClient{
-		Base: "http://" + config.Host,
+func formServerConfig(trans *object.DnsAndTrans) []string {
+	var result []string
+	result = append(result, "    server {", "        listen 80 ;")
+	result = append(result, fmt.Sprintf("        server_name %s;", trans.Spec.Host))
+	for _, val := range trans.Spec.Paths {
+		result = append(result, fmt.Sprintf("        location ~ %s {", val.Name))
+		result = append(result, fmt.Sprintf("            proxy_pass http://%s:%s;", val.Ip, val.Port))
+		result = append(result, "        }")
 	}
-	attachUrl := "/registry/pod/default/" + "1111111"
-	resp, err := client.Get(restClient.Base + attachUrl)
+	result = append(result, "       }")
+	return result
+}
+func writeNginxConfig(trans *object.DnsAndTrans) {
+	var content []string
+	content = append(content, "error_log stderr;")
+	content = append(content, "events { worker_connections  1024; }")
+	content = append(content, "http {", "    access_log /dev/stdout combined;")
+	content = append(content, formServerConfig(trans)...)
+	content = append(content, "}")
+	//test
+	fmt.Println(content)
+	f, err := os.OpenFile(netconfig.NginxPathPrefix+"/"+trans.MetaData.Name+"/"+netconfig.NginxConfigFileName, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+	if err != nil {
+		fmt.Println("[dnsConfigWriter] writerNginxConfig error" + err.Error())
+		return
+	}
+	w := bufio.NewWriter(f)
+	for _, v := range content {
+		fmt.Fprintln(w, v)
+	}
+	err = w.Flush()
+	if err != nil {
+		fmt.Println("[dnsConfigWriter] writerNginxConfig error" + err.Error())
+		return
+	}
+	return
+}
+func main() {
+	data, err := ioutil.ReadFile("/home/minik8s/test/dnsAndTrans/dnsTest.yaml")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	dnsAndTrans := &object.DnsAndTrans{}
+	err = yaml.Unmarshal([]byte(data), dnsAndTrans)
 	if err != nil {
 		fmt.Println(err)
 	}
-	if resp != nil {
-		fmt.Println(resp)
-	}
+	dnsAndTrans.Spec.Paths[0].Ip = "10.10.10.1"
+	writeNginxConfig(dnsAndTrans)
 }

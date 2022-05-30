@@ -1,0 +1,11 @@
+kind: DNS
+metadata:
+  name: dnsTest  #名称
+  labels:
+    key: test
+spec:
+  host: zyh.com   #域名主路径
+  paths:
+    - name: /hong   #子路径名
+      service: ghostService #对应的服务
+      port: 80  #对应的端口

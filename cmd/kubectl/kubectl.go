@@ -8,7 +8,7 @@ var (
 )
 
 func main() {
-	//data, err := ioutil.ReadFile("/home/minik8s/test/pod/example.yaml")
+	//data, err := ioutil.ReadFile("/home/minik8s/test/pod/gateWayService.yaml")
 	//if err != nil {
 	//	fmt.Println(err)
 	//}

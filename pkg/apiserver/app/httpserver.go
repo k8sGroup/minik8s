@@ -110,6 +110,7 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 		engine.DELETE(config.ServiceConfig, s.deleteService)
 	}
 	{
+		engine.PUT(config.DnsAndTrans, s.AddDnsAndTrans)
 		engine.GET(config.RS_POD, s.getActivePods)
 	}
 	{

@@ -85,7 +85,7 @@ type PodStatus struct {
 
 type PodTemplate struct {
 	ObjectMeta `json:"metadata" yaml:"metadata"`
-	Spec       PodSpec
+	Spec       PodSpec `json:"spec" yaml:"spec"`
 }
 
 // PodList is a list of Pods.
@@ -193,7 +193,7 @@ type ServicePort struct {
 	//服务监听的端口号
 	Port string `json:"port" yaml:"port"`
 	//需要转发到后端Pod的端口号
-	TargetPort string `json:"target" yaml:"targetPort"`
+	TargetPort string `json:"targetPort" yaml:"targetPort"`
 	//当service类型为NodePort时，指定映射到物理机的端口号
 	NodePort string `json:"nodePort" yaml:"nodePort"`
 }
@@ -207,4 +207,33 @@ type ServiceStatus struct {
 	//pod name到 podIp:port的映射
 	Pods2IpAndPort map[string]string `json:"pods2IpAndPort" yaml:"pods2IpAndPort"`
 	Phase          string            `json:"phase" yaml:"phase"`
+}
+
+/***************************DNS与转发*******************************/
+type DnsAndTrans struct {
+	MetaData ObjectMeta        `json:"metadata" yaml:"metadata"`
+	Spec     DnsAndTransSpec   `json:"spec" yaml:"spec"`
+	Status   DnsAndTransStatus `json:"status" yaml:"status"`
+}
+type DnsAndTransSpec struct {
+	Host string `json:"host" yaml:"host"`
+	//需要部署完gateway服务ip才知道
+	GateWayIp string      `json:"gateWayIp" yaml:"gateWayIp"`
+	Paths     []TransPath `json:"paths" yaml:"paths"`
+}
+type TransPath struct {
+	Name    string `json:"name" yaml:"name"`
+	Service string `json:"service" yaml:"service"`
+	Ip      string `json:"ip" yaml:"ip"` //用户输入的时候并不知道Ip, handler填入
+	Port    string `json:"port"  yaml:"port"`
+}
+
+const (
+	FileCreated    string = "FileCreated"
+	ServiceCreated string = "ServiceCreated"
+)
+
+type DnsAndTransStatus struct {
+	//阶段有 "", "FileCreated", "ServiceCreated", "deleted"
+	Phase string `json:"phase" yaml:"phase"`
 }
