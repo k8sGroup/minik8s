@@ -16,6 +16,7 @@ type HPASpec struct {
 	ScaleTargetRef HPARef   `json:"scaleTargetRef" yaml:"scaleTargetRef"`
 	MinReplicas    int32    `json:"minReplicas" yaml:"minReplicas"`
 	MaxReplicas    int32    `json:"maxReplicas" yaml:"maxReplicas"`
+	ScaleInterval  int32    `json:"scaleInterval" yaml:"scaleInterval"`
 	Metrics        []Metric `json:"metrics" yaml:"metrics"`
 }
 

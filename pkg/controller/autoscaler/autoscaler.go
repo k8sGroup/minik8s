@@ -9,11 +9,15 @@ import (
 	"minik8s/cmd/kube-controller-manager/util"
 	"minik8s/cmd/kubectl/app"
 	"minik8s/object"
+	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/klog"
 	"minik8s/pkg/listerwatcher"
 	concurrentmap "minik8s/util/map"
+	"minik8s/util/queue"
+	"path"
+	"sync"
 	"time"
 )
 
@@ -29,8 +33,7 @@ type memoryPercentage float64
 
 type metricHandler struct {
 	calculateFunc calculateStatus
-	upperBound    float64
-	lowerBound    float64
+	bound         float64
 }
 
 type calculateStatus func(statusList []resourceStatus) (cpuPercentage, memoryPercentage)
@@ -46,6 +49,10 @@ type resourceStatus struct {
 	cpu      float64
 }
 
+func (s *resourceStatus) toString() string {
+	return fmt.Sprintf("[Pod-Name] %-30s [Memory] %8.3f [CPU] %8.3f", s.metadata.Name, s.memory, s.cpu)
+}
+
 type stringAndChan struct {
 	key    string
 	stopCh chan<- struct{}
@@ -56,10 +63,10 @@ type AutoscalerController struct {
 	promClient        *client.PromClient
 	stopChannel       chan struct{}
 	resyncInterval    time.Duration
-	scaleInterval     time.Duration
 	deploymentMap     *concurrentmap.ConcurrentMapTrait[string, object.VersionedDeployment]
 	replicasetMap     *concurrentmap.ConcurrentMapTrait[string, object.VersionedReplicaset]
 	autoscalerMap     *concurrentmap.ConcurrentMapTrait[string, object.VersionedAutoscaler]
+	lockMap           *concurrentmap.ConcurrentMapTrait[string, sync.Mutex]
 	object2autoscaler *concurrentmap.ConcurrentMapTrait[scalableObject, stringAndChan] // mapping an object key to the autoscaler key
 	apiServerBase     string
 }
@@ -71,10 +78,10 @@ func NewAutoscalerController(ctx context.Context, controllerCtx util.ControllerC
 		promClient:        client.NewPromClient(promBase),
 		stopChannel:       make(chan struct{}),
 		resyncInterval:    time.Duration(controllerCtx.Config.ResyncIntervals) * time.Second,
-		scaleInterval:     time.Duration(controllerCtx.Config.ScaleIntervals) * time.Second,
 		deploymentMap:     concurrentmap.NewConcurrentMapTrait[string, object.VersionedDeployment](),
 		replicasetMap:     concurrentmap.NewConcurrentMapTrait[string, object.VersionedReplicaset](),
 		autoscalerMap:     concurrentmap.NewConcurrentMapTrait[string, object.VersionedAutoscaler](),
+		lockMap:           concurrentmap.NewConcurrentMapTrait[string, sync.Mutex](),
 		object2autoscaler: concurrentmap.NewConcurrentMapTrait[scalableObject, stringAndChan](),
 		apiServerBase:     "http://" + controllerCtx.MasterIP + ":" + controllerCtx.HttpServerPort,
 	}
@@ -100,9 +107,9 @@ func (acc *AutoscalerController) register() {
 
 	registerWatchReplicaset := func() {
 		for {
-			err := acc.ls.Watch("/registry/rs/default", acc.watchReplicaset, acc.stopChannel)
+			err := acc.ls.Watch(config.RSConfigPrefix, acc.watchReplicaset, acc.stopChannel)
 			if err != nil {
-				klog.Errorf("Error watching /registry/rs : %s\n", err.Error())
+				klog.Errorf("Error watching /registry/rsConfig : %s\n", err.Error())
 			}
 			time.Sleep(5 * time.Second)
 		}
@@ -118,56 +125,56 @@ func (acc *AutoscalerController) register() {
 		}
 	}
 
-	registerResyncLoop := func() {
-		for {
-			{
-				resList, err := acc.ls.List("/registry/autoscaler/default")
-				if err != nil {
-					klog.Errorf("Error synchronizing!\n")
-					goto failed
-				}
-				newMap := make(map[string]object.VersionedAutoscaler)
-				for _, res := range resList {
-					versionedAS := object.VersionedAutoscaler{Version: res.ResourceVersion}
-					_ = json.Unmarshal(res.ValueBytes, &versionedAS.Autoscaler)
-					newMap[res.Key] = versionedAS
-				}
-				acc.autoscalerMap.UpdateAll(newMap, object.SelectNewerAutoscaler)
-			}
-			{
-				resList, err := acc.ls.List("/registry/rs/default")
-				if err != nil {
-					klog.Errorf("Error synchronizing!\n")
-					goto failed
-				}
-				newMap := make(map[string]object.VersionedReplicaset)
-				for _, res := range resList {
-					versionedRS := object.VersionedReplicaset{Version: res.ResourceVersion}
-					_ = json.Unmarshal(res.ValueBytes, &versionedRS.Replicaset)
-					newMap[res.Key] = versionedRS
-				}
-				acc.replicasetMap.UpdateAll(newMap, object.SelectNewerReplicaset)
-			}
-			{
-				resList, err := acc.ls.List("/registry/deployment/default")
-				if err != nil {
-					klog.Errorf("Error synchronizing!\n")
-					goto failed
-				}
-				newMap := make(map[string]object.VersionedDeployment)
-				for _, res := range resList {
-					versionedDM := object.VersionedDeployment{Version: res.ResourceVersion}
-					_ = json.Unmarshal(res.ValueBytes, &versionedDM.Deployment)
-					newMap[res.Key] = versionedDM
-				}
-				acc.deploymentMap.UpdateAll(newMap, object.SelectNewerDeployment)
-			}
-		failed:
-			time.Sleep(acc.resyncInterval)
-		}
-	}
+	//registerResyncLoop := func() {
+	//	for {
+	//		{
+	//			resList, err := acc.ls.List("/registry/autoscaler/default")
+	//			if err != nil {
+	//				klog.Errorf("Error synchronizing!\n")
+	//				goto failed
+	//			}
+	//			newMap := make(map[string]object.VersionedAutoscaler)
+	//			for _, res := range resList {
+	//				versionedAS := object.VersionedAutoscaler{Version: res.ResourceVersion}
+	//				_ = json.Unmarshal(res.ValueBytes, &versionedAS.Autoscaler)
+	//				newMap[res.Key] = versionedAS
+	//			}
+	//			acc.autoscalerMap.UpdateAll(newMap, object.SelectNewerAutoscaler)
+	//		}
+	//		{
+	//			resList, err := acc.ls.List(config.RSConfigPrefix)
+	//			if err != nil {
+	//				klog.Errorf("Error synchronizing!\n")
+	//				goto failed
+	//			}
+	//			newMap := make(map[string]object.VersionedReplicaset)
+	//			for _, res := range resList {
+	//				versionedRS := object.VersionedReplicaset{Version: res.ResourceVersion}
+	//				_ = json.Unmarshal(res.ValueBytes, &versionedRS.Replicaset)
+	//				newMap[res.Key] = versionedRS
+	//			}
+	//			acc.replicasetMap.UpdateAll(newMap, object.SelectNewerReplicaset)
+	//		}
+	//		{
+	//			resList, err := acc.ls.List("/registry/deployment/default")
+	//			if err != nil {
+	//				klog.Errorf("Error synchronizing!\n")
+	//				goto failed
+	//			}
+	//			newMap := make(map[string]object.VersionedDeployment)
+	//			for _, res := range resList {
+	//				versionedDM := object.VersionedDeployment{Version: res.ResourceVersion}
+	//				_ = json.Unmarshal(res.ValueBytes, &versionedDM.Deployment)
+	//				newMap[res.Key] = versionedDM
+	//			}
+	//			acc.deploymentMap.UpdateAll(newMap, object.SelectNewerDeployment)
+	//		}
+	//	failed:
+	//		time.Sleep(acc.resyncInterval)
+	//	}
+	//}
+	//go registerResyncLoop()
 
-	go registerResyncLoop()
 	go registerWatchAutoscaler()
 	go registerWatchDeployment()
 	go registerWatchReplicaset()
@@ -258,7 +265,6 @@ func (acc *AutoscalerController) watchReplicaset(res etcdstore.WatchRes) {
 func (acc *AutoscalerController) handleAutoscalerPut(autoscalerKey string, vac object.VersionedAutoscaler) {
 	scalableObj, err := autoscaler2ScalableObject(vac)
 	if err != nil {
-		klog.Errorf("%s\n", err.Error())
 		return
 	}
 	calculateFuncMap := make(map[string]metricHandler)
@@ -268,13 +274,13 @@ func (acc *AutoscalerController) handleAutoscalerPut(autoscalerKey string, vac o
 			case object.MetricMax:
 				calculateFuncMap[metric.Name] = metricHandler{
 					calculateFunc: calculateMaxStatus,
-					upperBound:    float64(metric.Percentage) / 100,
+					bound:         float64(metric.Percentage) / 100,
 				}
 				break
 			case object.MetricAverage:
 				calculateFuncMap[metric.Name] = metricHandler{
 					calculateFunc: calculateAverageStatus,
-					upperBound:    float64(metric.Percentage) / 100,
+					bound:         float64(metric.Percentage) / 100,
 				}
 				break
 			default:
@@ -282,8 +288,9 @@ func (acc *AutoscalerController) handleAutoscalerPut(autoscalerKey string, vac o
 			}
 		}
 	}
+	fmt.Println("Init monitoring loop")
 	var ok bool
-	var monitoringLoop func(stopCh <-chan struct{}, deploymentKey string, calculateFuncMap map[string]metricHandler, maxReplicas int32, minReplicas int32)
+	var monitoringLoop func(stopCh <-chan struct{}, deploymentKey string, calculateFuncMap map[string]metricHandler, maxReplicas int32, minReplicas int32, scaleInterval int32)
 	switch scalableObj.kind {
 	case deployment:
 		_, ok = acc.deploymentMap.Get(scalableObj.key)
@@ -296,6 +303,7 @@ func (acc *AutoscalerController) handleAutoscalerPut(autoscalerKey string, vac o
 	case replicaset:
 		_, ok = acc.replicasetMap.Get(scalableObj.key)
 		if !ok {
+			fmt.Println("replicaset not found, return !")
 			return
 		} else {
 			monitoringLoop = acc.monitoringReplicasetLoop
@@ -311,10 +319,14 @@ func (acc *AutoscalerController) handleAutoscalerPut(autoscalerKey string, vac o
 	}
 	acc.autoscalerMap.Put(autoscalerKey, vac)
 	acc.object2autoscaler.Put(scalableObj, autoscalerMeta)
-	go monitoringLoop(stopChan, scalableObj.key, calculateFuncMap, vac.Autoscaler.Spec.MaxReplicas, vac.Autoscaler.Spec.MinReplicas)
+	var interval int32 = 10
+	if vac.Autoscaler.Spec.ScaleInterval > 0 {
+		interval = vac.Autoscaler.Spec.ScaleInterval
+	}
+	go monitoringLoop(stopChan, scalableObj.key, calculateFuncMap, vac.Autoscaler.Spec.MaxReplicas, vac.Autoscaler.Spec.MinReplicas, interval)
 }
 
-func (acc *AutoscalerController) monitoringDeploymentLoop(stopCh <-chan struct{}, deploymentKey string, calculateFuncMap map[string]metricHandler, maxReplicas int32, minReplicas int32) {
+func (acc *AutoscalerController) monitoringDeploymentLoop(stopCh <-chan struct{}, deploymentKey string, calculateFuncMap map[string]metricHandler, maxReplicas int32, minReplicas int32, interval int32) {
 	for {
 		select {
 		case <-stopCh:
@@ -339,22 +351,22 @@ func (acc *AutoscalerController) monitoringDeploymentLoop(stopCh <-chan struct{}
 			}
 			podStatusList := acc.getPodsResourcePercentage(pods)
 
-			var cpu, cpuUpperBound, cpuLowerBound cpuPercentage
-			var memory, memoryUpperBound, memoryLowerBound memoryPercentage
+			var cpu, cpuBound cpuPercentage
+			var memory, memoryBound memoryPercentage
 			var cpuMetric, memoryMetric bool
 			var handler metricHandler
 
 			if handler, cpuMetric = calculateFuncMap[object.MetricCPU]; cpuMetric {
 				cpu, _ = handler.calculateFunc(podStatusList)
-				cpuUpperBound = cpuPercentage(handler.upperBound)
+				cpuBound = cpuPercentage(handler.bound)
 			}
 			if handler, memoryMetric = calculateFuncMap[object.MetricMemory]; memoryMetric {
 				_, memory = handler.calculateFunc(podStatusList)
-				memoryUpperBound = memoryPercentage(handler.upperBound)
+				memoryBound = memoryPercentage(handler.bound)
 			}
 
-			rsKey := "/registry/rs/default/" + rs.Name + rs.UID
-			if (cpuMetric && cpu > cpuUpperBound) || (memoryMetric && memory > memoryUpperBound) {
+			rsKey := path.Join(config.RSConfigPrefix, rs.Name+rs.UID)
+			if (cpuMetric && cpu > cpuBound) || (memoryMetric && memory > memoryBound) {
 				rs.Spec.Replicas += 1
 				if rs.Spec.Replicas <= maxReplicas {
 					err = client.Put(acc.apiServerBase+rsKey, rs)
@@ -362,7 +374,7 @@ func (acc *AutoscalerController) monitoringDeploymentLoop(stopCh <-chan struct{}
 						goto StepEnd
 					}
 				}
-			} else if (cpuMetric && cpu < cpuLowerBound) && (memoryMetric && memory < memoryLowerBound) {
+			} else if (cpuMetric && memoryMetric && cpu < cpuBound && memory < memoryBound) || (cpuMetric && !memoryMetric && cpu < cpuBound) || (memoryMetric && !cpuMetric && memory < memoryBound) {
 				rs.Spec.Replicas -= 1
 				if rs.Spec.Replicas >= minReplicas {
 					err = client.Put(acc.apiServerBase+rsKey, rs)
@@ -373,11 +385,14 @@ func (acc *AutoscalerController) monitoringDeploymentLoop(stopCh <-chan struct{}
 			}
 		}
 	StepEnd:
-		time.Sleep(acc.scaleInterval)
+		time.Sleep(time.Duration(interval) * time.Second)
 	}
 }
 
-func (acc *AutoscalerController) monitoringReplicasetLoop(stopCh <-chan struct{}, replicasetKey string, calculateFuncMap map[string]metricHandler, maxReplicas int32, minReplicas int32) {
+func (acc *AutoscalerController) monitoringReplicasetLoop(stopCh <-chan struct{}, replicasetKey string, calculateFuncMap map[string]metricHandler, maxReplicas int32, minReplicas int32, interval int32) {
+	fmt.Println("monitoring replicaset loop")
+	memRingQ := queue.NewRingQueue[memoryPercentage](5)
+	cpuRingQ := queue.NewRingQueue[cpuPercentage](5)
 	for {
 		select {
 		case <-stopCh:
@@ -388,45 +403,73 @@ func (acc *AutoscalerController) monitoringReplicasetLoop(stopCh <-chan struct{}
 		if ok {
 			pods, err := client.GetRSPods(acc.ls, vrs.Replicaset.ObjectMeta.Name, vrs.Replicaset.UID)
 			if err != nil {
+				fmt.Printf("cannot get pods of replicaset %s\n", vrs.Replicaset.ObjectMeta.Name)
 				goto StepEnd
 			}
 			podStatusList := acc.getPodsResourcePercentage(pods)
+			fmt.Println("pod's status information")
+			for _, status := range podStatusList {
+				fmt.Println(status.toString())
+			}
 
-			var cpu, cpuUpperBound, cpuLowerBound cpuPercentage
-			var memory, memoryUpperBound, memoryLowerBound memoryPercentage
+			var cpu, cpuBound cpuPercentage
+			var memory, memoryBound memoryPercentage
 			var cpuMetric, memoryMetric bool
 			var handler metricHandler
 
 			if handler, cpuMetric = calculateFuncMap[object.MetricCPU]; cpuMetric {
-				cpu, _ = handler.calculateFunc(podStatusList)
-				cpuUpperBound = cpuPercentage(handler.upperBound)
+				tmp, _ := handler.calculateFunc(podStatusList)
+				cpuRingQ.Push(tmp)
+				cpu = 0
+				for _, i := range cpuRingQ.GetElements() {
+					cpu = cpuPercentage(math.Max(float64(cpu), float64(i)))
+				}
+				cpuBound = cpuPercentage(handler.bound)
 			}
 			if handler, memoryMetric = calculateFuncMap[object.MetricMemory]; memoryMetric {
-				_, memory = handler.calculateFunc(podStatusList)
-				memoryUpperBound = memoryPercentage(handler.upperBound)
+				_, tmp := handler.calculateFunc(podStatusList)
+				memRingQ.Push(tmp)
+				memory = 0
+				for _, i := range memRingQ.GetElements() {
+					memory = memoryPercentage(math.Max(float64(memory), float64(i)))
+				}
+				memoryBound = memoryPercentage(handler.bound)
 			}
 
-			rsKey := "/registry/rs/default/" + vrs.Replicaset.Name + vrs.Replicaset.UID
-			if (cpuMetric && cpu > cpuUpperBound) || (memoryMetric && memory > memoryUpperBound) {
-				vrs.Replicaset.Spec.Replicas += 1
-				if vrs.Replicaset.Spec.Replicas <= maxReplicas {
-					err = client.Put(acc.apiServerBase+rsKey, vrs.Replicaset)
-					if err != nil {
-						goto StepEnd
+			fmt.Printf("[CPU BOUND] %5.2f [CPU] %5.2f [MEM BOUND] %5.2f [MEM] %5.2f\n", cpuBound, cpu, memoryBound, memory)
+			fmt.Printf("check cpu ? %t\tcheck mem ? %t\n", cpuMetric, memoryMetric)
+
+			mtx := acc.lockMap.PutIfNotExist(replicasetKey, sync.Mutex{})
+
+			func() {
+				if mtx.TryLock() {
+					defer mtx.Unlock()
+					if (cpuMetric && cpu > cpuBound) || (memoryMetric && memory > memoryBound) {
+						fmt.Println("increase replicas")
+						for vrs.Replicaset.Spec.Replicas < maxReplicas {
+							vrs.Replicaset.Spec.Replicas += 1
+							err = client.Put(acc.apiServerBase+replicasetKey, vrs.Replicaset)
+							if err != nil {
+								vrs.Replicaset.Spec.Replicas -= 1
+							}
+							time.Sleep(time.Duration(interval) * time.Second)
+						}
+					} else if (cpuMetric && memoryMetric && cpu < cpuBound && memory < memoryBound) || (cpuMetric && !memoryMetric && cpu < cpuBound) || (memoryMetric && !cpuMetric && memory < memoryBound) {
+						fmt.Println("decrease replicas")
+						for vrs.Replicaset.Spec.Replicas > minReplicas {
+							vrs.Replicaset.Spec.Replicas -= 1
+							err = client.Put(acc.apiServerBase+replicasetKey, vrs.Replicaset)
+							if err != nil {
+								vrs.Replicaset.Spec.Replicas += 1
+							}
+							time.Sleep(time.Duration(interval) * time.Second)
+						}
 					}
 				}
-			} else if (cpuMetric && cpu < cpuLowerBound) && (memoryMetric && memory < memoryLowerBound) {
-				vrs.Replicaset.Spec.Replicas -= 1
-				if vrs.Replicaset.Spec.Replicas >= minReplicas {
-					err = client.Put(acc.apiServerBase+rsKey, vrs.Replicaset)
-					if err != nil {
-						goto StepEnd
-					}
-				}
-			}
+			}()
 		}
 	StepEnd:
-		time.Sleep(acc.scaleInterval)
+		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -554,7 +597,7 @@ func autoscaler2ScalableObject(vac object.VersionedAutoscaler) (scalableObject, 
 		scalableObj.kind = deployment
 		break
 	case app.Replicaset:
-		key = "/registry/rs/default/" + targetObjName
+		key = path.Join(config.RSConfigPrefix, targetObjName)
 		scalableObj.key = key
 		scalableObj.kind = replicaset
 		break
