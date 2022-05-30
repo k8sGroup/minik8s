@@ -1,0 +1,16 @@
+kind: Replicaset
+metadata:
+  name: cpu_devourer_rs
+  labels:
+    version: v1
+    key: test_cpu
+spec:
+  replicas: 3
+  template:
+    metadata:
+      name: cpu_devourer_pod
+    spec:
+      containers:
+        - name: cpu_devourer
+          image: chn1234wanghaotian/cpu_devourer:3.0
+          args: ["/root/sleeping_beauty"]

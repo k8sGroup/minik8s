@@ -12,8 +12,6 @@ type flags struct {
 }
 
 var (
-	flagsDel flags
-
 	cmdDel = &cobra.Command{
 		Use:   "del <resource> <resource-name>",
 		Short: "delete resource",

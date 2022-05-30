@@ -1,0 +1,17 @@
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cpu_devourer_scaler
+spec:
+  scaleTargetRef:
+    kind: Replicaset
+    name: cpu_devourer_rs
+  minReplicas: 1
+  maxReplicas: 5
+  scaleInterval: 10
+  metrics:
+    - name: cpu
+      strategy: max
+      percentage: 15
+    - name: memory
+      strategy: average
+      percentage: 50
