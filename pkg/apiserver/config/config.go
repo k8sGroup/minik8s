@@ -67,10 +67,13 @@ const (
 	SharedData       = "/registry/sharedData/default/:resourceName"
 	SharedDataPrefix = "/registry/sharedData/default"
 
+	VirtualSvc       = "/registry/virtualSvc/default/:resourceName"
+	VirtualSvcPrefix = "/registry/virtualSvc/default"
+
 	RS_POD = "/rs/pod"
 )
 
-var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler", "podConfig", "sharedData", "service", "job", "serviceConfig", "rsConfig"}
+var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler", "podConfig", "sharedData", "service", "job", "serviceConfig", "rsConfig", "virtualSvc"}
 
 type ServerConfig struct {
 	HttpPort       int

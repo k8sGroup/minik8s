@@ -47,7 +47,14 @@ func (d *Router) register() {
 			fmt.Printf("[Router] ListWatch init fail...")
 		}
 	}
+	watchVirtualSvc := func(d *Router) {
+		err := d.ls.Watch(config.VirtualSvcPrefix, d.watchVirtualService, d.stopChannel)
+		if err != nil {
+			fmt.Printf("[Router] ListWatch init fail...")
+		}
+	}
 	go watchSvc(d)
+	go watchVirtualSvc(d)
 }
 
 func (d *Router) watchRuntimeService(res etcdstore.WatchRes) {
@@ -70,7 +77,7 @@ func (d *Router) watchRuntimeService(res etcdstore.WatchRes) {
 	svc := &object.Service{}
 	err := json.Unmarshal(res.ValueBytes, svc)
 	if err != nil {
-		fmt.Println("[kubeProxy] Unmarshall fail")
+		fmt.Println("[watchRuntimeService] Unmarshall fail")
 		return
 	}
 
@@ -96,6 +103,33 @@ func (d *Router) watchRuntimeService(res etcdstore.WatchRes) {
 	}
 
 	d.m[clusterIP] = newEndpoints
+}
+
+func (d *Router) watchVirtualService(res etcdstore.WatchRes) {
+	vs := &object.VirtualService{}
+	err := json.Unmarshal(res.ValueBytes, vs)
+	if err != nil {
+		fmt.Println("[watchVirtualService] Unmarshall fail")
+		return
+	}
+	svcName := vs.Spec.Host
+	clusterIP, ok := d.svcMap[svcName]
+	if !ok {
+		fmt.Printf("[watchVirtualService] service not exist:%v\n", svcName)
+		return
+	}
+
+	vdest := vs.Spec.Route.VDest
+	pdest := vs.Spec.Route.PDest
+
+	if (len(vdest) == 0 && len(pdest) == 0) || (len(vdest) != 0 && len(pdest) != 0) {
+		fmt.Printf("[watchVirtualService] invalid virtual service\n")
+		return
+	}
+
+	//for _, route := range routes {
+	//	route.
+	//}
 }
 
 func (d *Router) UpsertEndpoints(clusterIP string, podIP string, weight int) {
