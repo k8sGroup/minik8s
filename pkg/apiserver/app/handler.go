@@ -230,11 +230,6 @@ func (s *Server) getActivePods(ctx *gin.Context) {
 	}
 
 	uid := ctx.Query("uid")
-	if uid == "" {
-		fmt.Println("[getActivePods] uid not exist")
-		ctx.Status(http.StatusBadRequest)
-		return
-	}
 
 	var expect int
 	var actual int

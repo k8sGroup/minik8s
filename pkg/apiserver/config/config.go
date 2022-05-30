@@ -67,7 +67,8 @@ const (
 	SharedData       = "/registry/sharedData/default/:resourceName"
 	SharedDataPrefix = "/registry/sharedData/default"
 
-	RS_POD = "/rs/pod"
+	RS_POD               = "/rs/pod"
+	DeploymentReplicaset = "/deployment/replicaset"
 )
 
 var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler", "podConfig", "sharedData", "service", "job", "serviceConfig", "rsConfig"}
