@@ -9,6 +9,7 @@ import (
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/listerwatcher"
 	"minik8s/pkg/netSupport/netconfig"
+	"sync"
 	"time"
 )
 
@@ -20,12 +21,17 @@ type Manager struct {
 	clientConfig client.Config
 	stopChannel  <-chan struct{}
 	client       client.RESTClient
+	name2DnsMap  map[string]*object.DnsAndTrans
+	lock         sync.Mutex
 }
 
 func NewManager(lsConfig *listerwatcher.Config, clientConfig client.Config) *Manager {
 	manager := &Manager{}
 	manager.serviceMap = make(map[string]*RuntimeService)
 	manager.stopChannel = make(chan struct{})
+	manager.name2DnsMap = make(map[string]*object.DnsAndTrans)
+	var lock sync.Mutex
+	manager.lock = lock
 	manager.client = client.RESTClient{
 		Base: "http://" + clientConfig.Host,
 	}
@@ -38,7 +44,41 @@ func NewManager(lsConfig *listerwatcher.Config, clientConfig client.Config) *Man
 	manager.clientConfig = clientConfig
 	manager.register()
 	go manager.checkAndBoot()
+	go manager.checkDnsAndTrans()
 	return manager
+}
+
+//每隔一段时间check一下map中的DnsAndTrans, 看服务是否部署
+func (manager *Manager) checkDnsAndTrans() {
+	for {
+		time.Sleep(2 * time.Second)
+		manager.lock.Lock()
+		var removes []string
+		for k, v := range manager.name2DnsMap {
+			resp, err := manager.client.GetRuntimeService(netconfig.GateWayServicePrefix + k)
+			if err != nil {
+				fmt.Println("[checkDnsAndTrans] getRuntimeService fail" + err.Error())
+				continue
+			}
+			if resp == nil {
+				continue
+			}
+			if resp.Status.Phase == object.Running {
+				v.Status.Phase = object.ServiceCreated
+				v.Spec.GateWayIp = resp.Spec.ClusterIp
+				err = manager.client.UpdateDnsAndTrans(v)
+				if err != nil {
+					fmt.Println("[checkDnsAndService]updateDns fail" + err.Error())
+					continue
+				}
+				removes = append(removes, k)
+			}
+		}
+		for _, val := range removes {
+			delete(manager.name2DnsMap, val)
+		}
+		manager.lock.Unlock()
+	}
 }
 
 //没隔一段时间查看一下有无节点注册， 如果有注册的调用boot
@@ -137,38 +177,39 @@ func (manager *Manager) watchDnsAndTrans(res etcdstore.WatchRes) {
 			fmt.Println(err)
 			return
 		}
-		//等待service部署
-		wait := 0
-		for {
-			time.Sleep(1 * time.Second)
-			resp, err2 := manager.client.GetRuntimeService(netconfig.GateWayServicePrefix + DnsAndTrans.MetaData.Name)
-			if err2 != nil {
-				fmt.Println("[serviceManager] wait for service deploy error" + err2.Error())
-				break
-			}
-			if resp == nil {
-				continue
-			}
-			if resp.Status.Phase == object.Running {
-				DnsAndTrans.Status.Phase = object.ServiceCreated
-				DnsAndTrans.Spec.GateWayIp = resp.Spec.ClusterIp
-				err = manager.client.UpdateDnsAndTrans(DnsAndTrans)
-				if err != nil {
-					fmt.Println("[ServiceManager] updateDns fail" + err.Error())
-				}
-				break
-			} else if resp.Status.Phase == "" {
-				wait++
-				if wait > 10 {
-					fmt.Println("[serviceManager] fail to deploy gateway service")
-					break
-				}
-				continue
-			} else {
-				fmt.Println("[serviceManager] fail to deploy gateway service")
-				break
-			}
-		}
+		//加入等待service部署的map
+		manager.lock.Lock()
+		manager.name2DnsMap[DnsAndTrans.MetaData.Name] = DnsAndTrans
+		manager.lock.Unlock()
+		//wait := 0
+		//for {
+		//	time.Sleep(1 * time.Second)
+		//	resp, err2 := manager.client.GetRuntimeService(netconfig.GateWayServicePrefix + DnsAndTrans.MetaData.Name)
+		//	if err2 != nil {
+		//		fmt.Println("[serviceManager] wait for service deploy error" + err2.Error())
+		//		break
+		//	}
+		//	if resp == nil {
+		//		continue
+		//	}
+		//	if resp.Status.Phase == object.Running {
+		//		DnsAndTrans.Status.Phase = object.ServiceCreated
+		//		DnsAndTrans.Spec.GateWayIp = resp.Spec.ClusterIp
+		//		err = manager.client.UpdateDnsAndTrans(DnsAndTrans)
+		//		if err != nil {
+		//			fmt.Println("[ServiceManager] updateDns fail" + err.Error())
+		//		}
+		//		break
+		//	} else {
+		//		fmt.Printf("wait round: %d", wait)
+		//		wait++
+		//		if wait > 60 {
+		//			fmt.Println("[serviceManager] fail to deploy gateway service")
+		//			break
+		//		}
+		//		continue
+		//	}
+		//}
 	} else {
 		//不用管这个
 		//gateWay的更新通常是配置的更新，所以这里不用管, 用户端会更新配置文件

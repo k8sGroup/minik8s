@@ -26,7 +26,8 @@ func getNewClient() (*client.Client, error) {
 }
 
 //获取所有容器,docker ps -a
-func getAllContainers() ([]types.Container, error) {
+
+func GetAllContainers() ([]types.Container, error) {
 	cli, err := getNewClient()
 	if err != nil {
 		return nil, err
@@ -367,7 +368,7 @@ func HandleCommand(command *message.Command) *message.Response {
 
 	switch command.CommandType {
 	case message.COMMAND_GET_ALL_CONTAINER:
-		containers, err := getAllContainers()
+		containers, err := GetAllContainers()
 		var result message.ResponseWithContainInfo
 		result.Response.CommandType = message.COMMAND_GET_ALL_CONTAINER
 		result.Response.Err = err

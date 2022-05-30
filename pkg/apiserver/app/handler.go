@@ -268,7 +268,7 @@ func (s *Server) AddDnsAndTrans(ctx *gin.Context) {
 	for k, v := range dnsAndTrans.Spec.Paths {
 		exist := false
 		for _, s := range services {
-			if v.Name == s.MetaData.Name {
+			if v.Service == s.MetaData.Name {
 				dnsAndTrans.Spec.Paths[k].Ip = s.Spec.ClusterIp
 				exist = true
 				break

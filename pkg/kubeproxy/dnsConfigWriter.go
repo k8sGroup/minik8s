@@ -103,6 +103,7 @@ func (d *DnsConfigWriter) watchDnsAndTrans(res etcdstore.WatchRes) {
 			d.formDir(DnsAndTrans.MetaData.Name)
 			//写nginx的配置
 			d.writeNginxConfig(DnsAndTrans)
+			fmt.Println("writeNginxConfig finished")
 			DnsAndTrans.Status.Phase = object.FileCreated
 			d.Client.UpdateDnsAndTrans(DnsAndTrans)
 			break
@@ -113,7 +114,9 @@ func (d *DnsConfigWriter) watchDnsAndTrans(res etcdstore.WatchRes) {
 			//服务已经部署, 可能是用户端的更新或者是gateWay服务的生成
 			d.key2DnsAnsTrans[res.Key] = DnsAndTrans
 			d.writeNginxConfig(DnsAndTrans)
+			fmt.Println("writeNginxConfig finished")
 			reloadNginxConf(DnsAndTrans.MetaData.Name)
+			fmt.Println("reloadNginxConf finished")
 			d.writeCoreDnsConfig()
 			break
 		case object.Delete:
@@ -162,7 +165,7 @@ func (d *DnsConfigWriter) writeNginxConfig(trans *object.DnsAndTrans) {
 	content = append(content, d.formServerConfig(trans)...)
 	content = append(content, "}")
 	//test
-	f, err := os.OpenFile(netconfig.NginxPathPrefix+trans.MetaData.Name+"/"+netconfig.NginxConfigFileName, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+	f, err := os.OpenFile(netconfig.NginxPathPrefix+"/"+trans.MetaData.Name+"/"+netconfig.NginxConfigFileName, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		fmt.Println("[dnsConfigWriter] writerNginxConfig error" + err.Error())
 		return
