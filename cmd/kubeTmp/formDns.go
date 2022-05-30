@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/go-yaml/yaml"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"minik8s/object"
 	"minik8s/pkg/client"
@@ -13,18 +13,19 @@ func main() {
 	restClient := client.RESTClient{
 		Base: "http://" + clientConfig.Host,
 	}
-	data, err := ioutil.ReadFile("/home/minik8s/test/service/ghostService.yaml")
+	data, err := ioutil.ReadFile("/home/minik8s/test/dnsAndTrans/dnsTest.yaml")
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	//fmt.Print(data)
-	service := &object.Service{}
-	err = yaml.Unmarshal([]byte(data), service)
-	fmt.Println(*service)
-	err = restClient.UpdateService(service)
+	dnsAndTrans := &object.DnsAndTrans{}
+	err = yaml.Unmarshal([]byte(data), dnsAndTrans)
 	if err != nil {
 		fmt.Println(err)
-		return
+	}
+	fmt.Println(dnsAndTrans)
+	err = restClient.UpdateDnsAndTrans(dnsAndTrans)
+	if err != nil {
+		fmt.Println(err)
 	}
 }

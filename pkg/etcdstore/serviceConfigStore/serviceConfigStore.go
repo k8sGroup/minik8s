@@ -19,13 +19,13 @@ type ServiceConfigStore struct {
 }
 
 var instance *ServiceConfigStore
-var lock sync.Locker
+var lock sync.Mutex
 
 func newServiceConfigStore() *ServiceConfigStore {
 	res := &ServiceConfigStore{}
 	res.Name2ClusterIp = make(map[string]string)
 	res.BasicClusterIp = BaseClusterIp
-	res.FourthField = 0
+	res.FourthField = 1
 	res.ThirdField = 0
 	return res
 }

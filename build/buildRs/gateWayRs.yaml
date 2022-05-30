@@ -1,0 +1,25 @@
+kind: ReplicaSet
+metadata:
+  name: gateWayRs  #gateWayRs + DnsAndTrans.Name
+  labels:
+    function: gateWay
+spec:
+  replicas: 3
+  template:
+    metadata:
+      name: gateWayPod #gateWayPod + DnsAndTrans.Name
+      labels:
+        belong: name #DnsAndTrans.Name
+    spec:
+      volumes:
+        - name: config
+          type: hostPath
+          path: /root/nginx #/root/nginx/DnsAndTrans.Name
+      containers:
+        - name: gatewayContainer #gatewayContainer + DnsAndTrans.Name
+          image: nginx
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx

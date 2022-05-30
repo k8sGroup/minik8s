@@ -1,0 +1,28 @@
+#do not modify
+kind: ReplicaSet
+metadata:
+  name: coreDnsRs
+  labels:
+    function: DNS
+spec:
+  replicas: 3
+  template:
+    metadata:
+        name: coreDnsPod
+        labels:
+          function: DNS
+    spec:
+      volumes:
+        - name: coredns
+          type: hostPath
+          path: /root/coredns
+      containers:
+        - name: coreDns
+          image: coredns/coredns:latest
+          ports:
+            - containerPort: 53
+              protocol: all
+          args: [ "-conf", "/etc/coredns/corefile" ]
+          volumeMounts:
+            - name: coredns
+              mountPath: /etc/coredns

@@ -3,8 +3,7 @@ package client
 import (
 	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/etcdstore"
-
-	"github.com/google/uuid"
+	"minik8s/util/uuid"
 
 	"bytes"
 	"context"
@@ -35,7 +34,7 @@ func DefaultClientConfig() Config {
 /******************************Pod*******************************/
 
 func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) error {
-	podUID := uuid.New().String()
+	podUID := uuid.NewUUID(5)
 	attachURL := config.PodConfigPREFIX + "/" + rs.Spec.Template.Name + podUID
 
 	pod, _ := GetPodFromRS(rs)
@@ -106,7 +105,9 @@ func (r RESTClient) GetConfigPod(name string) (*object.Pod, error) {
 // GetPodFromRS TODO: type conversion
 func GetPodFromRS(rs *object.ReplicaSet) (*object.Pod, error) {
 	pod := &object.Pod{}
+	pod.Labels = rs.Spec.Template.Labels
 	pod.Spec = rs.Spec.Template.Spec
+	pod.Labels = rs.Spec.Template.Labels
 	// add ownership
 	owner := object.OwnerReference{
 		Kind:       object.ReplicaSetKind,
@@ -188,7 +189,16 @@ func MakePods(raw []etcdstore.ListRes, name string, UID string) ([]*object.Pod, 
 
 	return pods, nil
 }
-
+func (r RESTClient) AddConfigRs(rs *object.ReplicaSet) error {
+	attachUrl := config.RSConfigPrefix + "/" + rs.Name
+	err := Put(r.Base+attachUrl, rs)
+	return err
+}
+func (r RESTClient) DeleteConfigRs(rsName string) error {
+	attachUrl := config.RSConfigPrefix + "/" + rsName
+	err := Del(r.Base + attachUrl)
+	return err
+}
 func (r RESTClient) DeleteRS(rsName string) error {
 	attachURL := "/registry/rs/default/" + rsName
 	fmt.Printf("delete rs:" + attachURL + "\n")
@@ -272,9 +282,21 @@ func (r RESTClient) GetRuntimeService(name string) (*object.Service, error) {
 	err = json.Unmarshal(resp[0].ValueBytes, result)
 	return result, err
 }
+func (r RESTClient) DeleteService(name string) error {
+	attachUrl := config.ServiceConfigPrefix + "/" + name
+	err := Del(r.Base + attachUrl)
+	return err
+}
 func (r RESTClient) DeleteRuntimeService(name string) error {
 	attachUrl := config.ServicePrefix + "/" + name
 	err := Del(r.Base + attachUrl)
+	return err
+}
+
+/***************************DnsAndTrans************************************/
+func (r RESTClient) UpdateDnsAndTrans(trans *object.DnsAndTrans) error {
+	attachUrl := config.DnsAndTransPrefix + "/" + trans.MetaData.Name
+	err := Put(r.Base+attachUrl, trans)
 	return err
 }
 

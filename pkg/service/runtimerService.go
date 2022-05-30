@@ -119,6 +119,13 @@ func (service *RuntimeService) selectPods(isInit bool) error {
 			service.serviceConfig.Status.Phase = object.Failed
 			service.serviceConfig.Status.Err = NoPodsError
 			updateEtcd = true
+		} else {
+			if isInit {
+				//第一次就没选到pod
+				service.serviceConfig.Spec.PodNameAndIps = replace
+				service.serviceConfig.Status.Phase = object.Failed
+				service.serviceConfig.Status.Err = NoPodsError
+			}
 		}
 	} else {
 		//先生成replace
@@ -138,8 +145,7 @@ func (service *RuntimeService) selectPods(isInit bool) error {
 		//第一次是一定要更新的
 		err = service.Client.UpdateRuntimeService(service.serviceConfig)
 		return err
-	}
-	if updateEtcd {
+	} else if updateEtcd {
 		err = service.Client.UpdateRuntimeService(service.serviceConfig)
 	}
 	return err
