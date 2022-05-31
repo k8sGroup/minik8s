@@ -421,7 +421,11 @@ func (acc *AutoscalerController) monitoringReplicasetLoop(stopCh <-chan struct{}
 				tmp, _ := handler.calculateFunc(podStatusList)
 				cpuRingQ.Push(tmp)
 				cpu = 0
-				for _, i := range cpuRingQ.GetElements() {
+				elements := cpuRingQ.GetElements()
+				if len(elements) == 0 {
+					continue
+				}
+				for _, i := range elements {
 					cpu = cpuPercentage(math.Max(float64(cpu), float64(i)))
 				}
 				cpuBound = cpuPercentage(handler.bound)
@@ -430,7 +434,11 @@ func (acc *AutoscalerController) monitoringReplicasetLoop(stopCh <-chan struct{}
 				_, tmp := handler.calculateFunc(podStatusList)
 				memRingQ.Push(tmp)
 				memory = 0
-				for _, i := range memRingQ.GetElements() {
+				elements := memRingQ.GetElements()
+				if len(elements) == 0 {
+					continue
+				}
+				for _, i := range elements {
 					memory = memoryPercentage(math.Max(float64(memory), float64(i)))
 				}
 				memoryBound = memoryPercentage(handler.bound)
