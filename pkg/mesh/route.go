@@ -29,14 +29,20 @@ type Router struct {
 	stopChannel <-chan struct{}
 }
 
-func NewRouter() *Router {
+func NewRouter(lsConfig *listerwatcher.Config) *Router {
 	rand.Seed(time.Now().Unix())
-	return &Router{}
+	ls, err := listerwatcher.NewListerWatcher(lsConfig)
+	if err != nil {
+		fmt.Println("[NewRouter] list watch fail...")
+	}
+	return &Router{
+		ls: ls,
+	}
 }
 
 func (d *Router) Run() {
 	klog.Debugf("[ReplicaSetController]start running\n")
-	go d.register()
+	//go d.register()
 	select {}
 }
 
@@ -122,17 +128,9 @@ func (d *Router) watchVirtualService(res etcdstore.WatchRes) {
 		return
 	}
 
-	vdest := vs.Spec.Route.VDest
 	pdest := vs.Spec.Route.PDest
 
-	if (len(vdest) == 0 && len(pdest) == 0) || (len(vdest) != 0 && len(pdest) != 0) {
-		fmt.Printf("[watchVirtualService] invalid virtual service\n")
-		return
-	}
-
-	if len(vdest) != 0 {
-
-	} else if len(pdest) != 0 {
+	if len(pdest) != 0 {
 		for _, pod := range pdest {
 			podIP := pod.PodIP
 			weight := pod.Weight
@@ -164,7 +162,9 @@ func (d *Router) GetEndPoint(clusterIP string) (podIP *string, err error) {
 	defer d.mtx.RUnlock()
 
 	endpoints, ok := d.m[clusterIP]
-	if !ok || len(endpoints) == 0 {
+	if !ok {
+		return &clusterIP, nil
+	} else if len(endpoints) == 0 {
 		return nil, errors.New("no endpoints")
 	}
 

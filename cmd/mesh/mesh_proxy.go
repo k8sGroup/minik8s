@@ -10,6 +10,7 @@ import (
 func main() {
 	syscall.Setuid(1337)
 	p := mesh.NewProxy(listerwatcher.GetLsConfig(netconfig.MasterIp))
-	p.Init()
-	p.Run()
+	addresses := []mesh.Address{{mesh.InIP, mesh.InPort}, {mesh.OutIP, mesh.OutPort}}
+	p.Init(addresses)
+	select {}
 }
