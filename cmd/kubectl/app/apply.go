@@ -22,6 +22,9 @@ const (
 	HorizontalPodAutoscaler string = "HorizontalPodAutoscaler"
 	Test                    string = "Test"
 	GpuJob                  string = "GpuJob"
+	Pod                     string = "Pod"
+	Service                 string = "Service"
+	DnsAndTrans             string = "DnsAndTrans"
 )
 
 var (
@@ -90,10 +93,19 @@ func analyzeFile(path string) {
 			return
 		}
 		break
-	case Test:
-		err = client.Put(baseUrl+"/registry/test/default/test1", "{test:\"test\"}")
-		if err != nil {
-			fmt.Println(err.Error())
+	case Pod:
+		if err := CasePod(file, path, unmarshal); err != nil {
+			return
+		}
+		break
+	case Service:
+		if err := CaseService(file, path, unmarshal); err != nil {
+			return
+		}
+		break
+	case DnsAndTrans:
+		if err := CaseDnsAndTrans(file, path, unmarshal); err != nil {
+			return
 		}
 		break
 	case "":
@@ -152,7 +164,48 @@ func CaseHPA(file []byte, path string, unmarshal func([]byte, any) error) error 
 	}
 	return nil
 }
-
+func CasePod(file []byte, path string, unmarshal func([]byte, any) error) error {
+	pod := &object.Pod{}
+	err := unmarshal(file, pod)
+	if err != nil {
+		fmt.Printf("Error unmarshaling file %s\n", path)
+		return err
+	}
+	err = client.Put(baseUrl+"/registry/podConfig/default/"+pod.Name, pod)
+	if err != nil {
+		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
+		return err
+	}
+	return nil
+}
+func CaseService(file []byte, path string, unmarshal func([]byte, any) error) error {
+	service := &object.Service{}
+	err := unmarshal(file, service)
+	if err != nil {
+		fmt.Printf("Error unmarshaling file %s\n", path)
+		return err
+	}
+	err = client.Put(baseUrl+"/registry/serviceConfig/default/"+service.MetaData.Name, service)
+	if err != nil {
+		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
+		return err
+	}
+	return nil
+}
+func CaseDnsAndTrans(file []byte, path string, unmarshal func([]byte, any) error) error {
+	dnsAndTrans := &object.DnsAndTrans{}
+	err := unmarshal(file, dnsAndTrans)
+	if err != nil {
+		fmt.Printf("Error unmarshaling file %s\n", path)
+		return err
+	}
+	err = client.Put(baseUrl+"/registry/dnsAndTrans/default/"+dnsAndTrans.MetaData.Name, dnsAndTrans)
+	if err != nil {
+		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
+		return err
+	}
+	return nil
+}
 func CaseGpuJob(file []byte, path string, unmarshal func([]byte, any) error) error {
 	uid := uuid.New().String()
 	gpuJob := object.GPUJob{}

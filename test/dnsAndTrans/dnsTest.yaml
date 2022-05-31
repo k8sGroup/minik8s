@@ -1,4 +1,4 @@
-kind: DNS
+kind: DnsAndTrans
 metadata:
   name: dnsTest  #名称
   labels:

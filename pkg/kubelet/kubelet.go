@@ -35,7 +35,7 @@ type Kubelet struct {
 	Err            error
 }
 
-func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kubelet {
+func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config, node *object.Node) *Kubelet {
 	kubelet := &Kubelet{}
 	kubelet.podManager = podManager.NewPodManager(clientConfig)
 	restClient := client.RESTClient{
@@ -49,7 +49,7 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config) *Kub
 		fmt.Printf("[NewKubelet] list watch start fail...")
 	}
 	kubelet.ls = ls
-	kubelet.kubeNetSupport, err = netSupport.NewKubeNetSupport(lsConfig, clientConfig)
+	kubelet.kubeNetSupport, err = netSupport.NewKubeNetSupport(lsConfig, clientConfig, node)
 	if err != nil {
 		fmt.Printf("[NewKubelet] new kubeNetSupport fail")
 	}

@@ -144,6 +144,7 @@ type EnvEntry struct {
 
 type Node struct {
 	MetaData ObjectMeta `json:"metadata" yaml:"metadata"`
+	MasterIp string     `json:"masterIp" yaml:"masterIp"`
 	Spec     NodeSpec   `json:"spec" yaml:"spec"`
 	Status   NodeStatus `json:"status" yaml:"status"`
 }

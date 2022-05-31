@@ -1,0 +1,6 @@
+kind: Node
+masterIp: 10.119.11.164
+metadata:
+  name: zhou-1
+  labels:
+    type: ubuntu

@@ -3,8 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/go-yaml/yaml"
-	"io/ioutil"
 	"minik8s/object"
 	"minik8s/pkg/netSupport/netconfig"
 	"os"
@@ -61,16 +59,20 @@ func writeNginxConfig(trans *object.DnsAndTrans) {
 	return
 }
 func main() {
-	data, err := ioutil.ReadFile("/home/minik8s/test/dnsAndTrans/dnsTest.yaml")
-	if err != nil {
-		fmt.Println(err)
-		return
+	//data, err := ioutil.ReadFile("/home/minik8s/test/dnsAndTrans/dnsTest.yaml")
+	//if err != nil {
+	//	fmt.Println(err)
+	//	return
+	//}
+	//dnsAndTrans := &object.DnsAndTrans{}
+	//err = yaml.Unmarshal([]byte(data), dnsAndTrans)
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+	//dnsAndTrans.Spec.Paths[0].Ip = "10.10.10.1"
+	//writeNginxConfig(dnsAndTrans)
+	fmt.Printf("totle variables = %d", len(os.Args))
+	for _, val := range os.Args[1:] {
+		fmt.Println(val)
 	}
-	dnsAndTrans := &object.DnsAndTrans{}
-	err = yaml.Unmarshal([]byte(data), dnsAndTrans)
-	if err != nil {
-		fmt.Println(err)
-	}
-	dnsAndTrans.Spec.Paths[0].Ip = "10.10.10.1"
-	writeNginxConfig(dnsAndTrans)
 }
