@@ -48,10 +48,14 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 	engine := gin.Default()
 	store, err := etcdstore.NewEtcdStore(c.EtcdEndpoints, c.EtcdTimeout)
 	if err != nil {
+		fmt.Println("Error connecting to etcd.")
+		fmt.Println(err.Error())
 		return nil, err
 	}
 	publisher, err := messaging.NewPublisher(c.QueueConfig)
 	if err != nil {
+		fmt.Println("Error connecting to rabbitmq.")
+		fmt.Println(err.Error())
 		return nil, err
 	}
 	watcherChan := make(chan watchOpt)
