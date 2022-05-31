@@ -27,6 +27,7 @@ func GetLsConfig(host string) *Config {
 			Password:      "123456",
 			Host:          host,
 			Port:          "5672",
+			VHost:         "admin",
 			MaxRetry:      10,
 			RetryInterval: 5 * time.Second,
 		},
