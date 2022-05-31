@@ -42,9 +42,6 @@ var (
 
 func init() {
 	rootCmd.AddCommand(cmdApply)
-	cmdDel.Flags().StringVarP(&flagsDel.namespace, "namespace", "n", "default", "namespace for a specific resource")
-	cmdDel.Flags().StringVar(&flagsDel.name, "resource-name", "", "resource name")
-	_ = cmdDel.MarkFlagRequired("resource-name")
 }
 
 func analyzeFile(path string) {

@@ -72,11 +72,10 @@ const (
 
 	VirtualSvc       = "/registry/virtualSvc/default/:resourceName"
 	VirtualSvcPrefix = "/registry/virtualSvc/default"
-	RS_POD = "/rs/pod"
+	RS_POD           = "/rs/pod"
 )
 
 var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler", "podConfig", "sharedData", "service", "job", "serviceConfig", "rsConfig", "dnsAndTrans", "virtualSvc"}
-
 
 type ServerConfig struct {
 	HttpPort       int

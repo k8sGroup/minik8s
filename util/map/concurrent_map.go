@@ -57,6 +57,18 @@ func (c *ConcurrentMapTrait[KEY, VALUE]) Put(key KEY, val VALUE) {
 	c.innerMap[key] = val
 }
 
+func (c *ConcurrentMapTrait[KEY, VALUE]) PutIfNotExist(key KEY, val VALUE) VALUE {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+	val2, ok := c.innerMap[key]
+	if ok {
+		return val2
+	} else {
+		c.innerMap[key] = val
+		return val
+	}
+}
+
 func (c *ConcurrentMapTrait[KEY, VALUE]) Del(key KEY) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
