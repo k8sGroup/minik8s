@@ -10,6 +10,7 @@ import (
 	"minik8s/pkg/klog"
 	"minik8s/pkg/listerwatcher"
 	"minik8s/pkg/netSupport/boot"
+	"minik8s/pkg/netSupport/netconfig"
 	"minik8s/pkg/netSupport/tools"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ type KubeNetSupport struct {
 	rwLock sync.RWMutex
 	//存一份snapshoop2
 	kubeproxySnapShoot KubeNetSupportSnapShoot
+	node               *object.Node
 	ls                 *listerwatcher.ListerWatcher
 	Client             client.RESTClient
 	stopChannel        <-chan struct{}
@@ -39,13 +41,14 @@ type KubeNetSupportSnapShoot struct {
 	Error       string
 }
 
-func NewKubeNetSupport(lsConfig *listerwatcher.Config, clientConfig client.Config) (*KubeNetSupport, error) {
+func NewKubeNetSupport(lsConfig *listerwatcher.Config, clientConfig client.Config, node *object.Node) (*KubeNetSupport, error) {
 	newKubeNetSupport := &KubeNetSupport{}
 	var rwLock sync.RWMutex
 	newKubeNetSupport.rwLock = rwLock
 	newKubeNetSupport.stopChannel = make(chan struct{}, 10)
 	newKubeNetSupport.myDynamicIp = tools.GetDynamicIp()
 	newKubeNetSupport.myIpAndMask = tools.GetDocker0IpAndMask()
+	newKubeNetSupport.node = node
 	ls, err2 := listerwatcher.NewListerWatcher(lsConfig)
 	if err2 != nil {
 		return nil, err2
@@ -92,11 +95,24 @@ func (k *KubeNetSupport) registerNode() error {
 	boot.BootFlannel()
 	//发起注册的http请求
 	attachURL := config.NODE_PREFIX + "/" + k.myDynamicIp
-	node := &object.Node{
-		Spec: object.NodeSpec{
-			DynamicIp:     k.myDynamicIp,
-			NodeIpAndMask: k.myIpAndMask,
-		},
+	var node *object.Node
+	if k.node == nil {
+		node = &object.Node{
+			MasterIp: netconfig.MasterIp,
+			Spec: object.NodeSpec{
+				DynamicIp:     k.myDynamicIp,
+				NodeIpAndMask: k.myIpAndMask,
+			},
+		}
+	} else {
+		node = &object.Node{
+			MetaData: k.node.MetaData,
+			MasterIp: k.node.MasterIp,
+			Spec: object.NodeSpec{
+				DynamicIp:     k.myDynamicIp,
+				NodeIpAndMask: k.myIpAndMask,
+			},
+		}
 	}
 	err := k.Client.PutWrap(attachURL, node)
 	if err != nil {

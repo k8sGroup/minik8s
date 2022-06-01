@@ -26,12 +26,80 @@ type beautifiedReplicaset struct {
 	podName string
 	status  rsStatus
 }
+type beautifiedPod struct {
+	Name     string
+	Ctime    string
+	PodIp    string
+	NodeName string
+	Status   string
+}
+
+func (bPod *beautifiedPod) ToString() string {
+	result := fmt.Sprintf("%s\t%s\t%s\t%s\t%s\n", bPod.Name, bPod.Ctime, bPod.PodIp, bPod.NodeName, bPod.Status)
+	return result
+}
 
 type beautifiedDeployment struct {
 	name string
 	rs   *beautifiedReplicaset
 }
+type beautifiedNode struct {
+	Name          string
+	Ctime         string
+	MasterIp      string
+	NodeIp        string
+	NodeIpAndMask string
+}
 
+func (bNode *beautifiedNode) ToString() string {
+	result := fmt.Sprintf("%s\t%s\t%s\t%s\t%s\n", bNode.Name, bNode.Ctime, bNode.MasterIp, bNode.NodeIp, bNode.NodeIpAndMask)
+	return result
+}
+
+type beautifiedService struct {
+	Name      string
+	Ctime     string
+	ClusterIP string
+	Ports     []PortAndProtocol
+	Status    string
+}
+type PortAndProtocol struct {
+	Port     string
+	Protocol string
+}
+
+func (bSvc *beautifiedService) ToString() string {
+	ports2string := "["
+	for _, port := range bSvc.Ports {
+		ports2string += port.Port + ":" + port.Protocol + " "
+	}
+	ports2string += "]"
+	result := fmt.Sprintf("%s\t%s\t%s\t%s\t%s\n", bSvc.Name, bSvc.Ctime, bSvc.ClusterIP, ports2string, bSvc.Status)
+	return result
+}
+
+type beautifiedDnsAndTrans struct {
+	Name      string
+	Ctime     string
+	Host      string
+	Path2Svcs []Path2Svc
+	Status    string
+}
+
+type Path2Svc struct {
+	Path string
+	Svc  string
+}
+
+func (bDnsAndTrans *beautifiedDnsAndTrans) ToString() string {
+	path2Svcs := "["
+	for _, path2Svc := range bDnsAndTrans.Path2Svcs {
+		path2Svcs += path2Svc.Path + ":" + path2Svc.Svc + " "
+	}
+	path2Svcs += "]"
+	result := fmt.Sprintf("%s\t%s\t%s\t%s\t%s\n", bDnsAndTrans.Name, bDnsAndTrans.Ctime, bDnsAndTrans.Host, path2Svcs, bDnsAndTrans.Status)
+	return result
+}
 func BRSHeader() string {
 	return "REPLICASET-NAME\tUUID\tPOD-TEMPLATE-NAME\tEXPECT\tACTUAL\n"
 }
@@ -40,6 +108,18 @@ func BDPHeader() string {
 	return "DEPLOYMENT-NAME\tREPLICASET-NAME\tUUID\tPOD-TEMPLATE-NAME\tEXPECT\tACTUAL\n"
 }
 
+func NODEHeader() string {
+	return "NodeName\tCtime\tMasterIp\tNodeIp\tNodeIpAndMask\n"
+}
+func PODHeader() string {
+	return "PodName\tCtime\tPodIp\tNodeName\tStatus\n"
+}
+func SERVICEHeader() string {
+	return "ServiceName\tCtime\tClusterIp\tPorts\tStatus\n"
+}
+func DnsAndTransHeader() string {
+	return "DnsAndTransName\tCtime\tHost\tPath2Svcs\tStatus\n"
+}
 func (brs *beautifiedReplicaset) ToString() string {
 	uid := brs.uid
 	if uid == "" {
@@ -77,7 +157,7 @@ func getHandler(cmd *cobra.Command, args []string) {
 	}
 
 	switch args[0] {
-	case "svc":
+	case "service":
 		caseService(name)
 		return
 	case "replicaset":
@@ -86,15 +166,143 @@ func getHandler(cmd *cobra.Command, args []string) {
 	case "deployment":
 		caseDeployment(name)
 		return
+	case "pod":
+		casePod(name)
+		return
+	case "node":
+		caseNode(name)
+		return
+	case "dnsAndTrans":
+		caseDnsAndTrans(name)
+		return
 	default:
 		fmt.Println("Unknown resource ", args[0])
 	}
 }
+func caseDnsAndTrans(name string) {
+	url := baseUrl + path.Join(config.DnsAndTransPrefix, name)
+	listRes, err := client.Get(url)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	var results []*beautifiedDnsAndTrans
+	for _, res := range listRes {
+		dnsAndTrans := &object.DnsAndTrans{}
+		err = json.Unmarshal(res.ValueBytes, dnsAndTrans)
+		if err != nil {
+			continue
+		}
+		bDnsAndTrans := &beautifiedDnsAndTrans{
+			Name:   dnsAndTrans.MetaData.Name,
+			Ctime:  dnsAndTrans.MetaData.Ctime,
+			Host:   dnsAndTrans.Spec.Host,
+			Status: dnsAndTrans.Status.Phase,
+		}
+		var path2Svcs []Path2Svc
+		for _, val := range dnsAndTrans.Spec.Paths {
+			path2Svcs = append(path2Svcs, Path2Svc{Path: val.Name, Svc: val.Service})
+		}
+		bDnsAndTrans.Path2Svcs = path2Svcs
+		results = append(results, bDnsAndTrans)
+	}
+	fmt.Print(DnsAndTransHeader())
+	for _, v := range results {
+		fmt.Print(v.ToString())
+	}
+}
 
+func caseNode(name string) {
+	url := baseUrl + path.Join(config.NODE_PREFIX, name)
+	listRes, err := client.Get(url)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	var results []*beautifiedNode
+	for _, res := range listRes {
+		node := &object.Node{}
+		err = json.Unmarshal(res.ValueBytes, node)
+		if err != nil {
+			continue
+		}
+		bNode := &beautifiedNode{
+			Name:          node.MetaData.Name,
+			Ctime:         node.MetaData.Ctime,
+			MasterIp:      node.MasterIp,
+			NodeIp:        node.Spec.DynamicIp,
+			NodeIpAndMask: node.Spec.NodeIpAndMask,
+		}
+		results = append(results, bNode)
+	}
+	fmt.Print(NODEHeader())
+	for _, bNode := range results {
+		fmt.Print(bNode.ToString())
+	}
+}
+
+func casePod(name string) {
+	url := baseUrl + path.Join(config.PodRuntimePrefix, name)
+	listRes, err := client.Get(url)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	var results []*beautifiedPod
+	for _, res := range listRes {
+		pod := &object.Pod{}
+		err = json.Unmarshal(res.ValueBytes, pod)
+		if err != nil {
+			continue
+		}
+		bPod := &beautifiedPod{
+			Name:     pod.Name,
+			Ctime:    pod.Ctime,
+			PodIp:    pod.Status.PodIP,
+			NodeName: pod.Spec.NodeName,
+			Status:   pod.Status.Phase,
+		}
+		results = append(results, bPod)
+	}
+	fmt.Print(PODHeader())
+	for _, bPod := range results {
+		fmt.Print(bPod.ToString())
+	}
+}
 func caseService(name string) {
-	//TODO
-	fmt.Println(name)
-	fmt.Println("Not supported yet")
+	url := baseUrl + path.Join(config.ServicePrefix, name)
+	listRes, err := client.Get(url)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	var results []*beautifiedService
+	for _, res := range listRes {
+		service := &object.Service{}
+		err = json.Unmarshal(res.ValueBytes, service)
+		if err != nil {
+			continue
+		}
+		bService := &beautifiedService{
+			Name:      service.MetaData.Name,
+			Ctime:     service.MetaData.Ctime,
+			ClusterIP: service.Spec.ClusterIp,
+			Status:    service.Status.Phase,
+		}
+		var ports []PortAndProtocol
+		for _, port := range service.Spec.Ports {
+			ports = append(ports, PortAndProtocol{
+				Port:     port.Port,
+				Protocol: port.Protocol,
+			})
+		}
+		bService.Ports = ports
+		results = append(results, bService)
+	}
+	fmt.Print(SERVICEHeader())
+	for _, bsvc := range results {
+		fmt.Print(bsvc.ToString())
+	}
 }
 
 func caseDeployment(name string) {
