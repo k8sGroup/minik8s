@@ -13,6 +13,7 @@ import (
 	"minik8s/pkg/etcdstore/serviceConfigStore"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // do not delete pod in etcd directly, just modify the status
@@ -162,6 +163,7 @@ func (s *Server) AddService(ctx *gin.Context) {
 		return
 	}
 	service.Spec.ClusterIp = ip
+	service.MetaData.Ctime = time.Now().Format("2006-01-02 15:04:05")
 	for _, v := range service.Spec.Ports {
 		if v.Protocol == "" {
 			v.Protocol = "TCP"

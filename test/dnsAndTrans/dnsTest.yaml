@@ -9,3 +9,6 @@ spec:
     - name: /hong   #子路径名
       service: ghostService #对应的服务
       port: 80  #对应的端口
+    - name: /qian
+      service: ghostService
+      port: 10086

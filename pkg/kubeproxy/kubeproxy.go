@@ -36,10 +36,30 @@ func NewKubeProxy(lsConfig *listerwatcher.Config, clientConfig client.Config) *K
 	res.dnsConfigWriter = NewDnsConfigWriter(lsConfig, clientConfig)
 	return res
 }
+func trans(from etcdstore.ListRes) etcdstore.WatchRes {
+	return etcdstore.WatchRes{
+		ResType:    etcdstore.PUT,
+		Key:        from.Key,
+		ValueBytes: from.ValueBytes,
+	}
+}
+func (proxy *KubeProxy) PreSetService() {
+	//拉取已经存在的service
+	res, err := proxy.ls.List(config.ServicePrefix)
+	if err != nil {
+		fmt.Println("[kubeproxy]PreSetService error")
+	} else {
+		for _, val := range res {
+			proxy.watchRuntimeService(trans(val))
+		}
+	}
+}
 func (proxy *KubeProxy) StartKubeProxy() {
 	Boot()
+	proxy.PreSetService()
 	proxy.registry()
 }
+
 func (proxy *KubeProxy) registry() {
 	//挂上watch， watch runtimeService
 	watchService := func() {
