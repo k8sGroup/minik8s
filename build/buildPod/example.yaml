@@ -1,6 +1,6 @@
 kind: Pod #kind资源 Pod
 metadata:
-  name: example2
+  name: example
   labels:
     key: test
 spec: #详细

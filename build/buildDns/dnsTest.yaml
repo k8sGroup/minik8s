@@ -1,0 +1,14 @@
+kind: DnsAndTrans
+metadata:
+  name: dnsTest  #名称
+  labels:
+    key: test
+spec:
+  host: zhou.com   #域名主路径
+  paths:
+    - name: /qian/
+      service: ghostService2
+      port: 80
+    - name: /hong/   #子路径名
+      service: ghostService #对应的服务
+      port: 80  #对应的端口

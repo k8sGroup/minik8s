@@ -1,0 +1,12 @@
+kind: Service
+metadata:
+  name: nginxService
+spec:
+  type: ClusterIp
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    name: nginxPod
