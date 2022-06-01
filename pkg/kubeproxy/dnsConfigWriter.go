@@ -229,7 +229,7 @@ func (d *DnsConfigWriter) formServerConfig(trans *object.DnsAndTrans) []string {
 	result = append(result, "    server {", "        listen 80 ;")
 	result = append(result, fmt.Sprintf("        server_name %s;", trans.Spec.Host))
 	for _, val := range trans.Spec.Paths {
-		result = append(result, fmt.Sprintf("        location ~ %s {", val.Name))
+		result = append(result, fmt.Sprintf("        location %s {", val.Name))
 		result = append(result, fmt.Sprintf("            proxy_pass http://%s:%s;", val.Ip, val.Port))
 		result = append(result, "        }")
 	}

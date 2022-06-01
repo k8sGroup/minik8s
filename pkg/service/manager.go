@@ -123,8 +123,13 @@ func (manager *Manager) checkAndBoot() {
 	}
 }
 func (manager *Manager) boot() {
+	//查看一下是否已经存在coreDns service, 存在的话不再生成
+	res, err := manager.client.GetRuntimeService("dnsService")
+	if res != nil {
+		return
+	}
 	//生成coreDns service
-	err := manager.client.AddConfigRs(GetCoreDnsRsModule())
+	err = manager.client.AddConfigRs(GetCoreDnsRsModule())
 	if err != nil {
 		fmt.Println("[ServiceManager] boot fail" + err.Error())
 		return
