@@ -8,6 +8,9 @@ spec: #详细
     - name: nginxConfig
       type: hostFile
       path: /home/minik8s/test/pod/nginx.conf
+    - name: tmpDir
+      type: hostPath
+      path: /home/minik8s/tmp
   containers: #容器信息
     - name: nginx #容器叫nginx
       image: nginx #使用的镜像
@@ -16,7 +19,24 @@ spec: #详细
       volumeMounts:
         - name: nginxConfig
           mountPath: /etc/nginx/nginx.conf
+        - name: tmpDir
+          mountPath: /tmp
     - name: ghost
       image: ghost
+      volumeMounts:
+        - name: tmpDir
+          mountPath: /tmp
+      limits:
+        cpu: 0.5
+        memory: 500M
+    - name: render
+      image: chn1234wanghaotian/render_with_cmd:latest
+      ports:
+        - containerPort: 10086
+      limits:
+        cpu: 0.5
+        memory: 500M
+      args: [ "/root/renderWithArgs", "Do not go gentle into that good night." ]
+
 
 

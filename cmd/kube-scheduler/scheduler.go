@@ -15,6 +15,12 @@ func main() {
 			fmt.Printf("unKnown type:%s, use default schedule police: random", selectType)
 			selectType = scheduler.SelectRandom
 		}
+		if selectType == scheduler.SelectRoundRobin {
+			fmt.Println("user Round Robin Policy")
+		}
+		if selectType == scheduler.SelectAffinity {
+			fmt.Println("use label match policy")
+		}
 	} else {
 		fmt.Println("use default schedule police: random")
 	}

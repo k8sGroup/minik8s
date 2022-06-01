@@ -8,6 +8,7 @@ import (
 	"minik8s/object"
 	"minik8s/pkg/kubelet/message"
 	"minik8s/pkg/netSupport/netconfig"
+	"strconv"
 	"unsafe"
 
 	"github.com/docker/docker/api/types"
@@ -271,6 +272,32 @@ func getContainerNetInfo(name string) (*types.NetworkSettings, error) {
 	}
 	return res.NetworkSettings, nil
 }
+func getCpu(input string) int64 {
+	len := len(input)
+	result := 0.0
+	if input[len-1] == 'm' {
+		result, _ = strconv.ParseFloat(input[:len-1], 32)
+		result *= 1e6
+	} else {
+		result, _ = strconv.ParseFloat(input[:len], 32)
+		result *= 1e9
+	}
+	return int64(result)
+}
+func getMemory(input string) int64 {
+	len := len(input)
+	result, _ := strconv.Atoi(input[:len-1])
+	mark := input[len-1]
+	if mark == 'K' || mark == 'k' {
+		result *= 1024
+	} else if mark == 'M' || mark == 'm' {
+		result *= 1024 * 1024
+	} else {
+		//G
+		result *= 1024 * 1024 * 1024
+	}
+	return int64(result)
+}
 func createContainersOfPod(containers []object.Container) ([]object.ContainerMeta, *types.NetworkSettings, error) {
 	cli, err2 := getNewClient()
 	if err2 != nil {
@@ -331,6 +358,14 @@ func createContainersOfPod(containers []object.Container) ([]object.ContainerMet
 				env = append(env, singleEnv)
 			}
 		}
+		//生成resource
+		resourceConfig := container.Resources{}
+		if value.Limits.Cpu != "" {
+			resourceConfig.NanoCPUs = getCpu(value.Limits.Cpu)
+		}
+		if value.Limits.Memory != "" {
+			resourceConfig.Memory = getMemory(value.Limits.Memory)
+		}
 		resp, err := cli.ContainerCreate(context.Background(), &container.Config{
 			Image:      value.Image,
 			Entrypoint: value.Command,
@@ -341,6 +376,7 @@ func createContainersOfPod(containers []object.Container) ([]object.ContainerMet
 			Mounts:      mounts,
 			IpcMode:     container.IpcMode("container:" + firstContainerId),
 			PidMode:     container.PidMode("container" + firstContainerId),
+			Resources:   resourceConfig,
 		}, nil, nil, value.Name)
 		if err != nil {
 			return nil, nil, err
