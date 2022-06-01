@@ -71,7 +71,7 @@ type AutoscalerController struct {
 	apiServerBase     string
 }
 
-func NewAutoscalerController(ctx context.Context, controllerCtx util.ControllerContext) *AutoscalerController {
+func NewAutoscalerController(controllerCtx util.ControllerContext) *AutoscalerController {
 	promBase := fmt.Sprintf("http://%s:%s", controllerCtx.MasterIP, controllerCtx.PromServerPort)
 	ac := &AutoscalerController{
 		ls:                controllerCtx.Ls,

@@ -26,7 +26,7 @@ type JobController struct {
 	allocator     *object.AccountAllocator
 }
 
-func NewJobController(ctx context.Context, controllerCtx util.ControllerContext) *JobController {
+func NewJobController(controllerCtx util.ControllerContext) *JobController {
 	jc := &JobController{
 		ls:            controllerCtx.Ls,
 		stopChannel:   make(chan struct{}),
