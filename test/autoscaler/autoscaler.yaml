@@ -1,6 +1,6 @@
 kind: HorizontalPodAutoscaler
 metadata:
-  name: cpu_devourer_scaler
+  name: devourer_scaler
 spec:
   scaleTargetRef:
     kind: Replicaset

@@ -101,7 +101,10 @@ func (service *RuntimeService) selectPods(isInit bool) error {
 			filter = append(filter, val)
 		}
 	}
-	oldPods := service.pods
+	oldPods := make([]*object.Pod, len(service.pods))
+	for idx, gee := range service.pods {
+		oldPods[idx] = gee
+	}
 	//先把service里的坏的给去掉
 	var okPods []*object.Pod
 	for _, val := range service.pods {
