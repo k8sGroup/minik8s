@@ -3,11 +3,10 @@ metadata:
   name: renderService
 spec:
   type: ClusterIp
-  clusterIp: 55.55.55.55
   ports:
     - port: 10086
       targetPort: 10086
-      protocol: UDP
+      protocol: TCP
       name: http
   selector:
     tag: devourer

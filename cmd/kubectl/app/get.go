@@ -8,6 +8,7 @@ import (
 	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/client"
 	"path"
+	"strings"
 )
 
 type rsStatus struct {
@@ -32,6 +33,30 @@ type beautifiedPod struct {
 	PodIp    string
 	NodeName string
 	Status   string
+}
+
+type beautifiedAutoscaler struct {
+	name          string
+	refKind       string
+	refName       string
+	minReplicas   int32
+	maxReplicas   int32
+	scaleInterval int32
+	metrics       []object.Metric
+}
+
+func BASHeader() string {
+	return "Name\tRefKind\tRefName\tMin\tMax\tInterval\tMetrics\n"
+}
+
+func (b *beautifiedAutoscaler) ToString() string {
+	metricsList := make([]string, len(b.metrics))
+	for i, str := range b.metrics {
+		metricsList[i] = str.ToString()
+	}
+	metrics := "{" + strings.Join(metricsList, ", ") + "}"
+	result := fmt.Sprintf("%s\t%s\t%s\t%d\t%d\t%d\t%s\n", b.name, b.refKind, b.refName, b.minReplicas, b.maxReplicas, b.scaleInterval, metrics)
+	return result
 }
 
 func (bPod *beautifiedPod) ToString() string {
@@ -174,6 +199,9 @@ func getHandler(cmd *cobra.Command, args []string) {
 		return
 	case "dnsAndTrans":
 		caseDnsAndTrans(name)
+		return
+	case "autoscaler":
+		caseAutoscaler(name)
 		return
 	default:
 		fmt.Println("Unknown resource ", args[0])
@@ -411,5 +439,35 @@ func caseReplicaset(name string) {
 	fmt.Print(BRSHeader())
 	for _, brs := range beautifiedReplicasets {
 		fmt.Print(brs.ToString())
+	}
+}
+
+func caseAutoscaler(name string) {
+	url := baseUrl + path.Join("/registry/autoscaler/default", name)
+	listRes, err := client.Get(url)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	bas := beautifiedAutoscaler{}
+	var bass []*beautifiedAutoscaler
+	for _, res := range listRes {
+		autoscaler := object.Autoscaler{}
+		err := json.Unmarshal(res.ValueBytes, &autoscaler)
+		if err != nil {
+			continue
+		}
+		bas.name = autoscaler.Metadata.Name
+		bas.refKind = autoscaler.Spec.ScaleTargetRef.Kind
+		bas.refName = autoscaler.Spec.ScaleTargetRef.Name
+		bas.maxReplicas = autoscaler.Spec.MaxReplicas
+		bas.minReplicas = autoscaler.Spec.MinReplicas
+		bas.scaleInterval = autoscaler.Spec.ScaleInterval
+		bas.metrics = autoscaler.Spec.Metrics
+		bass = append(bass, &bas)
+	}
+	fmt.Print(BASHeader())
+	for _, i := range bass {
+		fmt.Print(i.ToString())
 	}
 }

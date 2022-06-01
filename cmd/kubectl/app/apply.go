@@ -168,6 +168,7 @@ func CasePod(file []byte, path string, unmarshal func([]byte, any) error) error 
 		fmt.Printf("Error unmarshaling file %s\n", path)
 		return err
 	}
+	fmt.Printf("%+v\n", pod)
 	err = client.Put(baseUrl+"/registry/podConfig/default/"+pod.Name, pod)
 	if err != nil {
 		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
