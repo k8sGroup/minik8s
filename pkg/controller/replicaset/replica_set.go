@@ -29,7 +29,7 @@ type ReplicaSetController struct {
 	Client client.RESTClient
 }
 
-func NewReplicaSetController(ctx context.Context, controllerCtx util.ControllerContext) *ReplicaSetController {
+func NewReplicaSetController(controllerCtx util.ControllerContext) *ReplicaSetController {
 	restClient := client.RESTClient{
 		Base: "http://" + controllerCtx.MasterIP + ":" + controllerCtx.HttpServerPort,
 	}

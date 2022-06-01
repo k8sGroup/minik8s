@@ -31,6 +31,8 @@ func (s *Server) addNode(ctx *gin.Context) {
 	}
 	if dynamicIp != node.Spec.DynamicIp {
 		fmt.Println("[ipHandler] error , DynamicIP inConsistent")
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
 	}
 	node, err = nodeConfigStore.AddNewNode(node)
 	if err != nil {

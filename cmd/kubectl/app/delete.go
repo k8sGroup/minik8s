@@ -31,20 +31,62 @@ func deleteResource(cmd *cobra.Command, args []string) {
 		fmt.Println("Unknown resource " + resource)
 		return
 	}
-	if resource == "replicaset" {
+	switch resource {
+	case "replicaset":
 		url := baseUrl + fmt.Sprintf("/registry/rsConfig/default/%s", resourceName)
 		err := client.Del(url)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
-	} else {
+		break
+	case "pod":
+		url := baseUrl + fmt.Sprintf("/registry/podConfig/default/%s", resourceName)
+		err := client.Del(url)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		break
+	case "service":
+		url := baseUrl + fmt.Sprintf("/registry/serviceConfig/default/%s", resourceName)
+		err := client.Del(url)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		break
+	case "dns":
+		url := baseUrl + fmt.Sprintf("/registry/dnsAndTrans/default/%s", resourceName)
+		err := client.Del(url)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		break
+	case "deployment":
 		url := baseUrl + fmt.Sprintf("/registry/%s/default/%s", resource, resourceName)
 		err := client.Del(url)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
+		break
 	}
+	//if resource == "replicaset" {
+	//	url := baseUrl + fmt.Sprintf("/registry/rsConfig/default/%s", resourceName)
+	//	err := client.Del(url)
+	//	if err != nil {
+	//		fmt.Println(err.Error())
+	//		return
+	//	}
+	//} else {
+	//	url := baseUrl + fmt.Sprintf("/registry/%s/default/%s", resource, resourceName)
+	//	err := client.Del(url)
+	//	if err != nil {
+	//		fmt.Println(err.Error())
+	//		return
+	//	}
+	//}
 	fmt.Println("Deleted")
 }

@@ -72,7 +72,7 @@ func (m *DockerMonitor) MetricDockerStat(ctx context.Context, pod *pod.Pod) {
 		//memPercent := m.r.Float64()
 		//cpuPercent := m.r.Float64()
 
-		fmt.Printf("[MetricDockerStat] cpu:%f%%  mem:%f%%\n", cpuPercent, memPercent)
+		// fmt.Printf("[MetricDockerStat] cpu:%f%%  mem:%f%%\n", cpuPercent, memPercent)
 
 		serviceTag := selectorAppTag(pod.GetLabel())
 		MakeMetricRecord(pod.GetName(), pod.GetUid(), serviceTag, memPercent, cpuPercent)
@@ -99,7 +99,7 @@ func getCPUPercent(statsJson *types.StatsJSON) float64 {
 
 	onlineCPU := statsJson.CPUStats.OnlineCPUs
 
-	fmt.Printf("deltaCPU:%v deltaSystem:%v onlineCPU:%v\n", deltaCPU, deltaSystem, onlineCPU)
+	// fmt.Printf("deltaCPU:%v deltaSystem:%v onlineCPU:%v\n", deltaCPU, deltaSystem, onlineCPU)
 
 	cpuPercent := (float64(deltaCPU) / float64(deltaSystem)) * float64(onlineCPU) * 100.0
 	return cpuPercent

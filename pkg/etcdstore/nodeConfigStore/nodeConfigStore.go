@@ -57,7 +57,13 @@ func AddNewNode(node *object.Node) (*object.Node, error) {
 	if flag {
 		return nil, errors.New("[nodeConfigStore]" + node.Spec.DynamicIp + " already exist")
 	}
-	name := GetNodeName()
+	var name string
+	if node.MetaData.Name == "" {
+		name = GetNodeName()
+	} else {
+		name = node.MetaData.Name
+	}
+
 	node.MetaData.Name = name
 	node.MetaData.Ctime = time.Now().Format("2006-01-02 15:04:05")
 	node.MetaData.UID = uuid.NewV4().String()

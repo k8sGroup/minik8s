@@ -66,7 +66,7 @@ type PodNetWork struct {
 func (p *Pod) GetName() string {
 	return p.configPod.Name
 }
-func (p *Pod) GetLabel() map[string]string{
+func (p *Pod) GetLabel() map[string]string {
 	return p.configPod.Labels
 }
 func (p *Pod) GetUid() string {
@@ -78,6 +78,7 @@ func (p *Pod) GetContainers() []object.ContainerMeta {
 	deepContainers := p.containers
 	return deepContainers
 }
+
 //修改了status返回true
 func (p *Pod) compareAndSetStatus(status string) bool {
 	oldStatus := p.getStatus()
@@ -107,7 +108,7 @@ func (p *Pod) uploadPod() {
 func NewPodfromConfig(config *object.Pod, clientConfig client.Config) *Pod {
 	newPod := &Pod{}
 	newPod.configPod = config
-	newPod.configPod.Ctime = time.Now().String()
+	newPod.configPod.Ctime = time.Now().Format("2006-01-02 15:04:05")
 	newPod.canProbeWork = false
 	var rwLock sync.RWMutex
 	newPod.rwLock = rwLock

@@ -5,7 +5,6 @@ import (
 	"github.com/go-yaml/yaml"
 	"io/ioutil"
 	"minik8s/object"
-	"minik8s/pkg/client"
 )
 
 func main() {
@@ -20,13 +19,16 @@ func main() {
 		fmt.Println(err)
 		return
 	} else {
-		fmt.Println(*pod)
+		if pod.Spec.Containers[0].Limits.Cpu == "" {
+			fmt.Println("true")
+		}
+		fmt.Println(pod.Spec.Containers[0].Limits.Cpu)
 	}
-	clientConfig := client.Config{Host: "127.0.0.1" + ":8080"}
-	restClient := client.RESTClient{
-		Base: "http://" + clientConfig.Host,
-	}
-	restClient.UpdateConfigPod(pod)
+	//clientConfig := client.Config{Host: "127.0.0.1" + ":8080"}
+	//restClient := client.RESTClient{
+	//	Base: "http://" + clientConfig.Host,
+	//}
+	//restClient.UpdateConfigPod(pod)
 	//var m int
 	//for {
 	//	fmt.Println("input m, 1 means delete")

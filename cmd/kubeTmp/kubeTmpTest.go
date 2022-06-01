@@ -3,11 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/go-yaml/yaml"
-	"io/ioutil"
 	"minik8s/object"
 	"minik8s/pkg/netSupport/netconfig"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -60,17 +59,37 @@ func writeNginxConfig(trans *object.DnsAndTrans) {
 	}
 	return
 }
+func getCpu(input string) int64 {
+	len := len(input)
+	result := 0.0
+	if input[len-1] == 'm' {
+		result, _ = strconv.ParseFloat(input[:len-1], 32)
+		result *= 1e6
+	} else {
+		result, _ = strconv.ParseFloat(input[:len], 32)
+		result *= 1e9
+	}
+	return int64(result)
+}
+func getMemory(input string) int64 {
+	len := len(input)
+	result, _ := strconv.Atoi(input[:len-1])
+	mark := input[len-1]
+	if mark == 'K' || mark == 'k' {
+		result *= 1024
+	} else if mark == 'M' || mark == 'm' {
+		result *= 1024 * 1024
+	} else {
+		//G
+		result *= 1024 * 1024 * 1024
+	}
+	return int64(result)
+}
 func main() {
-	data, err := ioutil.ReadFile("/home/minik8s/test/dnsAndTrans/dnsTest.yaml")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	dnsAndTrans := &object.DnsAndTrans{}
-	err = yaml.Unmarshal([]byte(data), dnsAndTrans)
-	if err != nil {
-		fmt.Println(err)
-	}
-	dnsAndTrans.Spec.Paths[0].Ip = "10.10.10.1"
-	writeNginxConfig(dnsAndTrans)
+	//fmt.Println(getCpu("0.5"))
+	//fmt.Println(getCpu("1.8"))
+	//fmt.Println(getCpu("65m"))
+	//fmt.Println(getCpu("3.4m"))
+	fmt.Println(getMemory("10k"))
+	fmt.Println(getMemory("10G"))
 }
