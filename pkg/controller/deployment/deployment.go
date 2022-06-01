@@ -32,7 +32,7 @@ type DeploymentController struct {
 	apiServerBase  string
 }
 
-func NewDeploymentController(ctx context.Context, controllerCtx util.ControllerContext) *DeploymentController {
+func NewDeploymentController(controllerCtx util.ControllerContext) *DeploymentController {
 	dc := &DeploymentController{
 		ls:             controllerCtx.Ls,
 		deploymentMap:  concurrentmap.NewConcurrentMapTrait[string, object.VersionedDeployment](),

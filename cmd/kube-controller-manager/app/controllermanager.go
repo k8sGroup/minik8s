@@ -63,6 +63,7 @@ func NewControllerInitializers() map[string]InitFunc {
 	controller["deployment"] = startDeploymentController
 	controller["autoscaler"] = startAutoscalerController
 	controller["job"] = startJobController
+	controller["service"] = startServiceController
 	return controller
 }
 
