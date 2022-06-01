@@ -1,8 +1,10 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"minik8s/cmd/kube-controller-manager/util"
 	"minik8s/object"
 	"minik8s/pkg/apiserver/config"
 	"minik8s/pkg/client"
@@ -17,14 +19,14 @@ type Manager struct {
 	//从service name 到 RuntimeService的映射
 	serviceMap   map[string]*RuntimeService
 	ls           *listerwatcher.ListerWatcher
-	lsConfig     *listerwatcher.Config
 	clientConfig client.Config
-	stopChannel  <-chan struct{}
+	stopChannel  chan struct{}
 	client       client.RESTClient
 	name2DnsMap  map[string]*object.DnsAndTrans
 	lock         sync.Mutex
 }
 
+// Deprecated: Use NewServiceController and Manager.Run instead.
 func NewManager(lsConfig *listerwatcher.Config, clientConfig client.Config) *Manager {
 	manager := &Manager{}
 	manager.serviceMap = make(map[string]*RuntimeService)
@@ -40,12 +42,34 @@ func NewManager(lsConfig *listerwatcher.Config, clientConfig client.Config) *Man
 		fmt.Println("[Service Manager] newManager fail")
 	}
 	manager.ls = ls
-	manager.lsConfig = lsConfig
 	manager.clientConfig = clientConfig
 	manager.register()
 	go manager.checkAndBoot()
 	go manager.checkDnsAndTrans()
 	return manager
+}
+
+func NewServiceController(controllerCtx util.ControllerContext) *Manager {
+	manager := &Manager{}
+	manager.serviceMap = make(map[string]*RuntimeService)
+	manager.stopChannel = make(chan struct{})
+	manager.name2DnsMap = make(map[string]*object.DnsAndTrans)
+	var lock sync.Mutex
+	manager.lock = lock
+	manager.client = client.RESTClient{
+		Base: "http://" + controllerCtx.MasterIP + ":" + controllerCtx.HttpServerPort,
+	}
+	manager.ls = controllerCtx.Ls
+	manager.clientConfig = client.Config{Host: controllerCtx.MasterIP + ":" + controllerCtx.HttpServerPort}
+	return manager
+}
+
+func (manager *Manager) Run(ctx context.Context) {
+	manager.register()
+	go manager.checkAndBoot()
+	go manager.checkDnsAndTrans()
+	<-ctx.Done()
+	close(manager.stopChannel)
 }
 
 //每隔一段时间check一下map中的DnsAndTrans, 看服务是否部署
@@ -241,12 +265,12 @@ func (manager *Manager) watchServiceConfig(res etcdstore.WatchRes) {
 		runtimeService, ok := manager.serviceMap[service.MetaData.Name]
 		if !ok {
 			//新建service
-			manager.serviceMap[service.MetaData.Name] = NewRuntimeService(service, manager.lsConfig, manager.clientConfig)
+			manager.serviceMap[service.MetaData.Name] = NewRuntimeService(service, manager.ls, manager.clientConfig)
 		} else {
 			//修改service, 直接删了重新建一个
 			runtimeService.DeleteService()
 			delete(manager.serviceMap, service.MetaData.Name)
-			manager.serviceMap[service.MetaData.Name] = NewRuntimeService(service, manager.lsConfig, manager.clientConfig)
+			manager.serviceMap[service.MetaData.Name] = NewRuntimeService(service, manager.ls, manager.clientConfig)
 		}
 	}
 }

@@ -153,11 +153,10 @@ func (service *RuntimeService) selectPods(isInit bool) error {
 
 //----------------------------------------------------------------------//
 
-func NewRuntimeService(serviceConfig *object.Service, lsConfig *listerwatcher.Config, clientConfig client.Config) *RuntimeService {
+func NewRuntimeService(serviceConfig *object.Service, ls *listerwatcher.ListerWatcher, clientConfig client.Config) *RuntimeService {
 	runtimeService := &RuntimeService{}
 	runtimeService.commandChan = make(chan command, 100)
 	runtimeService.serviceConfig = serviceConfig
-	ls, _ := listerwatcher.NewListerWatcher(lsConfig)
 	runtimeService.ls = ls
 	runtimeService.Client = client.RESTClient{
 		Base: "http://" + clientConfig.Host,
