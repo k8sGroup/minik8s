@@ -7,6 +7,7 @@ const (
 )
 
 //
+//
 //func (p *Proxy) initChain() error {
 //	ipt, err := iptables.New()
 //	if err != nil {

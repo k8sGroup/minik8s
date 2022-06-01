@@ -30,19 +30,22 @@ type Router struct {
 }
 
 func NewRouter(lsConfig *listerwatcher.Config) *Router {
-	rand.Seed(time.Now().Unix())
 	ls, err := listerwatcher.NewListerWatcher(lsConfig)
 	if err != nil {
 		fmt.Println("[NewRouter] list watch fail...")
 	}
+	m := make(map[string][]EndPoint)
+	svcMap := make(map[string]string)
 	return &Router{
-		ls: ls,
+		ls:     ls,
+		m:      m,
+		svcMap: svcMap,
 	}
 }
 
 func (d *Router) Run() {
 	klog.Debugf("[ReplicaSetController]start running\n")
-	//go d.register()
+	go d.register()
 	select {}
 }
 
@@ -87,6 +90,8 @@ func (d *Router) watchRuntimeService(res etcdstore.WatchRes) {
 		return
 	}
 
+	fmt.Printf("[watchRuntimeService] service:%+v\n", svc)
+
 	svcName := svc.MetaData.Name
 	clusterIP := svc.Spec.ClusterIp
 	d.svcMap[svcName] = clusterIP
@@ -109,6 +114,8 @@ func (d *Router) watchRuntimeService(res etcdstore.WatchRes) {
 	}
 
 	d.m[clusterIP] = newEndpoints
+
+	fmt.Printf("[watchRuntimeService] clusterIP:%+v endpoints:%+v\n", clusterIP, d.m[clusterIP])
 }
 
 func (d *Router) watchVirtualService(res etcdstore.WatchRes) {
@@ -157,7 +164,7 @@ func (d *Router) UpsertEndpoints(clusterIP string, podIP string, weight int) {
 	}
 }
 
-func (d *Router) GetEndPoint(clusterIP string) (podIP *string, err error) {
+func (d *Router) GetEndPoint(clusterIP string, direction string) (podIP *string, err error) {
 	d.mtx.RLock()
 	defer d.mtx.RUnlock()
 
@@ -165,6 +172,7 @@ func (d *Router) GetEndPoint(clusterIP string) (podIP *string, err error) {
 	if !ok {
 		return &clusterIP, nil
 	} else if len(endpoints) == 0 {
+		fmt.Printf("[Endpoint:%v] endpoints for service not exist:%v\n", direction, clusterIP)
 		return nil, errors.New("no endpoints")
 	}
 
@@ -173,14 +181,25 @@ func (d *Router) GetEndPoint(clusterIP string) (podIP *string, err error) {
 		sum += ep.Weight
 	}
 
+	rand.Seed(time.Now().Unix())
+
+	if sum == 0 {
+		idx := rand.Intn(len(endpoints))
+		fmt.Printf("[Endpoint:%v] %v for service %v\n", direction, endpoints[idx].PodIP, clusterIP)
+		return &endpoints[idx].PodIP, nil
+	}
+
 	num := rand.Intn(sum) + 1
 	sum = 0
 	for _, ep := range endpoints {
 		sum += ep.Weight
 		if sum >= num {
+			fmt.Printf("[Endpoint:%v] %v for service %v\n", direction, ep.PodIP, clusterIP)
 			return &ep.PodIP, nil
 		}
 	}
+
+	fmt.Printf("[GetEndPoint] find enpoint by weight fail, clusterIP:%v\n", clusterIP)
 
 	return nil, errors.New("no endpoints chosen")
 }

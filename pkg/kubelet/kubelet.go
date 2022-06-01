@@ -12,7 +12,6 @@ import (
 	"minik8s/pkg/kubelet/podConfig"
 	"minik8s/pkg/kubelet/podManager"
 	"minik8s/pkg/kubelet/types"
-	"minik8s/pkg/kubeproxy"
 	"minik8s/pkg/listerwatcher"
 	"minik8s/pkg/netSupport"
 	"minik8s/pkg/tools"
@@ -28,11 +27,11 @@ type Kubelet struct {
 	PodConfig      *podConfig.PodConfig
 	podMonitor     *monitor.DockerMonitor
 	kubeNetSupport *netSupport.KubeNetSupport
-	kubeProxy      *kubeproxy.KubeProxy
-	ls             *listerwatcher.ListerWatcher
-	stopChannel    <-chan struct{}
-	Client         client.RESTClient
-	Err            error
+	//kubeProxy      *kubeproxy.KubeProxy
+	ls          *listerwatcher.ListerWatcher
+	stopChannel <-chan struct{}
+	Client      client.RESTClient
+	Err         error
 }
 
 func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config, node *object.Node) *Kubelet {
@@ -53,7 +52,7 @@ func NewKubelet(lsConfig *listerwatcher.Config, clientConfig client.Config, node
 	if err != nil {
 		fmt.Printf("[NewKubelet] new kubeNetSupport fail")
 	}
-	kubelet.kubeProxy = kubeproxy.NewKubeProxy(lsConfig, clientConfig)
+	//kubelet.kubeProxy = kubeproxy.NewKubeProxy(lsConfig, clientConfig)
 	// initialize pod podConfig
 	kubelet.PodConfig = podConfig.NewPodConfig()
 
@@ -68,7 +67,7 @@ func (k *Kubelet) getNodeName() string {
 
 func (kl *Kubelet) Run() {
 	kl.kubeNetSupport.StartKubeNetSupport()
-	kl.kubeProxy.StartKubeProxy()
+	//kl.kubeProxy.StartKubeProxy()
 	updates := kl.PodConfig.GetUpdates()
 	go kl.podMonitor.Listener()
 	go kl.syncLoop(updates, kl)

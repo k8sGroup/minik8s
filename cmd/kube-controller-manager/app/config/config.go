@@ -7,7 +7,7 @@ import (
 type Config struct {
 	*controllers.ReplicaSetControllerOptions
 	*controllers.DeploymentControllerOptions
-	*controllers.AutoscalerControllerOptions
+	//*controllers.AutoscalerControllerOptions
 }
 
 type CompletedConfig struct {

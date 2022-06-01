@@ -40,6 +40,9 @@ func (r RESTClient) CreateRSPod(ctx context.Context, rs *object.ReplicaSet) erro
 	pod, _ := GetPodFromRS(rs)
 	pod.Name = rs.Spec.Template.Name + podUID
 	pod.UID = podUID
+	pod.Labels = rs.Spec.Template.Labels
+	fmt.Printf("pod:%+v\n", pod)
+	fmt.Printf("labels:%+v\n", rs.Spec.Template.Labels)
 	podRaw, _ := json.Marshal(pod)
 	reqBody := bytes.NewBuffer(podRaw)
 
@@ -105,7 +108,6 @@ func (r RESTClient) GetConfigPod(name string) (*object.Pod, error) {
 // GetPodFromRS TODO: type conversion
 func GetPodFromRS(rs *object.ReplicaSet) (*object.Pod, error) {
 	pod := &object.Pod{}
-	pod.Labels = rs.Spec.Template.Labels
 	pod.Spec = rs.Spec.Template.Spec
 	pod.Labels = rs.Spec.Template.Labels
 	// add ownership

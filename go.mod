@@ -11,7 +11,6 @@ require (
 	github.com/google/uuid v1.2.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pkg/errors v0.9.1
-	github.com/pquerna/ffjson v0.0.0-20190930134022-aa0246cd15f7
 	github.com/prometheus/client_golang v1.12.2
 	github.com/satori/go.uuid v1.2.0
 	github.com/spf13/cobra v1.4.0
@@ -22,6 +21,7 @@ require (
 	go.etcd.io/etcd/client/v3 v3.5.4
 	go.uber.org/atomic v1.7.0
 	golang.org/x/net v0.0.0-20220412020605-290c469a71a5
+	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools/v3 v3.2.0
 )
 
@@ -80,6 +80,5 @@ require (
 	google.golang.org/grpc v1.45.0 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )

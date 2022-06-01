@@ -149,7 +149,7 @@ func (s *Server) AddService(ctx *gin.Context) {
 	service := &object.Service{}
 	err = json.Unmarshal(body, service)
 	if err != nil {
-		fmt.Println("[AddService] service unmarshal fail")
+		fmt.Println(fmt.Sprintf("[AddService] service unmarshal fail %v", err))
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}

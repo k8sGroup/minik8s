@@ -14,13 +14,17 @@ import (
 var (
 	InIP    = "0.0.0.0"
 	InPort  = 15006
-	OutIP   = "127.0.0.1"
+	OutIP   = "0.0.0.0"
 	OutPort = 15001
+
+	DirIn  = "in15006"
+	DirOut = "out15001"
 )
 
 type Address struct {
-	IP   string
-	Port int
+	IP        string
+	Port      int
+	Direction string
 }
 
 type Proxy struct {
@@ -52,13 +56,14 @@ func (p *Proxy) Init(addresses []Address) {
 
 		fmt.Println("[Init] listening to " + addr.IP + ":" + strconv.Itoa(addr.Port))
 
-		go p.run(server)
+		go p.run(server, addr.Direction)
 	}
 
 	go p.router.Run()
+	select {}
 }
 
-func (p *Proxy) run(server *net.TCPListener) {
+func (p *Proxy) run(server *net.TCPListener, direction string) {
 	if server == nil {
 		fmt.Println("[Proxy Run] No server available")
 	}
@@ -68,14 +73,14 @@ func (p *Proxy) run(server *net.TCPListener) {
 		if err != nil {
 			continue
 		}
-		go p.handleConn(conn)
+		go p.handleConn(conn, direction)
 	}
 
 }
 
-func (p *Proxy) handleConn(clientConn *net.TCPConn) {
+func (p *Proxy) handleConn(clientConn *net.TCPConn, direction string) {
 
-	fmt.Printf("connection from:%v...\n", clientConn.RemoteAddr().String())
+	//fmt.Printf("connection from:%v...\n", clientConn.RemoteAddr().String())
 
 	if clientConn == nil {
 		return
@@ -87,11 +92,9 @@ func (p *Proxy) handleConn(clientConn *net.TCPConn) {
 		return
 	}
 
-	fmt.Printf("To %v:%v", ipv4, port)
-
 	// clusterIP to an endpoint
 	// if ipv4 is not clusterIP, endPoint will still be ipv4
-	endpointIP, err := p.router.GetEndPoint(ipv4)
+	endpointIP, err := p.router.GetEndPoint(ipv4, direction)
 	if err != nil || endpointIP == nil {
 		fmt.Printf("[handleConn] no endpoints for %v err:%v", ipv4, endpointIP)
 		return
@@ -102,7 +105,7 @@ func (p *Proxy) handleConn(clientConn *net.TCPConn) {
 		fmt.Printf("Could not connect, giving up: %v", err)
 		return
 	}
-	fmt.Printf("Connected to remote end %v %v", clientConn.RemoteAddr(), directConn.RemoteAddr())
+	//fmt.Printf("Connected to remote end %v %v", clientConn.RemoteAddr(), directConn.RemoteAddr())
 
 	go copy(clientConn, directConn)
 	go copy(directConn, clientConn)
@@ -189,7 +192,6 @@ func copy(dst io.ReadWriteCloser, src io.ReadWriteCloser) {
 
 	_, err := io.Copy(dst, src)
 	if err != nil {
-		fmt.Println("[copy] error")
 		return
 	}
 }
