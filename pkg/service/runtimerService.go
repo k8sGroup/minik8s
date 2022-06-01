@@ -46,6 +46,26 @@ func isExist(target string, from []string) bool {
 	}
 	return false
 }
+
+//if different return true, else return false
+func compareOldAndNew(oldPods []*object.Pod, newPods []*object.Pod) bool {
+	if len(oldPods) != len(newPods) {
+		return true
+	}
+	for _, val := range oldPods {
+		founded := false
+		for _, newVal := range newPods {
+			if val.Name == newVal.Name {
+				founded = true
+				break
+			}
+		}
+		if !founded {
+			return true
+		}
+	}
+	return false
+}
 func (service *RuntimeService) selectPods(isInit bool) error {
 	selector := service.serviceConfig.Spec.Selector
 	res, err := service.ls.List(config.PodRuntimePrefix)
@@ -81,6 +101,7 @@ func (service *RuntimeService) selectPods(isInit bool) error {
 			filter = append(filter, val)
 		}
 	}
+	oldPods := service.pods
 	//先把service里的坏的给去掉
 	var okPods []*object.Pod
 	for _, val := range service.pods {
@@ -89,10 +110,10 @@ func (service *RuntimeService) selectPods(isInit bool) error {
 		}
 	}
 	service.pods = okPods
-	//尝试填充,最多三个
+	//尝试填充,最多五个
 	for _, val := range filter {
-		if len(service.pods) >= 3 {
-			//最多三个
+		if len(service.pods) >= 5 {
+			//最多五个
 			break
 		}
 		isExist := false
@@ -128,17 +149,20 @@ func (service *RuntimeService) selectPods(isInit bool) error {
 			}
 		}
 	} else {
-		//先生成replace
-		for _, val := range service.pods {
-			replace = append(replace, object.PodNameAndIp{Name: val.Name, Ip: val.Status.PodIP})
+		//比较旧的和新的pod
+		if compareOldAndNew(oldPods, service.pods) {
+			//先生成replace
+			for _, val := range service.pods {
+				replace = append(replace, object.PodNameAndIp{Name: val.Name, Ip: val.Status.PodIP})
+			}
+			//更新serviceConfig
+			service.serviceConfig.Spec.PodNameAndIps = replace
+			service.serviceConfig.Status.Phase = object.Running
+			if service.serviceConfig.Status.Err == NoPodsError {
+				service.serviceConfig.Status.Err = ""
+			}
+			updateEtcd = true
 		}
-		//更新serviceConfig
-		service.serviceConfig.Spec.PodNameAndIps = replace
-		service.serviceConfig.Status.Phase = object.Running
-		if service.serviceConfig.Status.Err == NoPodsError {
-			service.serviceConfig.Status.Err = ""
-		}
-		updateEtcd = true
 	}
 	//更新etcd
 	if isInit {
@@ -210,6 +234,11 @@ func (service *RuntimeService) syncLoop(commands <-chan command) {
 					if callSelect {
 						//调用selectPods
 						service.Err = service.selectPods(false)
+					} else {
+						//如果个数小于5，那么调用selectPods
+						if len(service.pods) < 5 {
+							service.Err = service.selectPods(false)
+						}
 					}
 				}
 				service.canPollSend = true
