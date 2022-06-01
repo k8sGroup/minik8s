@@ -4,10 +4,10 @@ metadata:
 spec:
   scaleTargetRef:
     kind: Replicaset
-    name: cpu_devourer_rs
+    name: devourers
   minReplicas: 1
   maxReplicas: 5
-  scaleInterval: 10
+  scaleInterval: 20
   metrics:
     - name: cpu
       strategy: max

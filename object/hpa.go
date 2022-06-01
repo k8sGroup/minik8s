@@ -1,5 +1,7 @@
 package object
 
+import "fmt"
+
 const (
 	MetricCPU     string = "cpu"
 	MetricMemory  string = "memory"
@@ -30,4 +32,8 @@ type Metric struct {
 	Name       string `json:"name" yaml:"name"`             // MetricCPU or MetricMemory
 	Strategy   string `json:"strategy" yaml:"strategy"`     // MetricMax or MetricAverage
 	Percentage int32  `json:"percentage" yaml:"percentage"` // percentage/100
+}
+
+func (m *Metric) ToString() string {
+	return fmt.Sprintf("{name: %s strategy %s percentage %d}", m.Name, m.Strategy, m.Percentage)
 }

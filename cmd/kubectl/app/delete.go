@@ -72,6 +72,14 @@ func deleteResource(cmd *cobra.Command, args []string) {
 			return
 		}
 		break
+	case "autoscaler":
+		url := baseUrl + fmt.Sprintf("/registry/%s/default/%s", resource, resourceName)
+		err := client.Del(url)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		break
 	}
 	//if resource == "replicaset" {
 	//	url := baseUrl + fmt.Sprintf("/registry/rsConfig/default/%s", resourceName)
