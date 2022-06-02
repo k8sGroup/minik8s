@@ -73,6 +73,9 @@ const (
 	VirtualSvc       = "/registry/virtualSvc/default/:resourceName"
 	VirtualSvcPrefix = "/registry/virtualSvc/default"
 	RS_POD           = "/rs/pod"
+
+	Job2PodPrefix = "/job/pod"
+	Job2Pod       = "/job/pod/:resourceName"
 )
 
 var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler", "podConfig", "sharedData", "service", "job", "serviceConfig", "rsConfig", "dnsAndTrans", "virtualSvc"}

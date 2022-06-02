@@ -1,18 +1,18 @@
 kind: GpuJob
 metadata:
-  name: cublashello
+  name: matrix_multi
 spec:
   slurmConfig:
-    jobName: cublashello
+    jobName: matrix_multi
     partition: dgx2
-    output: "%j.out"
-    error: "%j.err"
+    output: "job.out"
+    error: "job.err"
     nodes: 1
     nTasksPerNode: 1
     cpusPerTask: 6
     gres: gpu:1
   commands:
     - "module load gcc/8.3.0 cuda/10.2"
-    - "nvcc cublashello.cu -o cublashello -lcublas"
-    - "./cublashello"
-  zipPath: "/home/jobzip/test.zip"
+    - "nvcc matrix_multiplication.cu -o matrix_multiplication -lcublas"
+    - "./matrix_multiplication"
+  zipPath: "/home/GPUTest/test/gpu/matrix_multiplication.zip"

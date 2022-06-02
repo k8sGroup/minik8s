@@ -120,6 +120,11 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 	{
 		engine.PUT(config.VirtualSvc, s.addVirtualSvc)
 	}
+	{
+		engine.GET(config.Job2PodPrefix, s.prefixGetJob2Pod)
+		engine.GET(config.Job2Pod, s.getJob2Pod)
+		engine.PUT(config.Job2Pod, s.putJob2Pod)
+	}
 
 	go s.daemon(watcherChan)
 

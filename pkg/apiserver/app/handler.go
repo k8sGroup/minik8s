@@ -388,3 +388,36 @@ func (s *Server) addVirtualSvc(ctx *gin.Context) {
 	body, _ = json.Marshal(vs)
 	err = s.store.Put(config.VirtualSvcPrefix+"/"+vs.Name, body)
 }
+
+func (s *Server) putJob2Pod(ctx *gin.Context) {
+	key := ctx.Request.URL.Path
+	body, err := ioutil.ReadAll(ctx.Request.Body)
+	jp := object.Job2Pod{}
+	err = json.Unmarshal(body, &jp)
+	if err != nil {
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	body, _ = json.Marshal(jp)
+	err = s.store.Put(key, body)
+}
+
+func (s *Server) prefixGetJob2Pod(ctx *gin.Context) {
+	prefixKey := ctx.Request.URL.Path
+	listResList, err := s.store.PrefixGet(prefixKey)
+	if err != nil {
+		ctx.AbortWithStatus(http.StatusBadRequest)
+	}
+	data, err := json.Marshal(listResList)
+	ctx.Data(http.StatusOK, "application/json", data)
+}
+
+func (s *Server) getJob2Pod(ctx *gin.Context) {
+	key := ctx.Request.URL.Path
+	listResList, err := s.store.Get(key)
+	if err != nil {
+		ctx.AbortWithStatus(http.StatusBadRequest)
+	}
+	data, err := json.Marshal(listResList)
+	ctx.Data(http.StatusOK, "application/json", data)
+}
