@@ -32,6 +32,7 @@ type KubeNetSupport struct {
 	//节点的docker网段
 	myIpAndMask string
 	err         error
+	reboot      bool
 }
 
 type KubeNetSupportSnapShoot struct {
@@ -48,7 +49,6 @@ func NewKubeNetSupport(lsConfig *listerwatcher.Config, clientConfig client.Confi
 	newKubeNetSupport.stopChannel = make(chan struct{}, 10)
 	newKubeNetSupport.myDynamicIp = tools.GetDynamicIp()
 	newKubeNetSupport.myIpAndMask = tools.GetDocker0IpAndMask()
-	newKubeNetSupport.node = node
 	ls, err2 := listerwatcher.NewListerWatcher(lsConfig)
 	if err2 != nil {
 		return nil, err2
@@ -58,6 +58,15 @@ func NewKubeNetSupport(lsConfig *listerwatcher.Config, clientConfig client.Confi
 		Base: "http://" + clientConfig.Host,
 	}
 	newKubeNetSupport.Client = restClient
+	resNode, _ := newKubeNetSupport.Client.GetNode(newKubeNetSupport.myDynamicIp)
+	if resNode == nil {
+		newKubeNetSupport.node = node
+		newKubeNetSupport.reboot = false
+	} else {
+		newKubeNetSupport.node = resNode
+		newKubeNetSupport.reboot = true
+		newKubeNetSupport.myNodeName = resNode.MetaData.Name
+	}
 	sErr := ""
 	if newKubeNetSupport.err != nil {
 		sErr = newKubeNetSupport.err.Error()
@@ -72,6 +81,9 @@ func NewKubeNetSupport(lsConfig *listerwatcher.Config, clientConfig client.Confi
 }
 func (k *KubeNetSupport) StartKubeNetSupport() error {
 	fmt.Println("start register")
+	if k.reboot {
+		return nil
+	}
 	return k.registerNode()
 }
 func (k *KubeNetSupport) registry() {
