@@ -257,6 +257,19 @@ func GetNodes(ls *listerwatcher.ListerWatcher) ([]*object.Node, error) {
 	}
 	return nodes, nil
 }
+func (r RESTClient) GetNode(ip string) (*object.Node, error) {
+	attachUrl := config.NODE_PREFIX + "/" + ip
+	resp, err := Get(r.Base + attachUrl)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp) == 0 {
+		return nil, nil
+	}
+	result := &object.Node{}
+	err = json.Unmarshal(resp[0].ValueBytes, result)
+	return result, err
+}
 
 /*******************************Service**********************************/
 func (r RESTClient) UpdateService(service *object.Service) error {
