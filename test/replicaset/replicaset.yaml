@@ -1,0 +1,23 @@
+kind: Replicaset
+metadata:
+  name: twins
+spec:
+  replicas: 3
+  template:
+    metadata:
+      name: twins
+      labels:
+        tag: twins
+    spec:
+      containers:
+        - name: loki
+          image: chn1234wanghaotian/render_with_cmd:latest
+          ports:
+            - containerPort: 10086
+              protocol: tcp
+          args: ["/root/renderWithArgs"]
+        - name: thor
+          image: nginx
+          ports:
+            - containerPort: 80
+              protocol: tcp
