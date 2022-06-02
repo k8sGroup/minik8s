@@ -3,6 +3,7 @@ package mesh
 import (
 	"fmt"
 	"io"
+	"minik8s/pkg/listerwatcher"
 	"net"
 	"strconv"
 	"syscall"
@@ -11,75 +12,64 @@ import (
 )
 
 var (
-	BasePort  int64 = 16001
-	RangePort int64 = 100
+	InIP    = "0.0.0.0"
+	InPort  = 15006
+	OutIP   = "127.0.0.1"
+	OutPort = 15001
 )
 
-type Proxy struct {
-	PodIP   string
-	Address string
-	server  *net.TCPListener
-	router  *Router
+type Address struct {
+	IP   string
+	Port int
 }
 
-func NewProxy(podIP string) *Proxy {
+type Proxy struct {
+	router *Router
+}
+
+func NewProxy(lsConfig *listerwatcher.Config) *Proxy {
 	return &Proxy{
-		PodIP:  podIP,
-		router: NewRouter(),
+		router: NewRouter(lsConfig),
 	}
 }
 
-func (p *Proxy) Init() {
+func (p *Proxy) Init(addresses []Address) {
 	var lnaddr *net.TCPAddr
-	var server *net.TCPListener
 	var err error
 
-	for i := BasePort; i < BasePort+RangePort; i++ {
-		lnaddr, err = net.ResolveTCPAddr("tcp", "127.0.0.1:"+strconv.Itoa(int(i)))
+	for _, addr := range addresses {
+		lnaddr, err = net.ResolveTCPAddr("tcp", addr.IP+":"+strconv.Itoa(addr.Port))
 		if err != nil {
-			continue
+			fmt.Println("[Proxy] No port available")
+			return
 		}
 
-		server, err = net.ListenTCP("tcp", lnaddr)
-		if err == nil {
-			p.Address = "127.0.0.1:" + strconv.Itoa(int(i))
-			p.server = server
-			break
+		server, err := net.ListenTCP("tcp", lnaddr)
+		if err != nil {
+			fmt.Println("[Proxy] init server fail")
+			return
 		}
-	}
 
-	if err != nil || server == nil {
-		fmt.Println("[Proxy] No port available")
-		return
-	}
+		fmt.Println("[Init] listening to " + addr.IP + ":" + strconv.Itoa(addr.Port))
 
-	fmt.Printf("[Proxy] listening to:%v\n", p.Address)
-
-	err = p.initChain()
-	if err != nil {
-		fmt.Printf("[FATAL] init iptables chain fail...\n")
-		return
+		go p.run(server)
 	}
 
 	go p.router.Run()
 }
 
-func (p *Proxy) Run() {
-	if p.server == nil {
+func (p *Proxy) run(server *net.TCPListener) {
+	if server == nil {
 		fmt.Println("[Proxy Run] No server available")
 	}
-
-	func(p *Proxy) {
-		defer p.finalizeChain()
-
-		for {
-			conn, err := p.server.AcceptTCP()
-			if err != nil {
-				continue
-			}
-			go p.handleConn(conn)
+	fmt.Println("Proxy Run...")
+	for {
+		conn, err := server.AcceptTCP()
+		if err != nil {
+			continue
 		}
-	}(p)
+		go p.handleConn(conn)
+	}
 
 }
 
@@ -99,7 +89,8 @@ func (p *Proxy) handleConn(clientConn *net.TCPConn) {
 
 	fmt.Printf("To %v:%v", ipv4, port)
 
-	// clusterIP to a endpoint
+	// clusterIP to an endpoint
+	// if ipv4 is not clusterIP, endPoint will still be ipv4
 	endpointIP, err := p.router.GetEndPoint(ipv4)
 	if err != nil || endpointIP == nil {
 		fmt.Printf("[handleConn] no endpoints for %v err:%v", ipv4, endpointIP)

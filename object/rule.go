@@ -11,14 +11,8 @@ type VirtualServiceSpec struct {
 }
 
 type Route struct {
-	Name  string                `json:"name" yaml:"name"`
-	VDest []*VersionDestination `json:"vdest" yaml:"vdest"`
-	PDest []*PodDestination     `json:"pdest" yaml:"pdest"`
-}
-
-type VersionDestination struct {
-	Subset string `json:"subset" yaml:"subset"`
-	Weight int32  `json:"weight" yaml:"weight"`
+	Name  string            `json:"name" yaml:"name"`
+	PDest []*PodDestination `json:"pdest" yaml:"pdest"`
 }
 
 type PodDestination struct {
