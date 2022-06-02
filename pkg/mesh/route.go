@@ -3,7 +3,6 @@ package mesh
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
 	"math/rand"
 	"minik8s/object"
 	"minik8s/pkg/apiserver/config"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 type EndPoint struct {
@@ -45,7 +46,7 @@ func NewRouter(lsConfig *listerwatcher.Config) *Router {
 
 func (d *Router) Run() {
 	klog.Debugf("[ReplicaSetController]start running\n")
-	go d.register()
+	//go d.register()
 	select {}
 }
 
