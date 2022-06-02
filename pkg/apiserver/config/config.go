@@ -33,6 +33,8 @@ apiServer 的路径是 /registry/{resource}/{namespace}/{resource_name}
 
 const SharedDataDirectory = "/home/SharedData"
 
+const Recover = "/recover"
+
 const Path = "/registry/:resource/:namespace/:resourceName"
 const PrefixPath = "/registry/:resource/:namespace"
 const ParamResource = "resource"
@@ -86,6 +88,7 @@ type ServerConfig struct {
 	EtcdEndpoints  []string // etcd集群每一个节点的ip和端口
 	EtcdTimeout    time.Duration
 	QueueConfig    *messaging.QConfig
+	Recover        bool
 }
 
 func DefaultServerConfig() *ServerConfig {
@@ -95,5 +98,6 @@ func DefaultServerConfig() *ServerConfig {
 		EtcdEndpoints:  []string{"localhost:12379"},
 		EtcdTimeout:    5 * time.Second,
 		QueueConfig:    messaging.DefaultQConfig(),
+		Recover:        false,
 	}
 }

@@ -23,6 +23,10 @@ type watchOpt struct {
 	ticket     uint64
 }
 
+type Recover struct {
+	R bool
+}
+
 type Ticket struct {
 	T uint64
 }
@@ -75,6 +79,15 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 		//kubeNetSupport: kubeNetSupport,
 	}
 
+	{
+		engine.GET(config.Recover, func(ctx *gin.Context) {
+			r := Recover{
+				R: c.Recover,
+			}
+			d, _ := json.Marshal(r)
+			ctx.Data(http.StatusOK, "application/json", d)
+		})
+	}
 	{
 		engine.GET(config.Path, s.validate, s.get)
 		engine.DELETE(config.Path, s.validate, s.del)
