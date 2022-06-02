@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+type Job2Pod struct {
+	PodName string
+}
+
 type GPUJob struct {
 	Metadata ObjectMeta `json:"metadata" yaml:"metadata"`
 	Spec     JobSpec    `json:"spec" yaml:"spec"`

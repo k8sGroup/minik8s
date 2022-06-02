@@ -36,6 +36,27 @@ func Get(url string) ([]etcdstore.ListRes, error) {
 	return resList, nil
 }
 
+func RawGet(url string) ([]byte, error) {
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode != http.StatusOK {
+		return nil, errors.New("StatusCode not 200")
+	}
+	reader := response.Body
+	defer reader.Close()
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
 func GetWithParams(url string, params map[string]string) ([]byte, error) {
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
