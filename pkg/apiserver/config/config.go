@@ -33,6 +33,8 @@ apiServer 的路径是 /registry/{resource}/{namespace}/{resource_name}
 
 const SharedDataDirectory = "/home/SharedData"
 
+const Recover = "/recover"
+
 const Path = "/registry/:resource/:namespace/:resourceName"
 const PrefixPath = "/registry/:resource/:namespace"
 const ParamResource = "resource"
@@ -74,7 +76,9 @@ const (
 	VirtualSvcPrefix = "/registry/virtualSvc/default"
 	RS_POD           = "/rs/pod"
 
-	Sidecar = "/registry/virtualSvc/default/sidecar"
+	Sidecar       = "/registry/virtualSvc/default/sidecar"
+	Job2PodPrefix = "/job/pod"
+	Job2Pod       = "/job/pod/:resourceName"
 )
 
 var defaultValidResources = []string{"pod", "rs", "deployment", "node", "test", "autoscaler", "podConfig", "sharedData", "service", "job", "serviceConfig", "rsConfig", "dnsAndTrans", "virtualSvc", "sidecar"}
@@ -85,6 +89,7 @@ type ServerConfig struct {
 	EtcdEndpoints  []string // etcd集群每一个节点的ip和端口
 	EtcdTimeout    time.Duration
 	QueueConfig    *messaging.QConfig
+	Recover        bool
 }
 
 func DefaultServerConfig() *ServerConfig {
@@ -94,5 +99,6 @@ func DefaultServerConfig() *ServerConfig {
 		EtcdEndpoints:  []string{"localhost:12379"},
 		EtcdTimeout:    5 * time.Second,
 		QueueConfig:    messaging.DefaultQConfig(),
+		Recover:        false,
 	}
 }

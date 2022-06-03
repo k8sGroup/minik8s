@@ -1,0 +1,12 @@
+kind: Pod
+metadata:
+  name: nginx
+  labels:
+    tag: test
+spec:
+  containers:
+    - name: thor
+      image: nginx
+      ports:
+        - containerPort: 80
+          protocol: tcp

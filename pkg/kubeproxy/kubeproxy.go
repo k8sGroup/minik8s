@@ -8,6 +8,7 @@ import (
 	"minik8s/pkg/client"
 	"minik8s/pkg/etcdstore"
 	"minik8s/pkg/listerwatcher"
+	"minik8s/pkg/netSupport/tools"
 	"time"
 )
 
@@ -44,6 +45,11 @@ func trans(from etcdstore.ListRes) etcdstore.WatchRes {
 	}
 }
 func (proxy *KubeProxy) PreSetService() {
+	//先检查是否已经注册过
+	resNode, _ := proxy.Client.GetNode(tools.GetDynamicIp())
+	if resNode != nil {
+		return
+	}
 	//拉取已经存在的service
 	res, err := proxy.ls.List(config.ServicePrefix)
 	if err != nil {

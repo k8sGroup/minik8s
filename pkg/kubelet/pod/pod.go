@@ -1,11 +1,13 @@
 package pod
 
 import (
+	"context"
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/satori/go.uuid"
 	"minik8s/object"
 	"minik8s/pkg/client"
+	"minik8s/pkg/kubelet/dockerClient"
 	"minik8s/pkg/kubelet/message"
 	"minik8s/pkg/kubelet/podWorker"
 	"os"
@@ -237,6 +239,10 @@ func (p *Pod) listeningResponse() {
 							}
 							if value == CONTAINER_EXITED_STATUS {
 								status = POD_EXITED_STATUS
+								cli, _ := dockerClient.GetNewClient()
+								for _, val := range p.containers {
+									_ = cli.ContainerStop(context.Background(), val.ContainerId, nil)
+								}
 								break
 							}
 						}

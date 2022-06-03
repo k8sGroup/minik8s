@@ -23,6 +23,10 @@ type watchOpt struct {
 	ticket     uint64
 }
 
+type Recover struct {
+	R bool
+}
+
 type Ticket struct {
 	T uint64
 }
@@ -76,6 +80,15 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 	}
 
 	{
+		engine.GET(config.Recover, func(ctx *gin.Context) {
+			r := Recover{
+				R: c.Recover,
+			}
+			d, _ := json.Marshal(r)
+			ctx.Data(http.StatusOK, "application/json", d)
+		})
+	}
+	{
 		engine.GET(config.Path, s.validate, s.get)
 		engine.DELETE(config.Path, s.validate, s.del)
 		engine.PUT(config.Path, s.validate, s.put)
@@ -122,6 +135,11 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 	}
 	{
 		engine.PUT(config.Sidecar, s.addSidecar)
+	}
+	{
+		engine.GET(config.Job2PodPrefix, s.prefixGetJob2Pod)
+		engine.GET(config.Job2Pod, s.getJob2Pod)
+		engine.PUT(config.Job2Pod, s.putJob2Pod)
 	}
 
 	go s.daemon(watcherChan)

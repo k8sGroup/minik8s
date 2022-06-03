@@ -203,6 +203,9 @@ func getHandler(cmd *cobra.Command, args []string) {
 	case "autoscaler":
 		caseAutoscaler(name)
 		return
+	case "job":
+		caseJob(name)
+		return
 	default:
 		fmt.Println("Unknown resource ", args[0])
 	}
@@ -469,5 +472,64 @@ func caseAutoscaler(name string) {
 	fmt.Print(BASHeader())
 	for _, i := range bass {
 		fmt.Print(i.ToString())
+	}
+}
+
+func caseJob(name string) {
+	url := baseUrl + path.Join(config.Job2PodPrefix, name)
+	if name == "" {
+		listRes, err := client.Get(url)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		results := make(map[string]string)
+		var tmp object.Job2Pod
+		for _, res := range listRes {
+			err = json.Unmarshal(res.ValueBytes, &tmp)
+			if err != nil {
+				continue
+			}
+			results[path.Base(res.Key)] = tmp.PodName
+		}
+		fmt.Printf("%-50s\t%-50s\n", "Job", "CommittedBy")
+		for k, v := range results {
+			fmt.Printf("%-50s\t%-50s\n", k, v)
+		}
+	} else {
+		listRes, err := client.Get(url)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		if len(listRes) == 0 {
+			fmt.Println("Job not found")
+		}
+		var tmp object.Job2Pod
+		err = json.Unmarshal(listRes[0].ValueBytes, &tmp)
+		if err != nil {
+			fmt.Println("Job not found")
+			return
+		}
+		fmt.Printf("%-15s%-50s\n%-15s%-50s\n", "Job", path.Base(listRes[0].Key), "CommittedBy", tmp.PodName)
+
+		listRes, err = client.Get(baseUrl + path.Join(config.PodRuntimePrefix, tmp.PodName))
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		if len(listRes) == 0 {
+			fmt.Println("Pod runtime not found.")
+			return
+		}
+		var pod object.Pod
+		err = json.Unmarshal(listRes[0].ValueBytes, &pod)
+		if err != nil {
+			fmt.Println("[error] Cannot get pod IP.")
+			return
+		}
+		fmt.Printf("Pod IP: %s. Check SharedData of the pod's host node to get the output.\nWaiting for remote server to respond, it takes a few time...\n\n", pod.Status.PodIP)
+		data, err := client.RawGet("http://" + pod.Status.PodIP + ":9990")
+		fmt.Println(string(data))
 	}
 }

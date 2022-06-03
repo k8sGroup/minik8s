@@ -110,7 +110,7 @@ func (jc *JobController) putJob(res etcdstore.WatchRes) {
 			Containers: []object.Container{
 				{
 					Name:    "gpuPod",
-					Image:   "chn1234wanghaotian/remote-runner:latest",
+					Image:   "chn1234wanghaotian/remote-runner:6.0",
 					Command: nil,
 					Args: []string{
 						"/root/remote_runner",
@@ -138,7 +138,12 @@ func (jc *JobController) putJob(res etcdstore.WatchRes) {
 		time.Sleep(time.Second * 3)
 		err = client.Put(jc.apiServerBase+config.PodConfigPREFIX+"/"+pod.Name, pod)
 		if err != nil {
-			klog.Errorf("%s\n", err.Error())
+			klog.Errorf("Put job pod config error : %s\n", err.Error())
+			return
+		}
+		err = client.Put(jc.apiServerBase+path.Join(config.Job2PodPrefix, path.Base(res.Key)), object.Job2Pod{PodName: pod.Name})
+		if err != nil {
+			klog.Errorf("Put Job2Pod error : %s\n", err.Error())
 		}
 	}()
 }

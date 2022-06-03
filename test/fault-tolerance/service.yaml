@@ -1,0 +1,12 @@
+kind: Service
+metadata:
+  name: nginx
+spec:
+  type: ClusterIp
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    tag: test
