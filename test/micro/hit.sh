@@ -1,7 +1,7 @@
 rm hit
 touch hit
 
-for ((i=1;i<=50;i++))
+for ((i=1;i<=100;i++))
 do
     curl '17.17.17.17:8080/ping' >> hit
     echo -e '' >> hit

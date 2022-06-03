@@ -1,0 +1,21 @@
+{
+  "kind": "Service",
+  "metadata": {
+    "name": "pongService"
+  },
+  "spec": {
+    "type": "ClusterIp",
+    "clusterIp":"18.18.18.18",
+    "ports": [
+      {
+        "port": "8080",
+        "targetPort": "8080",
+        "protocol": "TCP",
+        "name": "example"
+      }
+    ],
+    "selector": {
+      "key": "pong"
+    }
+  }
+}

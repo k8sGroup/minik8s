@@ -25,6 +25,8 @@ const (
 	Pod                     string = "Pod"
 	Service                 string = "Service"
 	DnsAndTrans             string = "DnsAndTrans"
+	VirtualService          string = "VirtualService"
+	Sidecar                 string = "Sidecar"
 )
 
 var (
@@ -102,6 +104,16 @@ func analyzeFile(path string) {
 		break
 	case DnsAndTrans:
 		if err := CaseDnsAndTrans(file, path, unmarshal); err != nil {
+			return
+		}
+		break
+	case VirtualService:
+		if err := CaseVirtualService(file, path, unmarshal); err != nil {
+			return
+		}
+		break
+	case Sidecar:
+		if err := CaseSidecar(file, path, unmarshal); err != nil {
 			return
 		}
 		break
@@ -231,6 +243,36 @@ func CaseGpuJob(file []byte, path string, unmarshal func([]byte, any) error) err
 		return err
 	}
 	err = client.Put(baseUrl+"/registry/job/default/"+jobKey, gpuJob)
+	if err != nil {
+		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
+		return err
+	}
+	return nil
+}
+
+func CaseVirtualService(file []byte, path string, unmarshal func([]byte, any) error) error {
+	vs := &object.VirtualService{}
+	err := unmarshal(file, vs)
+	if err != nil {
+		fmt.Printf("Error unmarshaling file %s\n", path)
+		return err
+	}
+	err = client.Put(baseUrl+"/registry/virtualSvc/default"+"/"+vs.Name, vs)
+	if err != nil {
+		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
+		return err
+	}
+	return nil
+}
+
+func CaseSidecar(file []byte, path string, unmarshal func([]byte, any) error) error {
+	car := &object.SidecarInject{}
+	err := unmarshal(file, car)
+	if err != nil {
+		fmt.Printf("Error unmarshaling file %s\n", path)
+		return err
+	}
+	err = client.Put(baseUrl+"/registry/virtualSvc/default/sidecar", car)
 	if err != nil {
 		fmt.Printf("Error applying file `file%s`\n.%s\n", path, err.Error())
 		return err

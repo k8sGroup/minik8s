@@ -1,0 +1,30 @@
+{
+  "kind": "Replicaset",
+  "metadata": {
+    "name": "ping"
+  },
+  "spec": {
+    "replicas": 3,
+    "template": {
+      "metadata": {
+        "name": "ping",
+        "labels":{
+          "key": "ping"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "ping",
+            "image": "qianbowen/hello_micro",
+            "ports": [
+              {
+                "containerPort": "8081"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

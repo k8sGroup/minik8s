@@ -1,0 +1,21 @@
+{
+  "kind": "Service",
+  "metadata": {
+    "name": "pingService"
+  },
+  "spec": {
+    "type": "ClusterIp",
+    "clusterIp":"17.17.17.17",
+    "ports": [
+      {
+        "port": "8080",
+        "targetPort": "8080",
+        "protocol": "TCP",
+        "name": "example"
+      }
+    ],
+    "selector": {
+      "key": "ping"
+    }
+  }
+}

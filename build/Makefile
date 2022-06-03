@@ -6,6 +6,7 @@ KUBELET=../cmd/kubelet/kubeletMain.go
 MESH=../cmd/mesh/mesh_proxy.go
 SIDECAR=../cmd/mesh_sidecar/sidecar.go
 SERVICE=../cmd/kube-service/serviceManager.go
+KUBECTL=../cmd/kubectl/kubectl.go
 
 build_windows:
 	go build -o ${BINARY_NAME}/controller.exe ${KUBE_CONTROLLER_MANAGER}
@@ -15,6 +16,7 @@ build_windows:
 	go build -o ${BINARY_NAME}/mesh.exe ${MESH}
 	go build -o ${BINARY_NAME}/service.exe ${SERVICE}
 	go build -o ${BINARY_NAME}/sidecar.exe ${SIDECAR}
+	go build -o ${BINARY_NAME}/kubectl.exe ${KUBECTL}
 
 
 build_linux:
@@ -26,6 +28,7 @@ build_linux:
 	go build -o ${BINARY_NAME}/mesh ${MESH}
 	go build -o ${BINARY_NAME}/service ${SERVICE}
 	go build -o ${BINARY_NAME}/sidecar ${SIDECAR}
+	go build -o ${BINARY_NAME}/kubectl ${KUBECTL}
 
 
 

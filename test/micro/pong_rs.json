@@ -1,0 +1,30 @@
+{
+  "kind": "Replicaset",
+  "metadata": {
+    "name": "pong"
+  },
+  "spec": {
+    "replicas": 3,
+    "template": {
+      "metadata": {
+        "name": "pong",
+        "labels":{
+          "key": "pong"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "pong",
+            "image": "qianbowen/hello_micro",
+            "ports": [
+              {
+                "containerPort": "8081"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
