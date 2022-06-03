@@ -4,6 +4,7 @@ API_SERVER=../cmd/kube-apiserver/apiserver.go
 SCHEDULER=../cmd/kube-scheduler/scheduler.go
 KUBELET=../cmd/kubelet/kubeletMain.go
 MESH=../cmd/mesh/mesh_proxy.go
+SIDECAR=../cmd/mesh_sidecar/sidecar.go
 SERVICE=../cmd/kube-service/serviceManager.go
 
 build_windows:
@@ -13,6 +14,7 @@ build_windows:
 	go build -o ${BINARY_NAME}/kubelet.exe ${KUBELET}
 	go build -o ${BINARY_NAME}/mesh.exe ${MESH}
 	go build -o ${BINARY_NAME}/service.exe ${SERVICE}
+	go build -o ${BINARY_NAME}/sidecar.exe ${SIDECAR}
 
 
 build_linux:
@@ -23,6 +25,7 @@ build_linux:
 	go build -o ${BINARY_NAME}/kubelet ${KUBELET}
 	go build -o ${BINARY_NAME}/mesh ${MESH}
 	go build -o ${BINARY_NAME}/service ${SERVICE}
+	go build -o ${BINARY_NAME}/sidecar ${SIDECAR}
 
 
 

@@ -120,6 +120,9 @@ func NewServer(c *config.ServerConfig) (*Server, error) {
 	{
 		engine.PUT(config.VirtualSvc, s.addVirtualSvc)
 	}
+	{
+		engine.PUT(config.Sidecar, s.addSidecar)
+	}
 
 	go s.daemon(watcherChan)
 

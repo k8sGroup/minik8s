@@ -388,3 +388,15 @@ func (s *Server) addVirtualSvc(ctx *gin.Context) {
 	body, _ = json.Marshal(vs)
 	err = s.store.Put(config.VirtualSvcPrefix+"/"+vs.Name, body)
 }
+
+func (s *Server) addSidecar(ctx *gin.Context) {
+	body, err := ioutil.ReadAll(ctx.Request.Body)
+	vs := object.SidecarInject{}
+	err = json.Unmarshal(body, &vs)
+	if err != nil {
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	body, _ = json.Marshal(vs)
+	err = s.store.Put(config.Sidecar, body)
+}

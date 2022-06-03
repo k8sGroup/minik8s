@@ -92,20 +92,28 @@ func (p *Proxy) handleConn(clientConn *net.TCPConn, direction string) {
 		return
 	}
 
+	//fmt.Printf("[1F]Direc:%v Connected to %v:%v\n", direction, ipv4, port)
+
 	// clusterIP to an endpoint
 	// if ipv4 is not clusterIP, endPoint will still be ipv4
+	//var endpointIP *string
+	//if direction == DirIn {
+	//	ipv4 = "127.0.0.1"
+	//	endpointIP = &ipv4
+	//}
 	endpointIP, err := p.router.GetEndPoint(ipv4, direction)
 	if err != nil || endpointIP == nil {
 		fmt.Printf("[handleConn] no endpoints for %v err:%v", ipv4, endpointIP)
 		return
 	}
 
+	//fmt.Printf("[2]Direc:%v Connected to %v:%v\n", direction, *endpointIP, port)
+
 	directConn, err := dial(*endpointIP, int(port))
 	if err != nil {
 		fmt.Printf("Could not connect, giving up: %v", err)
 		return
 	}
-	//fmt.Printf("Connected to remote end %v %v", clientConn.RemoteAddr(), directConn.RemoteAddr())
 
 	go copy(clientConn, directConn)
 	go copy(directConn, clientConn)

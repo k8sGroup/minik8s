@@ -19,3 +19,11 @@ type PodDestination struct {
 	PodIP  string `json:"podIP" yaml:"podIP"` // host can use regex
 	Weight int32  `json:"weight" yaml:"weight"`
 }
+
+type SidecarInject struct {
+	ObjectMeta `json:"metadata" yaml:"metadata"`
+	Inbound    int  `json:"inbound" yaml:"inbound"`
+	Outbound   int  `json:"outbound" yaml:"outbound"`
+	SysUid     int  `json:"sysUid" yaml:"sysUid"`
+	Status     bool `json:"status" yaml:"status"`
+}

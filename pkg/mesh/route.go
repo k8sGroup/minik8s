@@ -3,6 +3,7 @@ package mesh
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
 	"math/rand"
 	"minik8s/object"
 	"minik8s/pkg/apiserver/config"
@@ -12,8 +13,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 type EndPoint struct {
@@ -45,8 +44,9 @@ func NewRouter(lsConfig *listerwatcher.Config) *Router {
 }
 
 func (d *Router) Run() {
+	rand.Seed(time.Now().Unix())
 	klog.Debugf("[ReplicaSetController]start running\n")
-	//go d.register()
+	go d.register()
 	select {}
 }
 
@@ -129,12 +129,7 @@ func (d *Router) watchVirtualService(res etcdstore.WatchRes) {
 		fmt.Println("[watchVirtualService] Unmarshall fail")
 		return
 	}
-	svcName := vs.Spec.Host
-	clusterIP, ok := d.svcMap[svcName]
-	if !ok {
-		fmt.Printf("[watchVirtualService] service not exist:%v\n", svcName)
-		return
-	}
+	clusterIP := vs.Spec.Host
 
 	pdest := vs.Spec.Route.PDest
 
@@ -146,23 +141,27 @@ func (d *Router) watchVirtualService(res etcdstore.WatchRes) {
 		}
 	}
 
+	endpoints, _ := d.m[clusterIP]
+	fmt.Printf("[watchVirtualService] Update weight:%v\n", endpoints)
 }
 
 func (d *Router) UpsertEndpoints(clusterIP string, podIP string, weight int) {
 
 	endpoints, ok := d.m[clusterIP]
-
 	if !ok {
-		d.m[clusterIP] = []EndPoint{{podIP, weight}}
-	} else {
-		for _, ep := range endpoints {
-			if ep.PodIP == podIP {
-				ep.Weight = weight
-				return
-			}
-		}
-		d.m[clusterIP] = append(d.m[clusterIP], EndPoint{podIP, weight})
+		return
 	}
+
+	newEndPoints := []EndPoint{{podIP, weight}}
+
+	for _, ep := range endpoints {
+		if ep.PodIP == podIP {
+			continue
+		}
+		newEndPoints = append(newEndPoints, ep)
+	}
+
+	d.m[clusterIP] = newEndPoints
 }
 
 func (d *Router) GetEndPoint(clusterIP string, direction string) (podIP *string, err error) {
@@ -181,8 +180,6 @@ func (d *Router) GetEndPoint(clusterIP string, direction string) (podIP *string,
 	for _, ep := range endpoints {
 		sum += ep.Weight
 	}
-
-	rand.Seed(time.Now().Unix())
 
 	if sum == 0 {
 		idx := rand.Intn(len(endpoints))
