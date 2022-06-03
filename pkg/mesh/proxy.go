@@ -6,6 +6,7 @@ import (
 	"minik8s/pkg/listerwatcher"
 	"net"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -91,17 +92,14 @@ func (p *Proxy) handleConn(clientConn *net.TCPConn, direction string) {
 	if err != nil {
 		return
 	}
+	//var b := make([]byte, 1024)
+	//n, err := clientConn.Read(b[:])
+	var url *string
 
-	//fmt.Printf("[1F]Direc:%v Connected to %v:%v\n", direction, ipv4, port)
+	//cpContent := b
+	//url, _, _ = ParseHttp(cpContent, n)
 
-	// clusterIP to an endpoint
-	// if ipv4 is not clusterIP, endPoint will still be ipv4
-	//var endpointIP *string
-	//if direction == DirIn {
-	//	ipv4 = "127.0.0.1"
-	//	endpointIP = &ipv4
-	//}
-	endpointIP, err := p.router.GetEndPoint(ipv4, direction)
+	endpointIP, err := p.router.GetEndPoint(ipv4, direction, url)
 	if err != nil || endpointIP == nil {
 		fmt.Printf("[handleConn] no endpoints for %v err:%v", ipv4, endpointIP)
 		return
@@ -115,8 +113,36 @@ func (p *Proxy) handleConn(clientConn *net.TCPConn, direction string) {
 		return
 	}
 
-	go copy(clientConn, directConn)
+	//_, err = directConn.Write(b[:])
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+
 	go copy(directConn, clientConn)
+	go copy(clientConn, directConn)
+}
+
+func ParseHttp(buf []byte, n int) (url *string, meth *string, isHttp bool) {
+	i := 0
+	var method_bt strings.Builder
+	for i < n && buf[i] != ' ' {
+		method_bt.WriteByte(buf[i])
+		i++
+	}
+	method := method_bt.String()
+
+	for i < n && buf[i] == ' ' {
+		i++
+	}
+
+	var url_bt strings.Builder
+	for i < n && buf[i] != ' ' {
+		url_bt.WriteByte(buf[i])
+		i++
+	}
+	rawUrl := url_bt.String()
+
+	return &rawUrl, &method, true
 }
 
 func getOriginalDst(clientConn *net.TCPConn) (ipv4 string, port uint16, newTCPConn *net.TCPConn, err error) {

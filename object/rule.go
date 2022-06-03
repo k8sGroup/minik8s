@@ -11,13 +11,15 @@ type VirtualServiceSpec struct {
 }
 
 type Route struct {
-	Name  string            `json:"name" yaml:"name"`
-	PDest []*PodDestination `json:"pdest" yaml:"pdest"`
+	Name      string            `json:"name" yaml:"name"`
+	MatchType int               `json:"match_type" yaml:"match_type"` // 0 regex 1 weight
+	PDest     []*PodDestination `json:"pdest" yaml:"pdest"`
 }
 
 type PodDestination struct {
-	PodIP  string `json:"podIP" yaml:"podIP"` // host can use regex
-	Weight int32  `json:"weight" yaml:"weight"`
+	PodIP  string `json:"podIP" yaml:"podIP"`
+	Weight int32  `json:"weight" yaml:"weight"` // match by weight
+	Uri    string `json:"uri" yaml:"uri"`       // match by http request uri
 }
 
 type SidecarInject struct {

@@ -7,14 +7,17 @@
     "hosts": "17.17.17.17",
     "route":{
       "name":"rule1",
+      "match_type": 1,
       "pdest":[
         {
           "podIP":"172.16.24.9",
-          "weight":9000
+          "weight":0,
+          "uri": "/ping"
         },
         {
           "podIP":"172.16.24.10",
-          "weight":9000
+          "weight":0,
+          "uri": "/add*"
         }
       ]
     }
