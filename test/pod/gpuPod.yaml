@@ -1,0 +1,17 @@
+kind: Pod
+metadata:
+  name: gpuPod
+  labels:
+    kind: gpu
+spec:
+  volumes:
+    - name: gpuPath
+      type: hostPath
+      path: D:\QQ\1787759658\FileRecv\job\job
+  containers:
+    - name: gpuPod
+      image: chn1234wanghaotian/remote-runner:1.0
+      args: ["/bin/remote_runner", "stu626", "2#Sp8Ejw", "login.hpc.sjtu.edu.cn", "/home/wang/code/job","/lustre/home/acct-stu/stu626/job2"]
+      volumeMounts:
+        - name: gpuPath
+          mountPath: /home/wang/code/job

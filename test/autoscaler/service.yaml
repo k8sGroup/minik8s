@@ -1,0 +1,12 @@
+kind: Service
+metadata:
+  name: renderService
+spec:
+  type: ClusterIp
+  ports:
+    - port: 10086
+      targetPort: 10086
+      protocol: TCP
+      name: http
+  selector:
+    tag: devourer

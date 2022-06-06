@@ -1,0 +1,13 @@
+kind: Service
+metadata:
+  name: dnsService
+spec:
+  type: ClusterIp
+  clusterIp: 10.10.10.10
+  ports:
+    - port: 53
+      targetPort: 53
+      protocol: UDP
+      name: http
+  selector:
+    function: DNS

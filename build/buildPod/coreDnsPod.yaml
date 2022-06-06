@@ -1,0 +1,20 @@
+kind: Pod
+metadata:
+  name: coreDnsPod
+  labels:
+    function: dns
+spec:
+  volumes:
+    - name: coredns
+      type: hostPath
+      path: /root/coredns
+  containers:
+    - name: coreDns
+      image: coredns/coredns:latest
+      ports:
+        - containerPort: 53
+          protocol: all
+      args: ["-conf", "/etc/coredns/corefile"]
+      volumeMounts:
+        - name: coredns
+          mountPath: /etc/coredns

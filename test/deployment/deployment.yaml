@@ -1,0 +1,22 @@
+kind: Deployment
+metadata:
+  name: nginx-test
+  labels:
+    version: v1
+    key: test
+    type: deployment
+spec:
+  replicas: 3
+  strategy:
+    type: rollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      name: nginx-pod-v1
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+

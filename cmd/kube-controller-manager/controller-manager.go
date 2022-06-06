@@ -1,7 +1,13 @@
 package main
 
-import "fmt"
+import (
+	"minik8s/cmd/kube-controller-manager/app"
+)
 
 func main() {
-	fmt.Println("controller manager.go")
+	command := app.NewControllerManagerCommand()
+	err := command.Execute()
+	if err != nil {
+		panic(err)
+	}
 }

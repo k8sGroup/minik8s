@@ -1,0 +1,18 @@
+kind: Replicaset
+metadata:
+  name: devourers
+spec:
+  replicas: 3
+  template:
+    metadata:
+      name: devourer
+      labels:
+        tag: devourer
+    spec:
+      containers:
+        - name: cpu_devourer
+          image: chn1234wanghaotian/render_with_cmd:latest
+          ports:
+            - containerPort: 10086
+              protocol: tcp
+          args: ["/root/renderWithArgs"]

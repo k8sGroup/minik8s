@@ -1,0 +1,22 @@
+kind: Pod #kind资源 Pod
+metadata:
+  name: example
+  labels:
+    key1: test
+spec: #详细
+  volumes:
+    - name: nginxConfig
+      type: hostFile
+      path: C:\coder\minik8s\test\pod\nginx.conf
+  containers: #容器信息
+    - name: nginx #容器叫nginx
+      image: nginx #使用的镜像
+      ports: #容器开放的端口
+        - containerPort: 80
+      volumeMounts:
+        - name: nginxConfig
+          mountPath: /etc/nginx/nginx.conf
+    - name: ghost
+      image: ghost
+
+

@@ -1,0 +1,17 @@
+kind: HorizontalPodAutoscaler
+metadata:
+  name: devourer_scaler
+spec:
+  scaleTargetRef:
+    kind: Replicaset
+    name: devourers
+  minReplicas: 1
+  maxReplicas: 5
+  scaleInterval: 20
+  metrics:
+    - name: cpu
+      strategy: max
+      percentage: 15
+    - name: memory
+      strategy: average
+      percentage: 50

@@ -1,0 +1,88 @@
+version: '3'
+services:
+  rabbitmq:
+    image: rabbitmq:3.9-management
+    container_name: rabbitmq
+    restart: always
+    hostname: rabbitmq_host
+    privileged: true
+    ports:
+      - "15672:15672"   # web UI 管理接口
+      - "5672:5672"    # 生产者和消费者连接使用的接口
+    volumes:
+      - ./docker/rabbit/data:/var/lib/rabbitmq/mnesia #挂载 RabbitMQ数据
+    environment:
+      - RABBITMQ_DEFAULT_USER=root
+      - RABBITMQ_DEFAULT_PASS=123456
+
+  etcdv2:
+    image: quay.io/coreos/etcd:v3.3.12
+    container_name: etcd-v2
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    environment:
+      ETCDCTL_API: 2
+    volumes:
+      - ./docker/etcdv2:/etcd-data
+    command:
+      - "/usr/local/bin/etcd"
+      - "--name"
+      - "s1"
+      - "--data-dir"
+      - "/etcd-data"
+      - "--advertise-client-urls"
+      - "http://0.0.0.0:2379"
+      - "--listen-client-urls"
+      - "http://0.0.0.0:2379"
+      - "--initial-advertise-peer-urls"
+      - "http://0.0.0.0:2380"
+      - "--listen-peer-urls"
+      - "http://0.0.0.0:2380"
+      - "--initial-cluster-token"
+      - "tkn"
+      - "--initial-cluster"
+      - "s1=http://0.0.0.0:2380"
+      - "--initial-cluster-state"
+      - "new"
+
+  etcdv3:
+    image: quay.io/coreos/etcd:v3.3.12
+    container_name: etcd-v3
+    ports:
+      - "12379:2379"
+      - "12380:2380"
+    environment:
+      ETCDCTL_API: 3
+    volumes:
+      - ./docker/etcdv3:/etcd-data
+    command:
+      - "/usr/local/bin/etcd"
+      - "--name"
+      - "s1"
+      - "--data-dir"
+      - "/etcd-data"
+      - "--advertise-client-urls"
+      - "http://0.0.0.0:2379"
+      - "--listen-client-urls"
+      - "http://0.0.0.0:2379"
+      - "--initial-advertise-peer-urls"
+      - "http://0.0.0.0:2380"
+      - "--listen-peer-urls"
+      - "http://0.0.0.0:2380"
+      - "--initial-cluster-token"
+      - "tkn"
+      - "--initial-cluster"
+      - "s1=http://0.0.0.0:2380"
+      - "--initial-cluster-state"
+      - "new"
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    hostname: prometheus
+    restart: always
+    volumes:
+      - ./build/config/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
