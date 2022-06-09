@@ -1,3 +1,5 @@
+# Deprecated ! Please check env-config.md and flannel-config.md for help!
+
 version: '3'
 services:
   rabbitmq:
